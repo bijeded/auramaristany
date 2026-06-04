@@ -5,5 +5,6 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  // newest supported by stripe@22.x
   apiVersion: "2026-05-27.dahlia",
 });
