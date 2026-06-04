@@ -11,14 +11,22 @@ export function ResetPasswordForm() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     const supabase = createClient();
-    await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password/update`,
     });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
     setSent(true);
   }
 
@@ -65,6 +73,9 @@ export function ResetPasswordForm() {
             required
           />
         </div>
+        {error && (
+          <p className="text-sm font-medium" style={{ color: "var(--error)" }}>{error}</p>
+        )}
         <Button
           type="submit"
           disabled={loading}

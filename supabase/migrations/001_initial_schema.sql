@@ -315,7 +315,12 @@ $$;
 create policy "profiles_select_own_or_admin"
   on profiles for select using (id = auth.uid() or is_admin());
 create policy "profiles_update_own"
-  on profiles for update using (id = auth.uid());
+  on profiles for update
+  using (id = auth.uid())
+  with check (
+    id = auth.uid()
+    and role = (select role from profiles where id = auth.uid())
+  );
 create policy "profiles_admin_insert_update_delete"
   on profiles for all using (is_admin());
 

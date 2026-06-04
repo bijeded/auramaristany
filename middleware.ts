@@ -70,7 +70,18 @@ export async function middleware(request: NextRequest) {
   if (redirectPath) {
     const url = request.nextUrl.clone();
     url.pathname = redirectPath;
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Propagate any refreshed session cookies from Supabase
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        httpOnly: cookie.httpOnly,
+        secure: cookie.secure,
+        sameSite: cookie.sameSite as "lax" | "strict" | "none" | undefined,
+        maxAge: cookie.maxAge,
+        path: cookie.path,
+      });
+    });
+    return redirectResponse;
   }
 
   return supabaseResponse;
