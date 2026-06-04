@@ -33,6 +33,9 @@ export function getRedirectPath(params: RedirectParams): string | null {
   }
 
   if (role === "client" && (pathname.startsWith("/portal") || pathname.startsWith("/onboarding"))) {
+    if (pathname === "/portal/sin-suscripcion") {
+      return null; // Allow access — this is the "no subscription" page itself
+    }
     if (!hasActiveSubscription) {
       return "/portal/sin-suscripcion";
     }

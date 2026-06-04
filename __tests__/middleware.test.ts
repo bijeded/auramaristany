@@ -105,4 +105,16 @@ describe("getRedirectPath", () => {
       })
     ).toBe("/portal/sin-suscripcion");
   });
+
+  it("allows access to /portal/sin-suscripcion even without a subscription (no redirect loop)", () => {
+    expect(
+      getRedirectPath({
+        pathname: "/portal/sin-suscripcion",
+        hasSession: true,
+        role: "client",
+        onboardingCompleted: false,
+        hasActiveSubscription: false,
+      })
+    ).toBeNull();
+  });
 });
