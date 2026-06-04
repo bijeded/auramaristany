@@ -1,6 +1,7 @@
 export type UserRole = "client" | "admin";
 export type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid" | "completed";
 export type BillingModel = "fixed_term_monthly" | "ongoing_monthly";
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type Database = {
   public: {
@@ -128,6 +129,42 @@ export type Database = {
           completed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>;
+      };
+      onboarding_questions: {
+        Row: {
+          id: string;
+          question_text: string;
+          question_type: string;
+          options: Json | null;
+          is_required: boolean;
+          is_active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          question_text: string;
+          question_type: string;
+          options?: Json | null;
+          is_required?: boolean;
+          is_active?: boolean;
+          sort_order?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["onboarding_questions"]["Insert"]>;
+      };
+      onboarding_responses: {
+        Row: {
+          id: string;
+          profile_id: string;
+          responses: Json;
+          completed_at: string;
+          created_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          responses: Json;
+          completed_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["onboarding_responses"]["Insert"]>;
       };
     };
     Views: Record<string, never>;
