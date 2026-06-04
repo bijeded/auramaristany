@@ -1,9 +1,75 @@
 export type UserRole = "client" | "admin";
-export type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid";
+export type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid" | "completed";
+export type BillingModel = "fixed_term_monthly" | "ongoing_monthly";
 
 export type Database = {
   public: {
     Tables: {
+      programs: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string | null;
+          billing_model: BillingModel;
+          duration_months: number | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          slug: string;
+          name: string;
+          description?: string | null;
+          billing_model: BillingModel;
+          duration_months?: number | null;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["programs"]["Insert"]>;
+      };
+      program_variants: {
+        Row: {
+          id: string;
+          program_id: string;
+          slug: string;
+          name: string;
+          level: string | null;
+          price_mxn: number;
+          stripe_price_id: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          program_id: string;
+          slug: string;
+          name: string;
+          level?: string | null;
+          price_mxn: number;
+          stripe_price_id?: string | null;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["program_variants"]["Insert"]>;
+      };
+      program_variant_prerequisites: {
+        Row: {
+          id: string;
+          program_variant_id: string;
+          prerequisite_group: number;
+          required_program_slug: string;
+          required_variant_levels: string[] | null;
+          required_status: string;
+          created_at: string;
+        };
+        Insert: {
+          program_variant_id: string;
+          prerequisite_group: number;
+          required_program_slug: string;
+          required_variant_levels?: string[] | null;
+          required_status: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["program_variant_prerequisites"]["Insert"]>;
+      };
       profiles: {
         Row: {
           id: string;
