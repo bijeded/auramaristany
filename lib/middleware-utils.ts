@@ -32,9 +32,11 @@ export function getRedirectPath(params: RedirectParams): string | null {
     return "/portal/today";
   }
 
-  if (role === "client" && pathname.startsWith("/portal")) {
-    // Fase 1: add subscription check here → redirect to /checkout/[variantSlug]
-    if (hasActiveSubscription && !onboardingCompleted) {
+  if (role === "client" && (pathname.startsWith("/portal") || pathname.startsWith("/onboarding"))) {
+    if (!hasActiveSubscription) {
+      return "/portal/sin-suscripcion";
+    }
+    if (hasActiveSubscription && !onboardingCompleted && pathname.startsWith("/portal")) {
       return "/onboarding/questionnaire";
     }
   }

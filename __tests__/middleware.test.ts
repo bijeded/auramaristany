@@ -81,4 +81,28 @@ describe("getRedirectPath", () => {
       hasActiveSubscription: false,
     })).toBeNull();
   });
+
+  it("redirects client with no subscription on /portal to /portal/sin-suscripcion", () => {
+    expect(
+      getRedirectPath({
+        pathname: "/portal/today",
+        hasSession: true,
+        role: "client",
+        onboardingCompleted: false,
+        hasActiveSubscription: false,
+      })
+    ).toBe("/portal/sin-suscripcion");
+  });
+
+  it("redirects client with no subscription on /onboarding to /portal/sin-suscripcion", () => {
+    expect(
+      getRedirectPath({
+        pathname: "/onboarding/questionnaire",
+        hasSession: true,
+        role: "client",
+        onboardingCompleted: false,
+        hasActiveSubscription: false,
+      })
+    ).toBe("/portal/sin-suscripcion");
+  });
 });
