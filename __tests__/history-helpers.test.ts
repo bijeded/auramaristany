@@ -80,4 +80,23 @@ describe("buildPerformanceSeries", () => {
     ];
     expect(buildPerformanceSeries(logs, meta)[0]?.points ?? []).toEqual([]);
   });
+
+  it("groups by normalized name across different uuids (case/space-insensitive)", () => {
+    // Mismo ejercicio "Sentadilla" con distinto uuid en cada día (Aura no clonó).
+    const nameMeta = new Map<string, ExerciseMeta>([
+      ["uuid-a", { name: "Sentadilla", metrics: ["weight_kg"] }],
+      ["uuid-b", { name: " sentadilla ", metrics: ["reps_done"] }],
+    ]);
+    const logs: LogForPerf[] = [
+      { logDate: "2026-06-01", exercisesDone: { "uuid-a": { completed: true, series: [{ weight_kg: 20 }] } } },
+      { logDate: "2026-06-08", exercisesDone: { "uuid-b": { completed: true, series: [{ reps_done: 12 }] } } },
+    ];
+    const result = buildPerformanceSeries(logs, nameMeta);
+    expect(result).toHaveLength(1);
+    expect(result[0].points.map((p) => p.date)).toEqual(["2026-06-01", "2026-06-08"]);
+    // Métricas unidas de ambos uuids, en orden de aparición.
+    expect(result[0].metrics).toEqual(["weight_kg", "reps_done"]);
+    expect(result[0].points[0].values.weight_kg).toBe(20);
+    expect(result[0].points[1].values.reps_done).toBe(12);
+  });
 });
