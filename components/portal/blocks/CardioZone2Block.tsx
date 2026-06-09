@@ -14,10 +14,10 @@ export function CardioZone2Block() {
       <div className="flex items-center gap-2 mb-3 font-head" style={{ color: "var(--lavanda-dark)" }}>
         <HeartPulse size={18} /> Calculadora Cardio Zona 2
       </div>
-      <label className="block font-body text-sm mb-1">Tu edad (años)</label>
+      <label className="block font-body text-sm mb-1 text-center">Tu edad (años)</label>
       <input type="number" inputMode="numeric" min={18} max={110} value={edad}
         onChange={(e) => setEdad(e.target.value)}
-        className="rounded-lg border px-3 py-2 font-body text-sm w-32"
+        className="rounded-lg border px-3 py-2 font-body text-sm w-32 mx-auto block text-center"
         style={{ borderColor: "var(--gris-linea)" }} />
       {edad !== "" && !valid && (
         <p className="mt-2 font-body" style={{ color: "var(--error)", fontSize: 13 }}>
