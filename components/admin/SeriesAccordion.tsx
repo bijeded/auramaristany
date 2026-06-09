@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers } from "lucide-react";
 import { WeeklyGrid } from "./WeeklyGrid";
 import type { AdminSeries } from "@/lib/admin/queries";
 
@@ -85,10 +85,16 @@ export function SeriesAccordion({ series, programId, programSlug, defaultOpen = 
               <div className="mb-3">
                 <Link
                   href={`/admin/content/${programId}/series/${series.id}/pillars`}
-                  className="font-body text-xs"
-                  style={{ color: "var(--lavanda-dark)" }}
+                  className="inline-flex items-center gap-1.5 font-body rounded-lg px-3 py-1.5"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: "var(--lavanda-soft)",
+                    color: "var(--lavanda-dark)",
+                    border: "1px solid var(--lavanda-soft)",
+                  }}
                 >
-                  Pilares del mes
+                  <Layers size={14} /> Pilares del mes
                 </Link>
               </div>
             )}
