@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import type { AdminDay } from "@/lib/admin/queries";
+import { DayCellMenu } from "./DayCellMenu";
+import { CloneWeekButton } from "./CloneWeekButton";
 
 const WEEKS = [1, 2, 3, 4];
 const DAYS = [
@@ -56,7 +58,10 @@ export function WeeklyGrid({ days, programId, seriesId }: Props) {
                 className="font-body"
                 style={{ padding: "4px 8px 4px 0", fontSize: 11, fontWeight: 600, color: "var(--gris-suave)", whiteSpace: "nowrap", verticalAlign: "middle" }}
               >
-                Sem {week}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                  <span>Sem {week}</span>
+                  <CloneWeekButton seriesId={seriesId} week={week} />
+                </div>
               </td>
               {DAYS.map((d) => {
                 const day = dayMap[week]?.[d.key];
@@ -127,32 +132,37 @@ function GridCell({
   const published = day.published;
 
   return (
-    <Link
-      href={`/admin/content/${programId}/series/${seriesId}/days/${day.id}`}
-      style={{
-        ...baseStyle,
-        background: published ? "var(--lavanda-tint)" : "#f0f0f0",
-        border: `1.5px solid ${published ? "rgba(130,100,180,0.25)" : "var(--gris-linea)"}`,
-        color: published ? "var(--lavanda-dark)" : "var(--gris-texto)",
-      }}
-    >
-      {day.workout_focus ? (
-        <span className="font-body" style={{ fontSize: 10.5, fontWeight: 600, lineHeight: 1.3 }}>
-          {day.workout_focus}
-        </span>
-      ) : (
-        <span className="font-body" style={{ fontSize: 10.5, color: "var(--gris-suave)" }}>
-          {day.title}
-        </span>
-      )}
-      {!published && (
-        <span
-          className="font-body mt-1"
-          style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.04em", color: "var(--gris-suave)", textTransform: "uppercase" }}
-        >
-          borrador
-        </span>
-      )}
-    </Link>
+    <div style={{ position: "relative" }}>
+      <Link
+        href={`/admin/content/${programId}/series/${seriesId}/days/${day.id}`}
+        style={{
+          ...baseStyle,
+          background: published ? "var(--lavanda-tint)" : "#f0f0f0",
+          border: `1.5px solid ${published ? "rgba(130,100,180,0.25)" : "var(--gris-linea)"}`,
+          color: published ? "var(--lavanda-dark)" : "var(--gris-texto)",
+        }}
+      >
+        {day.workout_focus ? (
+          <span className="font-body" style={{ fontSize: 10.5, fontWeight: 600, lineHeight: 1.3 }}>
+            {day.workout_focus}
+          </span>
+        ) : (
+          <span className="font-body" style={{ fontSize: 10.5, color: "var(--gris-suave)" }}>
+            {day.title}
+          </span>
+        )}
+        {!published && (
+          <span
+            className="font-body mt-1"
+            style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.04em", color: "var(--gris-suave)", textTransform: "uppercase" }}
+          >
+            borrador
+          </span>
+        )}
+      </Link>
+      <div style={{ position: "absolute", top: 2, right: 2 }}>
+        <DayCellMenu dayId={day.id} seriesId={seriesId} />
+      </div>
+    </div>
   );
 }
