@@ -332,10 +332,12 @@ CREATE TABLE progress_logs (
   -- { "exercise-uuid": { "completed": true,
   --                      "series": [{ "reps_done": 12, "weight_kg": 15.0 }, ...] } }
   -- (N objetos en series = N sets; campos null si no se llenaron)
-  general_notes TEXT,
+  notes TEXT,                 -- ⚠ la columna se llama 'notes' (no 'general_notes').
+                              -- El código lo expone como general_notes vía alias en el SELECT
+                              -- (general_notes:notes) y escribe en 'notes' en el upsert.
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(profile_id, program_day_id, log_date)
+  UNIQUE(profile_id, program_day_id) -- 1 registro por (clienta, día); el upsert usa este onConflict
 );
 
 CREATE TABLE body_metrics (

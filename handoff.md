@@ -261,9 +261,22 @@ Middleware (orden):
 /components/admin/SeriesAccordion.tsx — acordeón por serie con WeeklyGrid integrado
 /app/admin/content/page.tsx         — lista de programas (CMS overview)
 /app/admin/content/[programId]/page.tsx — series de un programa
--- PENDIENTE Subsistema E:
-/components/admin/DayEditor.tsx     — editor CMS de Aura (aún no creado)
-/app/admin/content/[programId]/series/[seriesId]/days/[dayId]/page.tsx
+-- Subsistema E/F (COMPLETADOS):
+/components/admin/DayEditorForm.tsx — editor de día (metadata + bloques dnd)
+/components/admin/BlockListEditor.tsx — lista de bloques arrastrables (compartido día/pilar)
+/components/admin/blocks/*          — 6 editores de bloque (incl. CardioZone2)
+/components/admin/PillarEditorForm.tsx — editor de pilar (reusa BlockListEditor)
+/components/admin/DayCellMenu.tsx + CloneWeekButton.tsx — clonar/eliminar en la grilla
+/lib/admin/dayActions.ts            — saveDay/saveBlocks/cloneDay/cloneWeek/deleteDay
+/lib/admin/pillarActions.ts         — savePillar/savePillarBlocks
+/lib/content/pillars.ts             — getCurrentMonthPillars (gate CuarentaMás/Extra)
+/lib/content/cardio.ts              — cardioZone2(edad)
+/app/api/admin/upload/route.ts      — upload a Supabase Storage (bucket 'content')
+/components/portal/PortalHeader.tsx — header AURA+fecha (today + pilares)
+/components/portal/PillarsView.tsx + /app/portal/pilares — sección de pilares
+/app/admin/content/[programId]/series/[seriesId]/days/{new,[dayId]}/page.tsx
+/app/admin/content/[programId]/series/[seriesId]/pillars/{,[pillarKey]}/page.tsx
+/supabase/migrations/004_editor_pilares.sql — day_type, cardio_zone2, tablas de pilares, bucket
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
