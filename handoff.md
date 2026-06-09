@@ -184,8 +184,9 @@ variant_series_map     — mapeo N:N variante↔serie (permite reutilizar conten
 subscriptions          — suscripción activa de cada clienta, months_elapsed aquí
 subscription_events    — auditoría de todos los webhooks de Stripe
 progress_logs          — registro diario: program_day_id + exercises_done JSONB
-body_metrics           — peso/cintura/cadera (opcionales, por fecha)
-progress_photos        — fotos de progreso vinculadas a body_metrics
+body_metrics           — peso/cintura/cadera (definido en schema; NO se captura en Fase 3)
+progress_photos        — fotos de progreso (storage_path, taken_at, caption). Columna 'angle'
+                         existe pero SIN uso; body_metrics_id queda null (fotos independientes)
 messages               — mensajes Aura→clientas (individual o broadcast)
 message_recipients     — destinatarios + read_at
 invoices               — historial de pagos (fuente del dashboard financiero)
@@ -215,10 +216,12 @@ exercise_list block JSONB estructura:
 
 /portal                          — guard: suscripción activa + onboarding=true
   /today                         — contenido del día + registro integrado
-  /history                       — desempeño, fotos, historial de días
+  /pilares                       — pilares mensuales (gate CuarentaMás/Extra)
+  /history                       — "Mi Progreso": tabs Desempeño + Fotos (Fase 3)
   /history/[logId]               — día pasado en modo lectura
-  /messages                      — solo lectura (Aura → clienta)
-  /settings                      — perfil + Stripe Customer Portal
+  /messages                      — solo lectura (Aura → clienta)  [Fase 4]
+  /settings                      — perfil + Stripe Customer Portal  [pendiente]
+  /activando · /sin-suscripcion  — polling post-pago / acceso denegado
 
 /admin                           — guard: role='admin'
   /dashboard                     — MRR, clientes activas, ingresos
@@ -234,7 +237,10 @@ exercise_list block JSONB estructura:
   /webhooks/stripe
   /subscriptions/create-checkout
   /subscriptions/customer-portal
-  /admin/upload
+  /admin/upload                  — upload admin a bucket público 'content'
+  /portal/progress               — upsert del registro del día (auto-guardado)
+  /portal/photos                 — POST subir foto (bucket privado 'progress')
+  /portal/photos/[id]            — DELETE borrar foto propia
 
 Middleware (orden):
   1. No autenticado → /auth/login
@@ -277,6 +283,23 @@ Middleware (orden):
 /app/admin/content/[programId]/series/[seriesId]/days/{new,[dayId]}/page.tsx
 /app/admin/content/[programId]/series/[seriesId]/pillars/{,[pillarKey]}/page.tsx
 /supabase/migrations/004_editor_pilares.sql — day_type, cardio_zone2, tablas de pilares, bucket
+-- Fase 3 — Historial (COMPLETADA):
+/lib/content/history.ts             — getHistoryList/getPerformanceData/getHistoryLog (server-only)
+/lib/content/history-helpers.ts     — funciones puras (countCompleted, countExercisesInBlocks,
+                                       aggregateDayValue, buildPerformanceSeries) — agrupa por NOMBRE
+/lib/portal/photo-validation.ts     — validatePhotoUpload + computeResizedDimensions (puro). MAX_PHOTOS=250, 5MB, 1280px
+/lib/portal/photo-compress.ts       — compressImage (canvas, cliente): reescala 1280px + JPEG 0.82
+/app/api/portal/photos/route.ts     — POST upload (bucket privado 'progress', prefijo {userId}/)
+/app/api/portal/photos/[id]/route.ts — DELETE (valida dueña + borra Storage y fila)
+/app/portal/history/page.tsx        — server: carga lista+desempeño+fotos (signed URLs 1h), monta ProgressView
+/app/portal/history/[logId]/page.tsx — server: detalle read-only (getHistoryLog, notFound si no es suya)
+/components/portal/ProgressView.tsx  — tabs Desempeño | Fotos (cliente)
+/components/portal/PerformanceTab.tsx + PerformanceChart.tsx — pills de ejercicio + Recharts + lista "Historial de ejercicios"
+/components/portal/PhotosTab.tsx     — grid 3col + filtro por mes + subir(comentario)/visor/borrar + badge [N/250]
+/components/portal/HistoryDayView.tsx — render read-only del día (badge 📅, sin guardar)
+/components/portal/blocks/ExerciseListLogged.tsx — ejercicios con valores registrados por serie
+/components/portal/blocks/BlockView.tsx — +prop loggedExercises (dispatch a ExerciseListLogged)
+/supabase/migrations/005_progress_photos.sql — bucket privado 'progress' + RLS storage + columna caption (APLICADA)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -351,7 +374,7 @@ COMPLETADO:
     - Usuarios autenticados sin fila en profiles ahora bloqueados en middleware
     Plan detallado: docs/superpowers/plans/2026-06-04-fase-1-subscripcion-mvp.md
 
-  ◑ FASE 2 — CONTENIDO (en progreso — iniciada 5 de junio de 2026)
+  ✓ FASE 2 — CONTENIDO (COMPLETADA y mergeada a main, merge cc33f89)
 
     ✓ Subsistema A — /portal/today funcional:
       ✓ Vista real del día con contenido desde DB (5 tipos de bloques)
@@ -430,12 +453,12 @@ COMPLETADO:
         (1280px, JPEG), visor con navegación + borrar. SIN métricas corporales.
     ✓ /portal/history/[logId]: detalle read-only (reusa BlockView con prop
       loggedExercises; ExerciseListLogged muestra valores por serie). Badge 📅.
-    ✓ Límites de fotos: 5MB/archivo, máx 30, reducción a 1280px (validación pura).
+    ✓ Límites de fotos: 5MB/archivo, máx 250 (badge [N/250]), reducción a 1280px.
     ✓ lib/content/history.ts (getHistoryList/getPerformanceData/getHistoryLog) +
       history-helpers.ts (puras, TDD). Endpoints propios del cliente:
       POST/DELETE /api/portal/photos.
     ✓ Migración 005_progress_photos.sql: bucket privado + RLS de Storage por
-      prefijo {profile_id}/ + columna caption. ⚠ APLICAR MANUALMENTE en Supabase.
+      prefijo {profile_id}/ + columna caption. APLICADA en Supabase (ver abajo).
     ✓ Gates: vitest 85/85, tsc limpio, lint limpio, build OK.
     Decisiones (P3): registro pasado es SOLO LECTURA (no editable).
     Bug corregido en review final: la columna real de progress_photos es
@@ -459,8 +482,9 @@ COMPLETADO:
     notas de admin sobre el registro del día (diferido, evaluar en Fase 4).
 
 PENDIENTE:
-  ○ Configurar Vercel + variables de entorno de producción
-  ○ Aplicar migración 005_progress_photos.sql en el dashboard de Supabase
+  ○ Configurar Vercel + variables de entorno de producción (deploy)
+  ○ Siguiente fase de desarrollo: FASE 4 — Mensajería (Aura ↔ clientas).
+    Bloque de arranque: docs/superpowers/context/2026-06-09-fase-4-mensajeria.md
   ○ Follow-ups menores (no bloquean): try/catch en stripe.subscriptions.retrieve;
     unificar formatDate duplicado; alinear SPEC/types.ts (dicen general_notes) con la
     columna real 'notes'; saveBlocks/savePillarBlocks no transaccionales; tests de
@@ -474,13 +498,13 @@ PENDIENTE:
 
 Fase 0 — Fundación         (sem 1-2)   Next.js + Supabase + Stripe test + Vercel  ✓ COMPLETADA
 Fase 1 — Suscripción MVP   (sem 3-5)   Quiz→pago→onboarding→portal básico          ✓ COMPLETADA
-Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + progreso  ◑ EN PROGRESO
+Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + progreso  ✓ COMPLETADA
   ✓ Sub A: portal/today funcional     ✓ Sub B: UI/UX portal
   ✓ Sub C: Admin layout + sidebar     ✓ Sub D: CMS overview + grilla semanal
   ✓ Sub E: Editor de día             ✓ Sub F: Gestión de días + Pilares
   ✓ Ronda de ajustes post-smoke (rediseño editor + fixes) — FASE 2 COMPLETADA
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días  ✓ COMPLETADA
-Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas
+Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas                    ← SIGUIENTE
 Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos
 Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción
 
@@ -533,8 +557,8 @@ P2: ¿Qué pasa en semanas 5 de un mes? (ver Limitaciones arriba)
               c) Aura crea contenido para semana 5 opcional en el CMS
 
 P3: ¿La clienta puede EDITAR un registro pasado desde /portal/history/[logId]?
-    Hoy definido como solo lectura. Decisión pendiente si se quiere permitir
-    correcciones posteriores.
+    RESUELTO (Fase 3): el detalle es SOLO LECTURA. No se permite editar registros
+    pasados. Si se quisiera, sería una decisión/feature posterior.
 
 P4: ¿Cuáles son las preguntas del onboarding que Aura quiere hacer?
     RESUELTO TEMPORALMENTE: Se sembraron 3 preguntas de prueba en la
@@ -570,6 +594,9 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Para continuar: revisar los JSX del diseño en design-handoff-aura/prototype/
-y comenzar con Fase 2 (CMS grilla semanal + portal del día + progreso).
+Estado: Fases 0–3 COMPLETAS y en main; migración 005 aplicada; smoke OK.
+Para continuar: leer docs/superpowers/context/2026-06-09-fase-4-mensajeria.md
+y arrancar Fase 4 (Mensajería Aura↔clientas) con brainstorm → plan → ejecución.
+Prototipos UI de referencia: design-handoff-aura/prototype/aura/ (client-messages.jsx,
+admin-messages.jsx).
 ════════════════════════════════════════════════════════════════

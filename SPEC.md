@@ -355,10 +355,11 @@ CREATE TABLE body_metrics (
 CREATE TABLE progress_photos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id),
-  body_metrics_id UUID REFERENCES body_metrics(id),
-  storage_path TEXT NOT NULL,
-  photo_date DATE NOT NULL,
-  angle TEXT,                  -- 'front' | 'side' | 'back'
+  body_metrics_id UUID REFERENCES body_metrics(id), -- queda NULL (no se capturan métricas)
+  storage_path TEXT NOT NULL,  -- bucket privado 'progress', prefijo {profile_id}/
+  taken_at DATE NOT NULL DEFAULT CURRENT_DATE, -- ⚠ la columna real es 'taken_at' (no 'photo_date')
+  caption TEXT,                -- comentario opcional de la clienta (migración 005)
+  -- angle TEXT existía en el plan original pero NO está en la tabla real; sin uso.
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -418,12 +419,13 @@ CREATE TABLE invoices (
 
   /portal                         ← guard: suscripción activa + onboarding_completed=true
     /today                        ← contenido del día + progreso integrado (1 sola pantalla)
+    /pilares                      ← pilares mensuales (gate CuarentaMás/Extra)
     /activando                    ← polling post-pago: espera webhook de Stripe antes de redirigir
     /sin-suscripcion              ← página de aterrizaje cuando no hay suscripción activa
-    /history                      ← desempeño (reps/peso), galería de fotos, historial de días
+    /history                      ← "Mi Progreso": tabs Desempeño (Recharts) + Fotos
     /history/[logId]              ← detalle de un día anterior: contenido + registro guardado (lectura)
-    /messages
-    /settings
+    /messages                     ← (Fase 4)
+    /settings                     ← (pendiente)
 
   /admin                          ← guard: role='admin'
     /dashboard
@@ -436,7 +438,10 @@ CREATE TABLE invoices (
     /webhooks/stripe
     /subscriptions/create-checkout
     /subscriptions/customer-portal
-    /admin/upload
+    /admin/upload                 ← upload admin a bucket público 'content'
+    /portal/progress              ← upsert del registro del día (auto-guardado)
+    /portal/photos                ← POST subir foto (bucket privado 'progress')
+    /portal/photos/[id]           ← DELETE borrar foto propia
 ```
 
 ### Lógica de middleware (en orden)
@@ -502,35 +507,33 @@ Si no existe fila para ese `(week_number, day_of_week)` → mostrar card de desc
 
 ---
 
-## Historial de Días Anteriores (`/portal/history`)
+## Historial / Mi Progreso (`/portal/history`)
 
-La clienta puede revisar cualquier día pasado para ver el contenido que hizo y lo que registró.
+> **Implementado en Fase 3 (v1.3).** La pantalla sigue el prototipo `client-progress.jsx`: **2 tabs (Desempeño · Fotos)**, no los 3 tabs que describía la v1.1. Las **métricas corporales** (peso/cintura/cadera) NO se piden ni registran; `body_metrics` queda sin captura. Detalle de día = **solo lectura** (resuelve P3).
 
-### Tab "Historial" en `/portal/history`
+La clienta puede ver su desempeño a lo largo del mes, revisar días pasados con su registro, y subir fotos de progreso privadas.
 
-Lista cronológica (más reciente primero) de todos los días con `progress_log` registrado:
+### Tab "Desempeño"
 
-```
-Miércoles 3 jun · Tren Inferior    ████ 5/5 ejercicios  →
-Lunes 1 jun     · Tren Superior    ███░ 4/5 ejercicios  →
-Viernes 30 may  · Full Body        ████ 5/5 ejercicios  →
-Miércoles 28 may· Tren Inferior    ████ 5/5 ejercicios  →
-```
+- **Gráficas (Recharts)** de las métricas de ejercicio (peso/reps/otras) **del mes corriente** (`log_date >= current_period_start`). Selector de ejercicio (pills) + **toggle de métrica dinámico** según el array `metrics` del ejercicio. **Sin** selector de periodo y **sin** stat cards.
+- **Relación de ejercicios: por NOMBRE normalizado** (no por uuid), para conectar el mismo ejercicio a lo largo de los días aunque Aura cree cada día desde cero. Agregación por día: **peso = promedio de las series**, **reps = suma**.
+- Debajo: lista **"Historial de ejercicios"** — cronológica (reciente primero) de los días con `progress_log`. Cada fila: fecha, título, `workout_focus` como tag, y `N/M` ejercicios completados. Click → `/portal/history/[logId]`.
 
-Cada fila muestra: fecha, título del día, `workout_focus` como tag, y cuántos ejercicios completó. Al tocar una fila → navega a `/portal/history/[logId]`.
+### Tab "Fotos"
+
+- Galería en **bucket privado de Storage (`progress`)** servida con **signed URLs** (TTL 1h). Grid de 3 columnas con **filtro por mes**.
+- Subir foto: archivo/cámara + **comentario opcional** (no editable); fecha = hoy. **Compresión en cliente** a 1280px (lado mayor) + JPEG antes de subir. Límites: **5MB/archivo**, **máx 250 fotos** por clienta (badge `[N/250]`).
+- Visor (lightbox) con navegación y **borrar** (solo la dueña; admin puede por RLS, sin UI aún).
 
 ### Vista de Detalle (`/portal/history/[logId]`)
 
-Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura**:
-- Todos los bloques de contenido (texto, video, PDF, imagen) visibles normalmente
-- Lista de ejercicios muestra los valores que la clienta registró (reps, peso, notas) pre-cargados y **no editables**
+Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura** (reusa `BlockView` con la prop `loggedExercises`):
+- Todos los bloques de contenido (texto, video, PDF, imagen, cardio_zone2) visibles normalmente
+- Lista de ejercicios muestra los valores que la clienta registró (reps, peso por serie) pre-cargados y **no editables** (`ExerciseListLogged`), con ✓ si se marcó completo
 - Notas generales del día visibles
-- Badge "📅 Lunes 1 de junio" en el encabezado (en lugar de "HOY")
+- Badge "📅 {fecha del log}" en el encabezado (en lugar de "HOY")
 - Sin botón de guardar
-
-**Acceso permitido a días pasados:**
-- Cualquier día con `log_date < today` cuyo `program_day` esté dentro de las semanas ya transcurridas
-- El contenido del programa se sigue mostrando aunque la clienta no haya registrado progreso ese día (puede haber entrado a ver y no guardado — se muestra el contenido pero vacíos los campos de registro)
+- Validación de pertenencia: el `logId` debe ser de la clienta autenticada (si no, 404)
 
 ---
 
@@ -668,3 +671,5 @@ NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
 *Spec generado el 3 de junio de 2026 · Versión 1.1 — Cambios: modelo semanal (week_number + day_of_week) en program_days; historial de días anteriores en /portal/history*
 
 *Versión 1.2 (9 de junio de 2026) — Cambios tras smoke de Fase 2: se elimina el selector de tipo de día (todos son "Actividad Física"; el Enfoque/`workout_focus` describe la actividad y los días de descanso llevan contenido); nuevo block type `cardio_zone2` (calculadora); tablas de pilares mensuales (`program_series_pillars`, `program_pillar_blocks`) + sección `/portal/pilares` para CuarentaMás/Extra. Pendiente ronda de ajustes de UI del editor (acercar al prototipo design-handoff).*
+
+*Versión 1.3 (9 de junio de 2026) — Fase 3 (Historial) completada y mergeada a main. `/portal/history` con **2 tabs (Desempeño · Fotos)** según prototipo (no 3); **sin métricas corporales** (`body_metrics` sin captura); gráficas Recharts del **mes corriente** con relación de ejercicios **por nombre** (no uuid); detalle `/portal/history/[logId]` **solo lectura** (resuelve P3). Fotos en **bucket privado `progress`** con signed URLs, comentario opcional, compresión cliente 1280px, límites 5MB/**250 fotos** (badge `[N/250]`). Migración `005_progress_photos.sql` aplicada: bucket privado + RLS de storage + columna `caption`. Corrección de esquema: la columna real de `progress_photos` es **`taken_at`** (no `photo_date`) y **no** existe `angle`. Follow-ups: regenerar `lib/supabase/types.ts` (incluir `progress_photos`/`body_metrics`), UI admin para borrar fotos, notas de admin sobre el registro (diferido a Fase 4).*
