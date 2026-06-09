@@ -41,11 +41,13 @@ export default function ActivandoPage() {
 
       if (sub) {
         clearInterval(interval);
-        const { data: profile } = await supabase
+        const { data: rawProfile } = await supabase
           .from("profiles")
           .select("onboarding_completed")
           .eq("id", user.id)
           .single();
+
+        const profile = rawProfile as unknown as { onboarding_completed: boolean } | null;
 
         router.replace(
           profile?.onboarding_completed ? "/portal/today" : "/onboarding/questionnaire"

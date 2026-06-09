@@ -59,7 +59,12 @@ export async function POST(request: NextRequest) {
       .eq("profile_id", user.id)
       .in("status", ["active", "completed"]);
 
-    const mapped: ClientSubscription[] = (clientSubs ?? []).map((s: any) => ({
+    const clientSubsTyped =
+      (clientSubs as unknown as {
+        status: string;
+        program_variants?: { level: string | null; programs?: { slug: string } | null } | null;
+      }[]) ?? [];
+    const mapped: ClientSubscription[] = clientSubsTyped.map((s) => ({
       program_slug: s.program_variants?.programs?.slug ?? "",
       variant_level: s.program_variants?.level ?? null,
       status: s.status,
@@ -91,8 +96,13 @@ export async function POST(request: NextRequest) {
       metadata: { supabase_user_id: user.id },
     });
     customerId = customer.id;
-    await (service
-      .from("profiles") as any)
+    await (
+      service.from("profiles") as unknown as {
+        update: (values: { stripe_customer_id: string }) => {
+          eq: (column: string, value: string) => Promise<unknown>;
+        };
+      }
+    )
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
   }

@@ -80,6 +80,12 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
 
   return pillars.map((p) => ({
     ...p,
-    blocks: blocks.filter((b) => b.pillar_id === p.id).map(({ pillar_id: _pid, ...rest }) => rest),
+    blocks: blocks
+      .filter((b) => b.pillar_id === p.id)
+      .map((b) => {
+        const { pillar_id, ...rest } = b;
+        void pillar_id;
+        return rest;
+      }),
   }));
 }
