@@ -134,3 +134,52 @@ export async function getDayWithBlocks(dayId: string): Promise<DayWithBlocks | n
 
   return { ...day, blocks: (rawBlocks as unknown as BlockData[]) ?? [] };
 }
+
+export const PILLARS = [
+  { key: "alimentacion", name: "Alimentación con intención" },
+  { key: "autoconocimiento", name: "Autoconocimiento" },
+  { key: "estres_sueno", name: "Manejo de estrés, descanso y sueño" },
+  { key: "respiraciones", name: "Respiraciones y suelo pélvico" },
+] as const;
+
+export interface PillarRow {
+  pillar_key: string;
+  name: string;
+  id: string | null;
+  title: string | null;
+  published: boolean;
+}
+
+export async function getSeriesPillars(seriesId: string): Promise<PillarRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("program_series_pillars")
+    .select("id, pillar_key, title, published")
+    .eq("series_id", seriesId);
+  const existing = (data as unknown as { id: string; pillar_key: string; title: string; published: boolean }[]) ?? [];
+  return PILLARS.map((p) => {
+    const row = existing.find((e) => e.pillar_key === p.key);
+    return { pillar_key: p.key, name: p.name, id: row?.id ?? null, title: row?.title ?? null, published: row?.published ?? false };
+  });
+}
+
+export async function getPillarWithBlocks(seriesId: string, pillarKey: string): Promise<{
+  id: string | null; pillar_key: string; title: string; published: boolean; blocks: BlockData[];
+}> {
+  const supabase = await createClient();
+  const { data: rawPillar } = await supabase
+    .from("program_series_pillars")
+    .select("id, pillar_key, title, published")
+    .eq("series_id", seriesId).eq("pillar_key", pillarKey).maybeSingle();
+
+  const pillar = rawPillar as unknown as { id: string; pillar_key: string; title: string; published: boolean } | null;
+  const name = PILLARS.find((p) => p.key === pillarKey)?.name ?? pillarKey;
+  if (!pillar) return { id: null, pillar_key: pillarKey, title: name, published: false, blocks: [] };
+
+  const { data: rawBlocks } = await supabase
+    .from("program_pillar_blocks")
+    .select("id, block_type, sort_order, content")
+    .eq("pillar_id", pillar.id).order("sort_order");
+
+  return { ...pillar, blocks: (rawBlocks as unknown as BlockData[]) ?? [] };
+}
