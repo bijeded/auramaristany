@@ -373,17 +373,33 @@ COMPLETADO:
         WHERE id = '00000000-0000-0000-0003-000000000001';
         (El seed ya tiene el título correcto para futuras instalaciones)
 
-    ○ Subsistema E — Editor de día (PENDIENTE — próximo paso):
-      Ruta edit:   /admin/content/[programId]/series/[seriesId]/days/[dayId]
-      Ruta create: /admin/content/[programId]/series/[seriesId]/days/new
-      Ver bloque de contexto: docs/superpowers/context/subsistema-e-editor-dia.md
+    ✓ Subsistema E — Editor de día (implementado, rama feature/fase-2-editor-pilares):
+      ✓ DayEditorForm (metadata + bloques arrastrables dnd-kit), 6 block editors
+        (texto Tiptap, youtube, pdf, imagen, lista de ejercicios, cardio_zone2)
+      ✓ /api/admin/upload (Storage, bucket 'content', admin-gated)
+      ✓ Rutas new/[dayId]; getDayWithBlocks; saveDay/saveBlocks
+      ✓ Portal: bloque cardio_zone2, día de descanso editable, badges
+      ✓ Migración 004 aplicada (day_type, cardio_zone2, tablas de pilares, bucket)
+
+    ✓ Subsistema F — Gestión + Pilares (implementado, misma rama):
+      ✓ cloneDay/cloneWeek/deleteDay + acciones en la grilla
+      ✓ Pilares mensuales: editor admin (reusa BlockListEditor) + /portal/pilares
+        (gated a CuarentaMás/Extra, mes actual)
+      ✓ Gates verdes: vitest 64/64, tsc limpio, npm run build OK
+      ✓ Fix pre-existente de activando TypeScript resuelto (+ 2 bloqueos de build de main)
+
+    ◑ Ronda de ajustes post-smoke (PENDIENTE — siguiente paso, misma rama):
+      Smoke test del 9-jun arrojó feedback. Decisiones tomadas (D1-D4) y lista de
+      correcciones en: docs/superpowers/context/2026-06-09-ajustes-post-smoke-editor-portal.md
+      Lo principal: rediseñar el editor acercándolo al prototipo; quitar selector de
+      tipo de día (todo "Actividad Física" + Enfoque); fixes de bloques (texto H3/H4+OL,
+      preview de imagen, labels de ejercicios); fondo blanco en /today; validación de
+      la calculadora (18-110). Aún NO mergeado a main.
 
 PENDIENTE:
-  ○ Subsistema E: editor de día (formulario metadata + bloques arrastrables)
-  ○ /api/admin/upload — endpoint para subir PDF/imagen a Supabase Storage
+  ○ Ronda de ajustes post-smoke (ver bloque de contexto del 9-jun)
+  ○ Merge de feature/fase-2-editor-pilares a main tras los ajustes + re-smoke
   ○ Configurar Vercel + variables de entorno de producción
-  ○ Fix pre-existente: app/portal/activando/page.tsx TypeScript error
-    (Property 'onboarding_completed' on type 'never')
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 11. FASES DE DESARROLLO
@@ -394,7 +410,8 @@ Fase 1 — Suscripción MVP   (sem 3-5)   Quiz→pago→onboarding→portal bás
 Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + progreso  ◑ EN PROGRESO
   ✓ Sub A: portal/today funcional     ✓ Sub B: UI/UX portal
   ✓ Sub C: Admin layout + sidebar     ✓ Sub D: CMS overview + grilla semanal
-  ○ Sub E: Editor de día (siguiente)
+  ✓ Sub E: Editor de día             ✓ Sub F: Gestión de días + Pilares
+  ◑ Ronda de ajustes post-smoke (rediseño editor + fixes) en rama feature/fase-2-editor-pilares
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días
 Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas
 Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos
@@ -421,10 +438,18 @@ PREREQUISITOS: La validación de prerequisitos (ej. verificar que CuarentaMás
 esté completado antes de permitir checkout de Extra) ocurre en el servidor
 al crear la Stripe Checkout Session. No se expone esta lógica al cliente.
 
-MODELO SEMANAL — MESES DE 5 SEMANAS: El modelo actual asume 4 semanas por
-mes. Si un período de pago cae en un mes con 5 lunes (por ejemplo), la
-semana 5 no tiene contenido definido en la tabla. Decisión pendiente:
-¿mostrar descanso, repetir semana 4, o agregar semana 5 al CMS?
+MODELO SEMANAL — MESES DE 5 SEMANAS: RESUELTO. La semana calculada se clampa
+a 4 (getCurrentDayKey en lib/content/access.ts), así la semana 5 reutiliza el
+contenido de la semana 4. El límite con el mes siguiente lo da el período de
+Stripe (invoice.paid → nuevo current_period_start).
+
+STRIPE CLI EN LOCAL (setup obligatorio para probar checkout): el flujo de pago
+necesita el reenvío de webhooks corriendo en una terminal aparte:
+  stripe listen --forward-to localhost:3000/api/webhooks/stripe
+El comando imprime un signing secret (whsec_...) que debe coincidir con
+STRIPE_WEBHOOK_SECRET en .env.local. Sin esto, checkout.session.completed nunca
+llega, la suscripción no se crea, y /portal/activando hace timeout con "Algo
+tardó más de lo esperado". NO es bug de código. Aplica incluso en test mode.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 13. PREGUNTAS PENDIENTES (sin resolver)

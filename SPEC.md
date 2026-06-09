@@ -213,11 +213,14 @@ CREATE TABLE program_days (
   week_number  INT  NOT NULL,  -- 1, 2, 3 o 4 (semana dentro del mes)
   day_of_week  TEXT NOT NULL,  -- 'lunes' | 'martes' | 'miercoles' | 'jueves'
                                -- | 'viernes' | 'sabado' | 'domingo'
-  workout_focus TEXT,          -- 'Tren Inferior', 'Tren Superior', 'Full Body', etc.
-                               -- NULL indica día de descanso (sin bloques de contenido)
+  workout_focus TEXT,          -- "Enfoque": descriptor libre de la actividad
+                               -- ('Tren Inferior', 'Protocolo Cardiovascular', 'Descanso', etc.)
   title TEXT NOT NULL,
   description TEXT,
-  day_type TEXT DEFAULT 'workout', -- 'workout' | 'rest' | 'assessment'
+  day_type TEXT DEFAULT 'workout', -- (v1.2: en desuso) El editor ya no expone selector de tipo.
+                               -- Todos los días son "Actividad Física"; el descriptor es workout_focus.
+                               -- Día de descanso = Aura crea un día con contenido de descanso.
+                               -- La card genérica de descanso solo aparece si NO existe fila para hoy.
   duration_minutes INT,
   published BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -240,7 +243,7 @@ CREATE TABLE program_days (
 CREATE TABLE program_day_blocks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   day_id UUID REFERENCES program_days(id),
-  block_type TEXT NOT NULL,    -- 'text' | 'youtube' | 'pdf' | 'image' | 'exercise_list'
+  block_type TEXT NOT NULL,    -- 'text' | 'youtube' | 'pdf' | 'image' | 'exercise_list' | 'cardio_zone2'
   sort_order INT NOT NULL,
   content JSONB NOT NULL,
   -- text:          { "html": "..." }
@@ -250,6 +253,8 @@ CREATE TABLE program_day_blocks (
   -- exercise_list: { "exercises": [{ "id": "uuid", "name": "...", "sets": 3,
   --                  "reps": "12", "rest_seconds": 60, "notes": "...",
   --                  "metrics": ["reps_done", "weight_kg"] }] }
+  -- cardio_zone2:  {}  -- calculadora fija; la clienta ingresa su edad en el portal
+  --                    -- y ve su rango Zona 2 = (220-edad)*0.60 a (220-edad)*0.70
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -260,6 +265,32 @@ CREATE TABLE variant_series_map (
   series_id UUID REFERENCES program_series(id),
   PRIMARY KEY (program_variant_id, series_id)
 );
+
+-- PILARES MENSUALES (solo CuarentaMás/Extra; cambian por mes/serie, no por día)
+-- Contenido paralelo a la actividad física: Alimentación con intención,
+-- Autoconocimiento, Manejo de estrés/descanso/sueño, Respiraciones y suelo pélvico.
+-- Reusan el mismo sistema de bloques (tablas espejo de program_days/program_day_blocks).
+CREATE TABLE program_series_pillars (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  series_id UUID REFERENCES program_series(id) ON DELETE CASCADE,
+  pillar_key TEXT NOT NULL,    -- 'alimentacion' | 'autoconocimiento' | 'estres_sueno' | 'respiraciones'
+  title TEXT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  published BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(series_id, pillar_key)
+);
+
+CREATE TABLE program_pillar_blocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pillar_id UUID REFERENCES program_series_pillars(id) ON DELETE CASCADE,
+  block_type TEXT NOT NULL,    -- mismos tipos que program_day_blocks (incl. cardio_zone2)
+  sort_order INT NOT NULL,
+  content JSONB NOT NULL
+);
+-- Portal: /portal/pilares muestra los pilares publicados del mes actual
+-- (months_elapsed → serie), solo para suscripciones CuarentaMás/Extra.
 
 -- SUSCRIPCIONES
 CREATE TABLE subscriptions (
@@ -428,7 +459,7 @@ Una sola pantalla — sin navegación adicional para registrar progreso:
 ├─────────────────────────────────────┤
 │  HOY · MIÉRCOLES                    │
 │  Piernas y Glúteos                  │
-│  [💪 Entrenamiento] [Tren Inferior] │
+│  [Tren Inferior]  (Enfoque)         │
 │  ⏱ 40 minutos                       │
 ├─────────────────────────────────────┤
 │  [▶ Video] (thumbnail propio + play)│
@@ -461,7 +492,7 @@ contenido = program_days WHERE
 Si no existe fila para ese `(week_number, day_of_week)` → mostrar card de descanso.
 
 - El banner de progreso muestra "Mes N · Semana N" en lugar de "Día N de 180"
-- El badge `workout_focus` ("Tren Inferior", "Full Body", etc.) aparece como tag junto al tipo de día
+- El badge `workout_focus` ("Enfoque": "Tren Inferior", "Protocolo Cardiovascular", "Descanso", etc.) aparece como tag (ya no hay badge de tipo de día)
 - Campos de progreso opcionales
 - Guardado automático con debounce
 - Si ya hay progreso registrado hoy, se muestran los valores previos
@@ -523,14 +554,15 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
   Sem 3  [T.Inf]     [—]   [T.Sup]     [—]   [Full]     [—]    [—]
   Sem 4  [vacío]     [—]   [vacío]     [—]   [vacío]    [—]    [—]
   ```
-- Al crear/editar un día, Aura define: semana, día de semana, `workout_focus`, título, tipo, duración
+- Al crear/editar un día, Aura define: semana, día de semana, `workout_focus` (Enfoque, texto libre), título, duración (sin selector de tipo — todos son "Actividad Física")
 - Editor de bloques arrastrables (dnd-kit):
-  - **Texto:** editor Tiptap con bold, italic, listas, encabezados
+  - **Texto:** editor Tiptap con bold, italic, encabezados (H2/H3/H4), listas (UL y OL)
   - **YouTube:** pegar URL → extrae video_id → preview del embed
   - **PDF:** upload a Supabase Storage → guarda storage_path
-  - **Imagen:** upload a Supabase Storage + alt text
-  - **Lista de ejercicios:** nombre, series×reps, descanso, notas, URL de video demo por ejercicio, y qué métricas registrará la cliente
-- Estados: borrador / publicado por día y por serie
+  - **Imagen:** upload a Supabase Storage + alt text + preview
+  - **Lista de ejercicios:** nombre, series×reps, descanso, notas, URL de video demo por ejercicio, y qué métricas registrará la cliente (reps / peso)
+  - **Calculadora Cardio Zona 2:** bloque fijo (la clienta ingresa su edad en el portal)
+- Estado por día como selector Publicado / Borrador (y por serie)
 - Timeline expandible para Extra y Strong & Fit (misma grilla por cada serie)
 
 ### Mensajería
@@ -632,3 +664,5 @@ NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
 ---
 
 *Spec generado el 3 de junio de 2026 · Versión 1.1 — Cambios: modelo semanal (week_number + day_of_week) en program_days; historial de días anteriores en /portal/history*
+
+*Versión 1.2 (9 de junio de 2026) — Cambios tras smoke de Fase 2: se elimina el selector de tipo de día (todos son "Actividad Física"; el Enfoque/`workout_focus` describe la actividad y los días de descanso llevan contenido); nuevo block type `cardio_zone2` (calculadora); tablas de pilares mensuales (`program_series_pillars`, `program_pillar_blocks`) + sección `/portal/pilares` para CuarentaMás/Extra. Pendiente ronda de ajustes de UI del editor (acercar al prototipo design-handoff).*
