@@ -39,13 +39,22 @@ export function ExerciseListBlockEditor({
             <button type="button" onClick={() => update(exercises.filter((_, idx) => idx !== i))}
               className="ml-2 text-[var(--gris-texto)]"><Trash2 size={15} /></button>
           </div>
-          <div className="flex gap-2">
-            <input className={`${input} w-20`} style={border} type="number" placeholder="Series"
-              value={ex.sets} onChange={(e) => setField(i, { sets: Number(e.target.value) })} />
-            <input className={`${input} w-24`} style={border} placeholder="Reps"
-              value={ex.reps} onChange={(e) => setField(i, { reps: e.target.value })} />
-            <input className={`${input} w-28`} style={border} type="number" placeholder="Descanso (s)"
-              value={ex.rest_seconds} onChange={(e) => setField(i, { rest_seconds: Number(e.target.value) })} />
+          <div className="flex gap-3 flex-wrap">
+            <label className="flex flex-col gap-1 font-body" style={{ fontSize: 12, color: "var(--gris-texto)" }}>
+              Series
+              <input className={`${input} w-20`} style={border} type="number"
+                value={ex.sets} onChange={(e) => setField(i, { sets: Number(e.target.value) })} />
+            </label>
+            <label className="flex flex-col gap-1 font-body" style={{ fontSize: 12, color: "var(--gris-texto)" }}>
+              Repeticiones
+              <input className={`${input} w-24`} style={border}
+                value={ex.reps} onChange={(e) => setField(i, { reps: e.target.value })} />
+            </label>
+            <label className="flex flex-col gap-1 font-body" style={{ fontSize: 12, color: "var(--gris-texto)" }}>
+              Descanso (seg)
+              <input className={`${input} w-28`} style={border} type="number"
+                value={ex.rest_seconds} onChange={(e) => setField(i, { rest_seconds: Number(e.target.value) })} />
+            </label>
           </div>
           <input className={`${input} w-full`} style={border} placeholder="Notas del coach"
             value={ex.notes} onChange={(e) => setField(i, { notes: e.target.value })} />
