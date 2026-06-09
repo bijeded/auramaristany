@@ -1,7 +1,7 @@
 "use client";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Bold, Italic, Heading2, List } from "lucide-react";
+import { Bold, Italic, Heading2, Heading3, List, ListOrdered } from "lucide-react";
 
 export function TextBlockEditor({
   content, onChange,
@@ -26,8 +26,15 @@ export function TextBlockEditor({
           onClick={() => editor.chain().focus().toggleItalic().run()}><Italic size={15} /></button>
         <button type="button" className={btn(editor.isActive("heading", { level: 2 }))}
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}><Heading2 size={15} /></button>
+        <button type="button" className={btn(editor.isActive("heading", { level: 3 }))}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}><Heading3 size={15} /></button>
+        <button type="button" className={btn(editor.isActive("heading", { level: 4 }))}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
+          style={{ fontFamily: "var(--font-head)", fontSize: 13, fontWeight: 700 }}>H4</button>
         <button type="button" className={btn(editor.isActive("bulletList"))}
           onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></button>
+        <button type="button" className={btn(editor.isActive("orderedList"))}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered size={15} /></button>
       </div>
       <EditorContent editor={editor} className="prose prose-sm max-w-none p-3 font-body" />
     </div>
