@@ -4,6 +4,7 @@ import { YoutubeBlock } from "./YoutubeBlock";
 import { PdfBlock } from "./PdfBlock";
 import { ImageBlock } from "./ImageBlock";
 import { CardioZone2Block } from "./CardioZone2Block";
+import { ExerciseListReadOnly, type ReadOnlyExercise } from "./ExerciseListReadOnly";
 
 export interface ViewBlock {
   id: string;
@@ -25,6 +26,8 @@ export function BlockView({ block }: { block: ViewBlock }) {
       return <ImageBlock content={block.content as { storage_path: string; alt: string }} />;
     case "cardio_zone2":
       return <CardioZone2Block />;
+    case "exercise_list":
+      return <ExerciseListReadOnly content={block.content as { exercises: ReadOnlyExercise[] }} />;
     default:
       return null;
   }
