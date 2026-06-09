@@ -77,6 +77,7 @@ export default async function AdminProgramPage({
               key={s.id}
               series={s}
               programId={programId}
+              programSlug={program.slug}
               defaultOpen={i === series.length - 1}
             />
           ))}
