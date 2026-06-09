@@ -1,7 +1,7 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
-Fecha: 4 de junio de 2026 · Actualizado: 6 de junio de 2026
-Estado: Fase 2 en progreso — Subsistemas C y D completados
+Fecha: 4 de junio de 2026 · Actualizado: 9 de junio de 2026
+Estado: Fase 2 COMPLETADA — Subsistemas A–F + ronda de ajustes post-smoke
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -388,18 +388,29 @@ COMPLETADO:
       ✓ Gates verdes: vitest 64/64, tsc limpio, npm run build OK
       ✓ Fix pre-existente de activando TypeScript resuelto (+ 2 bloqueos de build de main)
 
-    ◑ Ronda de ajustes post-smoke (PENDIENTE — siguiente paso, misma rama):
-      Smoke test del 9-jun arrojó feedback. Decisiones tomadas (D1-D4) y lista de
-      correcciones en: docs/superpowers/context/2026-06-09-ajustes-post-smoke-editor-portal.md
-      Lo principal: rediseñar el editor acercándolo al prototipo; quitar selector de
-      tipo de día (todo "Actividad Física" + Enfoque); fixes de bloques (texto H3/H4+OL,
-      preview de imagen, labels de ejercicios); fondo blanco en /today; validación de
-      la calculadora (18-110). Aún NO mergeado a main.
+    ✓ Ronda de ajustes post-smoke (completada 9-jun, re-smoke OK):
+      Plan: docs/superpowers/plans/2026-06-09-ajustes-post-smoke-editor-portal.md
+      ✓ Editor rediseñado (top bar, estado dropdown, sin selector de tipo → todo
+        "Actividad Física" + Enfoque libre; paleta de bloques con íconos; back link)
+      ✓ Texto: H3/H4 + listas (instalado @tailwindcss/typography) + espaciado
+      ✓ Imagen: preview; Ejercicios: labels; /today fondo blanco; /pilares header + rosa
+      ✓ Calculadora Cardio Zona 2: validación 18-110 + rediseño (rango grande + barra)
+      ✓ Editor/pilar: breadcrumb + botón de regreso
+      Bugs corregidos en esta ronda:
+        - current_period_start/end nunca se seteaban (Stripe 2026 los movió a
+          subscription.items) → portal siempre mostraba descanso. Fix en stripe-handlers.
+        - "Error al guardar": progress_logs usa columna 'notes' (no 'general_notes')
+          y onConflict debía ser (profile_id, program_day_id). Fix en queries.ts.
+      Gates verdes: vitest 67/67, tsc limpio, build OK, lint limpio.
 
 PENDIENTE:
-  ○ Ronda de ajustes post-smoke (ver bloque de contexto del 9-jun)
-  ○ Merge de feature/fase-2-editor-pilares a main tras los ajustes + re-smoke
   ○ Configurar Vercel + variables de entorno de producción
+  ○ Follow-ups menores (no bloquean): try/catch en stripe.subscriptions.retrieve;
+    unificar formatDate duplicado; alinear SPEC/types.ts (dicen general_notes) con la
+    columna real 'notes'; saveBlocks/savePillarBlocks no transaccionales; tests de
+    cloneDay/cloneWeek.
+  ○ Setup local: correr `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+    para probar checkout (ver sección 12).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 11. FASES DE DESARROLLO
@@ -411,7 +422,7 @@ Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + 
   ✓ Sub A: portal/today funcional     ✓ Sub B: UI/UX portal
   ✓ Sub C: Admin layout + sidebar     ✓ Sub D: CMS overview + grilla semanal
   ✓ Sub E: Editor de día             ✓ Sub F: Gestión de días + Pilares
-  ◑ Ronda de ajustes post-smoke (rediseño editor + fixes) en rama feature/fase-2-editor-pilares
+  ✓ Ronda de ajustes post-smoke (rediseño editor + fixes) — FASE 2 COMPLETADA
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días
 Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas
 Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos
