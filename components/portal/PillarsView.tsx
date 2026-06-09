@@ -9,7 +9,7 @@ export function PillarsView({ pillars, dateLabel }: { pillars: PillarWithBlocks[
   const [open, setOpen] = useState<string | null>(pillars[0]?.id ?? null);
   if (pillars.length === 0) {
     return (
-      <div style={{ background: "var(--blanco)" }}>
+      <div style={{ background: "var(--rosa-soft)" }}>
         <PortalHeader dateLabel={dateLabel} />
         <div className="px-4 pt-4 pb-8">
         <h1 className="font-head text-2xl mb-4">Pilares del mes</h1>
@@ -30,7 +30,7 @@ export function PillarsView({ pillars, dateLabel }: { pillars: PillarWithBlocks[
     );
   }
   return (
-    <div style={{ background: "var(--blanco)" }}>
+    <div style={{ background: "var(--rosa-soft)" }}>
       <PortalHeader dateLabel={dateLabel} />
       <div className="px-4 pt-4 pb-8 space-y-3">
       <h1 className="font-head text-2xl mb-2">Pilares del mes</h1>
