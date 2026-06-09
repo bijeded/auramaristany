@@ -144,6 +144,15 @@ Reusa el máximo del portal actual:
 
 ---
 
+## Ajustes post-smoke (aplicados, mergeados a main)
+- **Relación de ejercicios en la gráfica: por NOMBRE normalizado**, no por uuid (decisión durante el smoke). Conecta el mismo ejercicio a lo largo de los días aunque Aura cree cada día desde cero. `buildPerformanceSeries` agrupa por `name.trim().toLowerCase()` y une las métricas de los uuids que comparten nombre.
+- **Tope de fotos: 250** (no 30) — ~1/día durante los 6 meses — con **badge `[N/250]`** en el tab Fotos y botón deshabilitado al llegar al tope.
+- **Pill del historial sin la palabra "ejercicios"** (solo `N/M`) para evitar salto de línea en móvil.
+- **`upsertProgressLog` respeta `DEV_DATE`** al fijar `log_date` (coherencia de la simulación; producción sin cambios).
+- **Límite de 5MB:** se confirmó que la compresión en cliente deja la foto muy por debajo de 5MB; el chequeo de 5MB queda como red de seguridad en el servidor. Sin cambios.
+- **Columna real:** `progress_photos.taken_at` (no `photo_date`); el código usa `taken_at`.
+- **Follow-up nuevo:** UI de admin para eliminar fotos de clientas (RLS ya lo permite); notas de admin sobre el registro del día (diferido a Fase 4).
+
 ## Follow-ups arrastrados (no bloquean Fase 3)
 - Configurar Vercel + variables de entorno de producción.
 - `stripe.subscriptions.retrieve` sin try/catch.

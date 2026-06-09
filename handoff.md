@@ -1,7 +1,7 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 9 de junio de 2026
-Estado: Fase 3 COMPLETADA (Historial) — Fases 0-3 listas; pendiente smoke manual + deploy
+Estado: Fase 3 COMPLETADA y smoke-tested (Historial) — Fases 0-3 en main; pendiente deploy
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -440,9 +440,23 @@ COMPLETADO:
     Decisiones (P3): registro pasado es SOLO LECTURA (no editable).
     Bug corregido en review final: la columna real de progress_photos es
     'taken_at' (NO 'photo_date' como decían SPEC/contexto). Código ya usa taken_at.
+    ✓ Migración 005 YA APLICADA en Supabase (vía CLI/Management API) y verificada:
+      bucket privado 'progress', columna caption, policies de storage + tabla.
+    ✓ Smoke manual hecho (cliente bije001@yahoo.com.mx, DEV_DATE): gráfica con
+      línea de 2 puntos, detalle read-only, fotos (subir/borrar/filtro mes/signed URL).
+    Ajustes post-smoke (mergeados a main):
+      - Gráfica relaciona ejercicios por NOMBRE normalizado (no uuid) → conecta el
+        mismo ejercicio aunque Aura cree cada día desde cero. (history-helpers.ts)
+      - Tope de fotos 30 → 250 (~1/día x 6 meses) + badge [N/250] en tab Fotos.
+      - Pill del historial sin la palabra "ejercicios" (evita salto de línea móvil).
+      - upsertProgressLog respeta DEV_DATE en log_date (antes usaba fecha real, lo que
+        colapsaba días simulados en la misma fecha). Producción sin cambios.
+      - Límite de 5MB: la compresión cliente deja la foto pequeña, comportamiento OK.
     Follow-ups Fase 3 (no bloquean): regenerar lib/supabase/types.ts para incluir
     progress_photos/body_metrics y quitar los `as any` de los endpoints de fotos;
-    tope de 30 fotos no es race-safe (aceptable single-user).
+    tope de 250 fotos no es race-safe (aceptable single-user); UI de admin para
+    eliminar fotos de clientas (RLS ya lo permite, falta UI — futura ficha de cliente);
+    notas de admin sobre el registro del día (diferido, evaluar en Fase 4).
 
 PENDIENTE:
   ○ Configurar Vercel + variables de entorno de producción
