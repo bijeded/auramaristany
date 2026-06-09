@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { compressImage } from "@/lib/portal/photo-compress";
+import { MAX_PHOTOS } from "@/lib/portal/photo-validation";
 
 export interface PhotoItem {
   id: string;
@@ -78,11 +79,30 @@ export function PhotosTab({ photos }: { photos: PhotoItem[] }) {
 
   return (
     <>
+      {/* Encabezado: contador de uso + botón subir */}
+      <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+        <span className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>
+          Fotos de progreso
+        </span>
+        <span
+          className="font-body rounded-full px-2.5 py-1"
+          style={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            background: photos.length >= MAX_PHOTOS ? "rgba(224,92,92,.14)" : "var(--gris-claro)",
+            color: photos.length >= MAX_PHOTOS ? "#c0463f" : "var(--gris-texto)",
+          }}
+        >
+          {photos.length}/{MAX_PHOTOS}
+        </span>
+      </div>
+
       {/* Botón subir */}
       <button
         onClick={() => fileRef.current?.click()}
+        disabled={photos.length >= MAX_PHOTOS}
         className="flex items-center justify-center gap-2 w-full rounded-xl font-body"
-        style={{ padding: "12px", background: "var(--lavanda)", color: "#fff", fontWeight: 600, fontSize: 14, marginBottom: 16 }}
+        style={{ padding: "12px", background: "var(--lavanda)", color: "#fff", fontWeight: 600, fontSize: 14, marginBottom: 16, opacity: photos.length >= MAX_PHOTOS ? 0.5 : 1 }}
       >
         <Camera size={18} /> Subir foto
       </button>

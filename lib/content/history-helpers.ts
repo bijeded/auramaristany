@@ -72,11 +72,24 @@ export function aggregateDayValue(
   return Math.round((sum / vals.length) * 100) / 100;
 }
 
+// Clave de agrupación: el ejercicio se identifica por su NOMBRE normalizado
+// (no por uuid), para conectar el mismo ejercicio a lo largo de los días aunque
+// Aura lo haya creado desde cero en cada día (uuids distintos).
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+interface NameGroup {
+  displayName: string;
+  metrics: string[]; // unión, en orden de aparición
+  byDate: Map<string, SeriesEntry[]>; // series acumuladas por fecha
+}
+
 export function buildPerformanceSeries(
   logs: LogForPerf[],
   meta: Map<string, ExerciseMeta>
 ): PerfExercise[] {
-  const byExercise = new Map<string, PerfExercise>();
+  const groups = new Map<string, NameGroup>();
   const sorted = [...logs].sort((a, b) => a.logDate.localeCompare(b.logDate));
 
   for (const log of sorted) {
@@ -85,22 +98,37 @@ export function buildPerformanceSeries(
       const m = meta.get(exId);
       if (!m) continue;
 
-      let pe = byExercise.get(exId);
-      if (!pe) {
-        pe = { exerciseId: exId, name: m.name, metrics: m.metrics, points: [] };
-        byExercise.set(exId, pe);
+      const key = normalizeName(m.name);
+      let g = groups.get(key);
+      if (!g) {
+        g = { displayName: m.name, metrics: [], byDate: new Map() };
+        groups.set(key, g);
       }
-
-      const values: Record<string, number | null> = {};
-      let hasAny = false;
       for (const metric of m.metrics) {
-        const v = aggregateDayValue(entry?.series, metric);
-        values[metric] = v;
-        if (v != null) hasAny = true;
+        if (!g.metrics.includes(metric)) g.metrics.push(metric);
       }
-      if (hasAny) pe.points.push({ date: log.logDate, values });
+      const daySeries = g.byDate.get(log.logDate) ?? [];
+      daySeries.push(...(entry?.series ?? []));
+      g.byDate.set(log.logDate, daySeries);
     }
   }
 
-  return Array.from(byExercise.values());
+  const result: PerfExercise[] = [];
+  for (const g of Array.from(groups.values())) {
+    const points: PerfPoint[] = [];
+    for (const date of Array.from(g.byDate.keys()).sort()) {
+      const series = g.byDate.get(date) ?? [];
+      const values: Record<string, number | null> = {};
+      let hasAny = false;
+      for (const metric of g.metrics) {
+        const v = aggregateDayValue(series, metric);
+        values[metric] = v;
+        if (v != null) hasAny = true;
+      }
+      if (hasAny) points.push({ date, values });
+    }
+    result.push({ exerciseId: normalizeName(g.displayName), name: g.displayName, metrics: g.metrics, points });
+  }
+
+  return result;
 }

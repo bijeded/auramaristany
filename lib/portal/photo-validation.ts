@@ -1,7 +1,7 @@
 // Validación y dimensionado de fotos. Puro (sin DOM/DB) → testeable.
 
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB
-export const MAX_PHOTOS = 30;
+export const MAX_PHOTOS = 250; // ~1 foto/día durante los 6 meses de programa
 export const MAX_PHOTO_DIMENSION = 1280;
 export const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 

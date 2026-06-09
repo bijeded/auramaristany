@@ -138,7 +138,7 @@ export function PerformanceTab({
                     color: h.totalCount > 0 && h.doneCount === h.totalCount ? "#3a8c60" : "var(--gris-texto)",
                   }}
                 >
-                  {h.doneCount}/{h.totalCount} ejercicios
+                  {h.doneCount}/{h.totalCount}
                 </span>
                 <ChevronRight size={16} color="var(--gris-suave)" />
               </div>

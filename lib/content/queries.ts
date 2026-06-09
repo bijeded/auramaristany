@@ -193,7 +193,12 @@ export async function upsertProgressLog(params: {
   completed: boolean;
 }): Promise<{ id: string } | null> {
   const supabase = await createClient();
-  const logDate = new Date().toISOString().split("T")[0];
+  // Respeta DEV_DATE (igual que getTodayContent) para que el día simulado y el
+  // log_date sean coherentes en desarrollo. En producción DEV_DATE no existe.
+  const today = process.env.DEV_DATE
+    ? new Date(`${process.env.DEV_DATE}T12:00:00`)
+    : new Date();
+  const logDate = today.toISOString().split("T")[0];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
