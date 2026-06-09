@@ -28,14 +28,14 @@ Al terminar, Aura puede crear todo el contenido de un programa y la clienta lo c
 | Métricas de ejercicio | Mantener 2 checkboxes (reps/peso). El array `metrics` ya es extensible sin migración. |
 | Meses de 5 semanas (P2) | La semana 5 repite el contenido de la semana 4. No abarca el mes siguiente (eso lo delimita el período de Stripe). |
 | `day_type` "Evaluación" | Se renombra a "Protocolo Cardiovascular" (la opción `assessment`, sin uso, pasa a `cardio`). |
-| Calculadora Cardio Zona 2 | Componente fijo dentro del editor, puro UI, sin persistencia. |
+| Calculadora Cardio Zona 2 | Nuevo block type `cardio_zone2` que Aura agrega solo a los días que lo ameriten. Sin configuración (fórmula fija). Se renderiza en el portal: la clienta ingresa su edad y ve el rango en vivo, sin persistencia. |
 | Días de descanso | Editables: un día de descanso puede ser una fila con bloques. |
 
 ---
 
 ## Parte 1 — Cambios de esquema (migración `004`)
 
-Tres cambios, ninguno destructivo (no hay datos en `assessment` ni en pilares aún).
+Cuatro cambios, ninguno destructivo (no hay datos en `assessment` ni en pilares aún).
 
 ### 1.1 Rename de `day_type`
 
@@ -72,7 +72,22 @@ Nueva semántica (retrocompatible):
 `workout_focus` sigue siendo `NULL` en días de descanso; ya no es el único
 indicador de "descanso".
 
-### 1.3 Pilares mensuales — tablas nuevas
+### 1.3 Nuevo block type `cardio_zone2`
+
+La constraint de `program_day_blocks.block_type` (y la de `program_pillar_blocks`,
+abajo) agrega `cardio_zone2`:
+
+```sql
+-- program_day_blocks
+alter table program_day_blocks drop constraint <nombre_check_block_type>;
+alter table program_day_blocks add check (block_type in
+  ('text','youtube','pdf','image','exercise_list','cardio_zone2'));
+```
+
+`content` del bloque `cardio_zone2` es `{}` (sin configuración: la fórmula es fija).
+No se renderiza un helper en el editor; se renderiza interactivo en el portal.
+
+### 1.4 Pilares mensuales — tablas nuevas
 
 Reusan el sistema de bloques existente con tablas espejo.
 
@@ -94,7 +109,7 @@ create table program_pillar_blocks (
   id uuid primary key default gen_random_uuid(),
   pillar_id uuid not null references program_series_pillars(id) on delete cascade,
   block_type text not null check (block_type in
-    ('text','youtube','pdf','image','exercise_list')),
+    ('text','youtube','pdf','image','exercise_list','cardio_zone2')),
   sort_order int not null,
   content jsonb not null,
   created_at timestamptz default now(),
@@ -138,13 +153,16 @@ app/admin/content/[programId]/series/[seriesId]/days/
 
 components/admin/
   DayEditorForm.tsx      — client component: metadata + lista de bloques + dnd
-  CardioZone2Calculator.tsx — helper colapsable, puro UI
   blocks/
     TextBlockEditor.tsx
     YoutubeBlockEditor.tsx
     PdfBlockEditor.tsx
     ImageBlockEditor.tsx
     ExerciseListBlockEditor.tsx
+    CardioZone2BlockEditor.tsx — trivial: sin campos (solo confirma "se agregó")
+
+components/portal/blocks/
+  CardioZone2Block.tsx   — renderer interactivo: input edad → muestra el rango
 
 lib/admin/dayActions.ts  — server actions: saveDay, saveBlocks
                            (+ cloneDay, cloneWeek, deleteDay en Subsistema F)
@@ -160,6 +178,7 @@ lib/admin/queries.ts     — agregar getDayWithBlocks(dayId): Promise<DayWithBlo
 lib/content/queries.ts   — soportar día de descanso con fila (no return null si day_type='rest')
                            + clamp de semana a 4 (meses de 5 semanas)
 components/portal/TodayView.tsx — renderizar día de descanso con bloques + badge day_type
+                           + caso 'cardio_zone2' → <CardioZone2Block />
 ```
 
 ### Sección de metadata
@@ -173,18 +192,26 @@ components/portal/TodayView.tsx — renderizar día de descanso con bloques + ba
 
 Si el tipo es Descanso, `workout_focus` es opcional pero **se permiten bloques**.
 
-### Calculadora Cardio Zona 2
+### Block type Cardio Zona 2 (`cardio_zone2`)
 
-Componente cliente fijo (helper colapsable dentro del editor). Puro UI, **sin
-persistencia**, nunca se modifica.
+No es un helper del editor: es un **bloque** que Aura agrega solo a los días que
+lo ameriten (vía "Agregar bloque ▾ → Calculadora Cardio Zona 2"). El editor del
+bloque es trivial (no hay nada que configurar; `content = {}`).
+
+**Renderer en el portal** (`components/portal/blocks/CardioZone2Block.tsx`): la
+clienta ingresa su edad y ve el rango en vivo, **sin persistencia**:
 
 ```
-edad (años) → suelo = (220 − edad) × 0.60
-            → cielo = (220 − edad) × 0.70
+edad (años) → suelo = round((220 − edad) × 0.60)
+            → cielo = round((220 − edad) × 0.70)
 ```
+
+Texto exacto del resultado:
+
+> **Tu Cardio zona 2 se encuentra en el rango: {suelo} – {cielo}**
 
 La aritmética se extrae a `lib/content/cardio.ts` → `cardioZone2(edad): { suelo, cielo }`
-para poder testearla.
+(enteros redondeados) para poder testearla y reusarla en el renderer.
 
 ### Editores de bloque
 
@@ -200,6 +227,8 @@ para poder testearla.
   name, sets (number), reps (text), rest_seconds, notes, video_url. Dos checkboxes
   ("Registrar reps" / "Registrar peso (kg)") → array `metrics` (`reps_done`,
   `weight_kg`). IDs con `crypto.randomUUID()`.
+- **CardioZone2BlockEditor:** trivial. Sin campos editables; solo muestra una nota
+  de que la clienta verá la calculadora en el portal. `content = {}`.
 
 ### Server actions
 
@@ -278,7 +307,7 @@ getCurrentMonthPillars(subscription): Promise<Pillar[]>  // [] si el programa no
 
 ### Automatizadas (vitest, ya configurado)
 
-- `cardioZone2(edad)` → rango `{ suelo, cielo }` correcto.
+- `cardioZone2(edad)` → rango `{ suelo, cielo }` correcto (enteros redondeados).
 - `extractVideoId(url)` → varias formas de URL (`watch?v=`, `youtu.be/`, con params).
 - `dayActions`:
   - `saveDay` insert y update.
@@ -294,9 +323,10 @@ getCurrentMonthPillars(subscription): Promise<Pillar[]>  // [] si el programa no
 
 ### Smoke manual (checklist)
 
-1. Crear día → agregar los 5 tipos de bloque → reordenar (dnd) → publicar → verlo en `/portal/today`.
+1. Crear día → agregar los 6 tipos de bloque → reordenar (dnd) → publicar → verlo en `/portal/today`.
 2. Día de descanso con info → portal renderiza los bloques (no card genérica).
-3. Día tipo Protocolo Cardiovascular → badge correcto en portal.
+3. Día tipo Protocolo Cardiovascular con bloque `cardio_zone2` → en el portal la clienta
+   ingresa su edad y ve "Tu Cardio zona 2 se encuentra en el rango: suelo – cielo".
 4. Clonar día a celda vacía; clonar semana completa.
 5. Eliminar día → la celda de la grilla queda vacía.
 6. Autor de un pilar en admin → aparece en `/portal/pilares` del mes actual.
@@ -319,15 +349,15 @@ Cierre con la skill `verification-before-completion`.
 
 | Archivo | Cambio |
 |---------|--------|
-| `supabase/migrations/004_*.sql` | rename `day_type`, tablas de pilares + RLS |
+| `supabase/migrations/004_*.sql` | rename `day_type`, `block_type += cardio_zone2`, tablas de pilares + RLS |
 | `components/admin/DayEditorForm.tsx` | nuevo — editor de día |
-| `components/admin/blocks/*` | nuevos — 5 editores de bloque |
-| `components/admin/CardioZone2Calculator.tsx` | nuevo — calculadora |
+| `components/admin/blocks/*` | nuevos — 6 editores de bloque (incluye `CardioZone2BlockEditor`) |
+| `components/portal/blocks/CardioZone2Block.tsx` | nuevo — renderer interactivo de la calculadora |
 | `lib/admin/dayActions.ts` | nuevo — saveDay/saveBlocks/cloneDay/cloneWeek/deleteDay |
 | `lib/admin/queries.ts` | `getDayWithBlocks` |
 | `lib/content/queries.ts` | descanso con fila, clamp semana, `getCurrentMonthPillars` |
 | `lib/content/cardio.ts`, `lib/admin/youtube.ts` | nuevos — funciones puras |
 | `app/api/admin/upload/route.ts` | nuevo — upload a Storage |
-| `components/portal/TodayView.tsx` | badge day_type + render descanso con bloques |
+| `components/portal/TodayView.tsx` | badge day_type + render descanso con bloques + caso `cardio_zone2` |
 | `app/portal/pilares/*` | nuevo — sección de pilares |
 | `components/admin/WeeklyGrid.tsx` / `SeriesAccordion.tsx` | acciones clonar/eliminar |
