@@ -1,7 +1,7 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 9 de junio de 2026
-Estado: Fase 2 COMPLETADA — Subsistemas A–F + ronda de ajustes post-smoke
+Estado: Fase 3 COMPLETADA (Historial) — Fases 0-3 listas; pendiente smoke manual + deploy
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -416,8 +416,37 @@ COMPLETADO:
           y onConflict debía ser (profile_id, program_day_id). Fix en queries.ts.
       Gates verdes: vitest 67/67, tsc limpio, build OK, lint limpio.
 
+  ✓ FASE 3 — HISTORIAL (completada 9 de junio de 2026, rama feature/fase-3-historial)
+    Plan: docs/superpowers/plans/2026-06-09-fase-3-historial.md
+    Diseño: docs/superpowers/specs/2026-06-09-fase-3-historial-design.md
+    ✓ /portal/history "Mi Progreso" con 2 tabs (siguiendo el prototipo, NO 3 tabs):
+      - Desempeño: gráfica Recharts por ejercicio (solo mes corriente,
+        log_date >= current_period_start), selector de ejercicio (pills),
+        toggle de métrica dinámico (reps/peso/otras), SIN selector de periodo,
+        SIN stat cards. Debajo: lista "Historial de ejercicios" (días con
+        progress_log, reciente primero) → /portal/history/[logId].
+      - Fotos: bucket privado 'progress' + signed URLs (1h), grid 3 col,
+        filtro por mes, subir con comentario opcional + compresión cliente
+        (1280px, JPEG), visor con navegación + borrar. SIN métricas corporales.
+    ✓ /portal/history/[logId]: detalle read-only (reusa BlockView con prop
+      loggedExercises; ExerciseListLogged muestra valores por serie). Badge 📅.
+    ✓ Límites de fotos: 5MB/archivo, máx 30, reducción a 1280px (validación pura).
+    ✓ lib/content/history.ts (getHistoryList/getPerformanceData/getHistoryLog) +
+      history-helpers.ts (puras, TDD). Endpoints propios del cliente:
+      POST/DELETE /api/portal/photos.
+    ✓ Migración 005_progress_photos.sql: bucket privado + RLS de Storage por
+      prefijo {profile_id}/ + columna caption. ⚠ APLICAR MANUALMENTE en Supabase.
+    ✓ Gates: vitest 85/85, tsc limpio, lint limpio, build OK.
+    Decisiones (P3): registro pasado es SOLO LECTURA (no editable).
+    Bug corregido en review final: la columna real de progress_photos es
+    'taken_at' (NO 'photo_date' como decían SPEC/contexto). Código ya usa taken_at.
+    Follow-ups Fase 3 (no bloquean): regenerar lib/supabase/types.ts para incluir
+    progress_photos/body_metrics y quitar los `as any` de los endpoints de fotos;
+    tope de 30 fotos no es race-safe (aceptable single-user).
+
 PENDIENTE:
   ○ Configurar Vercel + variables de entorno de producción
+  ○ Aplicar migración 005_progress_photos.sql en el dashboard de Supabase
   ○ Follow-ups menores (no bloquean): try/catch en stripe.subscriptions.retrieve;
     unificar formatDate duplicado; alinear SPEC/types.ts (dicen general_notes) con la
     columna real 'notes'; saveBlocks/savePillarBlocks no transaccionales; tests de
@@ -436,7 +465,7 @@ Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + 
   ✓ Sub C: Admin layout + sidebar     ✓ Sub D: CMS overview + grilla semanal
   ✓ Sub E: Editor de día             ✓ Sub F: Gestión de días + Pilares
   ✓ Ronda de ajustes post-smoke (rediseño editor + fixes) — FASE 2 COMPLETADA
-Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días
+Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días  ✓ COMPLETADA
 Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas
 Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos
 Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción
