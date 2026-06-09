@@ -1,9 +1,8 @@
 "use client";
-import { useState } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, X, Plus } from "lucide-react";
+import { GripVertical, X, Type, Video, FileText, Image as ImageIcon, Dumbbell, HeartPulse, type LucideIcon } from "lucide-react";
 import { TextBlockEditor } from "./blocks/TextBlockEditor";
 import { YoutubeBlockEditor } from "./blocks/YoutubeBlockEditor";
 import { PdfBlockEditor } from "./blocks/PdfBlockEditor";
@@ -17,6 +16,11 @@ export interface EditorBlock { key: string; block_type: BlockType; content: Reco
 const BLOCK_LABELS: Record<BlockType, string> = {
   text: "Texto", youtube: "Video YouTube", pdf: "PDF", image: "Imagen",
   exercise_list: "Lista de ejercicios", cardio_zone2: "Calculadora Cardio Zona 2",
+};
+
+const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
+  text: Type, youtube: Video, pdf: FileText, image: ImageIcon,
+  exercise_list: Dumbbell, cardio_zone2: HeartPulse,
 };
 
 function SortableBlock({ block, children, onRemove }: {
@@ -46,11 +50,8 @@ export function BlockListEditor({ blocks, setBlocks }: {
   blocks: EditorBlock[];
   setBlocks: (b: EditorBlock[]) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   const addBlock = (t: BlockType) => {
     setBlocks([...blocks, { key: crypto.randomUUID(), block_type: t, content: {} }]);
-    setMenuOpen(false);
   };
   const updateBlock = (key: string, content: Record<string, unknown>) =>
     setBlocks(blocks.map((b) => (b.key === key ? { ...b, content } : b)));
@@ -77,8 +78,6 @@ export function BlockListEditor({ blocks, setBlocks }: {
     }
   }
 
-  const border = { borderColor: "var(--gris-linea)" };
-
   return (
     <>
       <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -91,21 +90,22 @@ export function BlockListEditor({ blocks, setBlocks }: {
         </SortableContext>
       </DndContext>
 
-      <div className="relative mb-6">
-        <button type="button" onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-1.5 font-body text-sm" style={{ color: "var(--lavanda-dark)" }}>
-          <Plus size={16} /> Agregar bloque
-        </button>
-        {menuOpen && (
-          <div className="absolute z-10 mt-1 rounded-lg border bg-white shadow-md" style={border}>
-            {(Object.keys(BLOCK_LABELS) as BlockType[]).map((t) => (
+      <div className="mt-2 mb-6">
+        <div className="font-body mb-2" style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.5px", color: "var(--gris-suave)", textTransform: "uppercase" }}>
+          Agregar bloque
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {(Object.keys(BLOCK_LABELS) as BlockType[]).map((t) => {
+            const Ico = BLOCK_ICONS[t];
+            return (
               <button key={t} type="button" onClick={() => addBlock(t)}
-                className="block w-full text-left px-4 py-2 font-body text-sm hover:bg-[var(--lavanda-tint)]">
-                {BLOCK_LABELS[t]}
+                className="flex items-center gap-1.5 font-body rounded-lg px-3 py-2"
+                style={{ fontSize: 13, border: "1px solid var(--gris-linea)", background: "white", color: "var(--negro)" }}>
+                <Ico size={16} color="var(--lavanda-dark)" /> {BLOCK_LABELS[t]}
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </>
   );
