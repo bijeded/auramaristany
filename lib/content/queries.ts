@@ -160,7 +160,7 @@ export async function getTodayContent(
   const todayDate = today.toISOString().split("T")[0];
   const { data: rawLog } = await supabase
     .from("progress_logs")
-    .select("id, completed, exercises_done, general_notes")
+    .select("id, completed, exercises_done, general_notes:notes")
     .eq("profile_id", userId)
     .eq("program_day_id", day.id)
     .eq("log_date", todayDate)
@@ -206,7 +206,7 @@ export async function upsertProgressLog(params: {
         program_day_id: params.programDayId,
         log_date: logDate,
         exercises_done: params.exercisesDone,
-        general_notes: params.generalNotes,
+        notes: params.generalNotes,
         completed: params.completed,
       },
       { onConflict: "profile_id,program_day_id" }

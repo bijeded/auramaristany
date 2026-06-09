@@ -45,5 +45,10 @@ describe("upsertProgressLog", () => {
       subscription_id: "sub1",
       program_day_id: "day1",
     });
+    // Save bug regression: must write to the real DB column `notes`,
+    // not the non-existent `general_notes`.
+    const payload = upsertCalls[0].payload as Record<string, unknown>;
+    expect(payload.notes).toBe("Listo");
+    expect(payload).not.toHaveProperty("general_notes");
   });
 });
