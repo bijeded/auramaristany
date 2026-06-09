@@ -1,0 +1,33 @@
+"use client";
+import { computeResizedDimensions, MAX_PHOTO_DIMENSION } from "./photo-validation";
+
+/**
+ * Reduce la imagen a MAX_PHOTO_DIMENSION (lado mayor) y recomprime a JPEG.
+ * Devuelve un File listo para subir. Si algo falla, devuelve el original.
+ */
+export async function compressImage(file: File): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const { width, height } = computeResizedDimensions(
+      bitmap.width,
+      bitmap.height,
+      MAX_PHOTO_DIMENSION
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.82)
+    );
+    if (!blob) return file;
+
+    const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
