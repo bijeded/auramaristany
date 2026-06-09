@@ -47,7 +47,7 @@ export function DayEditorForm({ day, seriesId, programId, weekNumber, dayOfWeek 
         <div className="flex items-center gap-2">
           <select value={published ? "publicado" : "borrador"}
             onChange={(e) => setPublished(e.target.value === "publicado")}
-            className="rounded-lg border px-3 py-2 font-body" style={{ fontSize: 13, borderColor: "var(--gris-linea)" }}>
+            className="rounded-lg border px-3 py-2 font-body" style={{ fontSize: 13, borderColor: "var(--gris-linea)", paddingRight: 28 }}>
             <option value="borrador">Borrador</option>
             <option value="publicado">Publicado</option>
           </select>
