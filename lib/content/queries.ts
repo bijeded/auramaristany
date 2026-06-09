@@ -16,7 +16,7 @@ export interface Exercise {
 
 export interface DayBlock {
   id: string;
-  block_type: "text" | "youtube" | "pdf" | "image" | "exercise_list";
+  block_type: "text" | "youtube" | "pdf" | "image" | "exercise_list" | "cardio_zone2";
   sort_order: number;
   content: Record<string, unknown>;
 }

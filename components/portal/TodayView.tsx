@@ -7,6 +7,7 @@ import { YoutubeBlock } from "./blocks/YoutubeBlock";
 import { PdfBlock } from "./blocks/PdfBlock";
 import { ImageBlock } from "./blocks/ImageBlock";
 import { ExerciseListBlock } from "./blocks/ExerciseListBlock";
+import { CardioZone2Block } from "./blocks/CardioZone2Block";
 import { useProgressForm } from "@/hooks/useProgressForm";
 import type { ExerciseSeriesEntry } from "@/hooks/useProgressForm";
 
@@ -150,6 +151,32 @@ function DayHeader({
           >
             <Dumbbell size={13} />
             {workoutFocus}
+          </span>
+        )}
+        {dayType === "cardio" && (
+          <span
+            className="flex items-center gap-1.5 font-body rounded-full px-3 py-1"
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              background: "var(--lavanda-tint)",
+              color: "var(--lavanda-dark)",
+            }}
+          >
+            Protocolo Cardiovascular
+          </span>
+        )}
+        {dayType === "rest" && (
+          <span
+            className="flex items-center gap-1.5 font-body rounded-full px-3 py-1"
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              background: "var(--rosa-soft)",
+              color: "#5e3d38",
+            }}
+          >
+            Descanso
           </span>
         )}
         {dayType === "workout" && durationMinutes && (
@@ -308,6 +335,8 @@ function BlockRenderer({
           onUpdateSeries={onUpdateSeries}
         />
       );
+    case "cardio_zone2":
+      return <CardioZone2Block />;
     default:
       return null;
   }
@@ -367,7 +396,7 @@ export function TodayView({ content }: { content: TodayContent | null }) {
               programSlug={content.programSlug}
             />
 
-            {content.day.workout_focus === null ? (
+            {content.day.day_type === "rest" && content.blocks.length === 0 ? (
               <RestDayCard />
             ) : content.blocks.length === 0 ? (
               <ContentNotAvailableCard />
