@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { BlockListEditor, type EditorBlock } from "./BlockListEditor";
 import { savePillar, savePillarBlocks } from "@/lib/admin/pillarActions";
 
@@ -27,17 +29,30 @@ export function PillarEditorForm({ seriesId, programId, pillarKey, pillarName, p
 
   return (
     <div className="max-w-2xl">
-      <h1 className="font-head text-xl mb-1">{pillarName}</h1>
-      <input className="w-full rounded-lg border px-3 py-2 font-body text-sm mb-3"
+      <div className="flex items-center justify-between mb-4">
+        <Link href={`/admin/content/${programId}/series/${seriesId}/pillars`}
+          className="flex items-center gap-1 font-body" style={{ fontSize: 14, color: "var(--lavanda-dark)" }}>
+          <ChevronLeft size={16} /> Volver a pilares
+        </Link>
+        <div className="flex items-center gap-2">
+          <select value={published ? "publicado" : "borrador"}
+            onChange={(e) => setPublished(e.target.value === "publicado")}
+            className="rounded-lg border px-3 py-2 font-body" style={{ fontSize: 13, borderColor: "var(--gris-linea)" }}>
+            <option value="borrador">Borrador</option>
+            <option value="publicado">Publicado</option>
+          </select>
+          <button type="button" onClick={handleSave} disabled={saving || title.trim() === ""}
+            className="font-head px-6 py-2.5 rounded-xl text-white disabled:opacity-50"
+            style={{ background: "var(--lavanda)" }}>
+            {saving ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      </div>
+      <h1 className="font-head text-xl mb-3">{pillarName}</h1>
+      <input className="w-full rounded-lg border px-3 py-2 font-body text-sm mb-6"
         style={{ borderColor: "var(--gris-linea)" }} placeholder="Título"
         value={title} onChange={(e) => setTitle(e.target.value)} />
-      <label className="flex items-center gap-2 font-body text-sm mb-6">
-        <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} /> Publicado
-      </label>
       <BlockListEditor blocks={blocks} setBlocks={setBlocks} />
-      <button type="button" onClick={handleSave} disabled={saving || title.trim() === ""}
-        className="font-head px-6 py-2.5 rounded-xl text-white disabled:opacity-50 mt-4"
-        style={{ background: "var(--lavanda)" }}>{saving ? "Guardando…" : "Guardar"}</button>
     </div>
   );
 }
