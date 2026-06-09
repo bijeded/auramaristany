@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     .insert({
       profile_id: user.id,
       storage_path: path,
-      photo_date: today,
+      taken_at: today,
       caption,
     })
     .select("id")

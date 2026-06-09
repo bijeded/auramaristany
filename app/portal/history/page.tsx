@@ -7,7 +7,7 @@ import type { PhotoItem } from "@/components/portal/PhotosTab";
 interface PhotoRow {
   id: string;
   storage_path: string;
-  photo_date: string;
+  taken_at: string;
   caption: string | null;
 }
 
@@ -26,9 +26,9 @@ export default async function HistoryPage() {
   // Fotos + signed URLs (bucket privado).
   const { data: rawPhotos } = await supabase
     .from("progress_photos")
-    .select("id, storage_path, photo_date, caption")
+    .select("id, storage_path, taken_at, caption")
     .eq("profile_id", user.id)
-    .order("photo_date", { ascending: false });
+    .order("taken_at", { ascending: false });
 
   const photoRows = (rawPhotos ?? []) as unknown as PhotoRow[];
   const photos: PhotoItem[] = [];
@@ -40,7 +40,7 @@ export default async function HistoryPage() {
       photos.push({
         id: p.id,
         url: signed.signedUrl,
-        photoDate: p.photo_date,
+        photoDate: p.taken_at,
         caption: p.caption,
       });
     }
