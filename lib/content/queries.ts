@@ -209,7 +209,7 @@ export async function upsertProgressLog(params: {
         general_notes: params.generalNotes,
         completed: params.completed,
       },
-      { onConflict: "profile_id,program_day_id,log_date" }
+      { onConflict: "profile_id,program_day_id" }
     )
     .select("id")
     .single();
