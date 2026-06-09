@@ -62,6 +62,16 @@ describe("getRedirectPath", () => {
     })).toBeNull();
   });
 
+  it("redirects authenticated user with no role on protected route to login", () => {
+    expect(getRedirectPath({
+      pathname: "/onboarding/questionnaire",
+      hasSession: true,
+      role: null,
+      onboardingCompleted: false,
+      hasActiveSubscription: false,
+    })).toBe("/auth/login");
+  });
+
   it("allows access to public auth routes without session", () => {
     expect(getRedirectPath({
       pathname: "/auth/login",
@@ -110,6 +120,18 @@ describe("getRedirectPath", () => {
     expect(
       getRedirectPath({
         pathname: "/portal/sin-suscripcion",
+        hasSession: true,
+        role: "client",
+        onboardingCompleted: false,
+        hasActiveSubscription: false,
+      })
+    ).toBeNull();
+  });
+
+  it("allows access to /portal/activando without a subscription (payment processing page)", () => {
+    expect(
+      getRedirectPath({
+        pathname: "/portal/activando",
         hasSession: true,
         role: "client",
         onboardingCompleted: false,

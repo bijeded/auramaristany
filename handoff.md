@@ -1,6 +1,7 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
-Fecha: 4 de junio de 2026 · Estado: planificación completa, listo para desarrollo
+Fecha: 4 de junio de 2026 · Actualizado: 6 de junio de 2026
+Estado: Fase 2 en progreso — Subsistemas C y D completados
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -189,9 +190,10 @@ messages               — mensajes Aura→clientas (individual o broadcast)
 message_recipients     — destinatarios + read_at
 invoices               — historial de pagos (fuente del dashboard financiero)
 
-exercises_done JSONB estructura:
-  { "exercise-uuid": { "completed": true, "reps_done": 12,
-                        "weight_kg": 15.0, "notes": "..." } }
+exercises_done JSONB estructura (v1.1 — por serie):
+  { "exercise-uuid": { "completed": true,
+                        "series": [{ "reps_done": 12, "weight_kg": 15.0 }, ...] } }
+  (N objetos en series = N sets; campos null si no se llenaron)
 
 exercise_list block JSONB estructura:
   { "exercises": [{ "id": "uuid", "name": "...", "sets": 3, "reps": "12",
@@ -247,10 +249,21 @@ Middleware (orden):
 
 /supabase/migrations/001_initial_schema.sql — esquema completo + RLS
 /lib/content/access.ts              — lógica de acceso para los 3 programas
+/lib/content/queries.ts             — getTodayContent + DEV_DATE override
 /app/api/webhooks/stripe/route.ts   — ciclo de vida de suscripciones
 /middleware.ts                      — protección por rol/suscripción/onboarding
-/components/admin/DayEditor.tsx     — editor CMS de Aura
+/hooks/useProgressForm.ts           — estado del formulario + auto-guardado (debounce 1.5s)
 /components/portal/TodayView.tsx    — vista del día + progreso integrado
+/app/portal/layout.tsx              — layout con nav inferior y max-width 640px (desktop)
+/app/admin/layout.tsx               — sidebar de navegación admin (desktop-first, 220px)
+/lib/admin/queries.ts               — consultas de datos del panel admin
+/components/admin/WeeklyGrid.tsx    — grilla 4×7 (semanas × días) del CMS
+/components/admin/SeriesAccordion.tsx — acordeón por serie con WeeklyGrid integrado
+/app/admin/content/page.tsx         — lista de programas (CMS overview)
+/app/admin/content/[programId]/page.tsx — series de un programa
+-- PENDIENTE Subsistema E:
+/components/admin/DayEditor.tsx     — editor CMS de Aura (aún no creado)
+/app/admin/content/[programId]/series/[seriesId]/days/[dayId]/page.tsx
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -277,20 +290,111 @@ COMPLETADO:
   ✓ Archivos de diseño en /Users/franciscovenegas/Desktop/Cowork/Aura/
     design-handoff-aura/prototype/ (JSX + CSS + datos mock)
 
-PENDIENTE (próximo paso — Fase 0):
-  ○ Inicializar proyecto Next.js 14 + TypeScript + Tailwind + shadcn/ui
-  ○ Configurar Supabase: migraciones SQL, Auth, Storage, RLS
-  ○ Stripe test mode: crear 10 Products/Prices en MXN
-  ○ Configurar Vercel + variables de entorno
-  ○ Implementar login/logout funcional como primer entregable
+  ✓ FASE 0 — FUNDACIÓN (completada 4 de junio de 2026)
+    ✓ Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui (Radix, estilo "default")
+    ✓ Brand tokens aplicados: Oswald/Hind, rosa/lavanda, CSS custom properties
+    ✓ Supabase configurado: proyecto bgvxaagfnzvzamtxqbkg.supabase.co
+    ✓ Schema SQL completo aplicado (18 tablas + RLS + triggers)
+    ✓ Middleware de protección de rutas con TDD (8/8 tests passing)
+    ✓ Auth completo: registro, confirmación por email, login, logout, reset password
+    ✓ Flujo verificado en local: registro → email → login → portal → logout
+    ✓ 0 errores TypeScript · build limpio
+    Plan detallado: docs/superpowers/plans/2026-06-04-fase-0-fundacion.md
+
+    Nota técnica — fix aplicado post-migración:
+    La función handle_new_user() requirió SET search_path = public por un
+    cambio de seguridad en versiones recientes de Supabase. Ya corregido
+    en la función activa del proyecto (no en el archivo SQL de migración).
+
+  ✓ FASE 1 — SUSCRIPCIÓN MVP (completada 5 de junio de 2026)
+    ✓ 10 Stripe Products/Prices creados en test mode ($999 MXN c/u)
+      Cuenta Stripe test: acct_1TeeqvRx0tAq6bwG
+      Script de seed: scripts/seed-stripe.ts
+      IDs actualizados en program_variants vía SQL en Supabase
+    ✓ /checkout/[variantSlug] — landing de conversión con CheckoutButton
+    ✓ /api/subscriptions/create-checkout — crea Stripe Checkout Session
+      con validación de prerequisitos y creación de customer
+    ✓ Webhook /api/webhooks/stripe — maneja ciclo de vida completo:
+      checkout.session.completed → crea suscripción (months_elapsed=1)
+      invoice.paid → incrementa months_elapsed (solo subscription_cycle)
+      customer.subscription.updated/deleted → actualiza status
+      invoice.payment_failed → status=past_due
+    ✓ /portal/activando — página de polling post-pago (resuelve race condition
+      entre redirect de Stripe y llegada asíncrona del webhook)
+    ✓ /onboarding/questionnaire — cuestionario dinámico desde DB
+    ✓ /portal/sin-suscripcion — página de acceso denegado con logout
+    ✓ Middleware actualizado: gate de suscripción + fix de usuarios sin rol
+    ✓ Login/Register preservan ?next= para redirigir al checkout tras auth
+    ✓ 25/25 tests passing
+    Flujo smoke-tested end-to-end en local:
+      checkout → pago → /portal/activando → onboarding → /portal/today
+
+    Notas técnicas — fixes aplicados durante desarrollo:
+    - Stripe SDK v22.x requiere apiVersion "2026-05-27.dahlia" (no "2024-04-10")
+    - Stripe API 2026: invoice.subscription movido a
+      invoice.parent.subscription_details.subscription
+    - Stripe API 2026: subscription.current_period_start/end eliminados
+    - Race condition post-pago resuelta con /portal/activando (polling 2s × 15)
+    - Usuarios autenticados sin fila en profiles ahora bloqueados en middleware
+    Plan detallado: docs/superpowers/plans/2026-06-04-fase-1-subscripcion-mvp.md
+
+  ◑ FASE 2 — CONTENIDO (en progreso — iniciada 5 de junio de 2026)
+
+    ✓ Subsistema A — /portal/today funcional:
+      ✓ Vista real del día con contenido desde DB (5 tipos de bloques)
+      ✓ Formulario de progreso integrado: reps + peso por serie (N filas = N sets)
+      ✓ Auto-guardado con debounce 1.5s (hook useProgressForm)
+      ✓ exercises_done JSONB estructura por serie (ver sección 6)
+      ✓ DEV_DATE: override de fecha para testing local (.env.local, server-only)
+        Nota: remover antes de producción (es gitignored, no llega a Vercel)
+
+    ✓ Subsistema B — UI/UX portal:
+      ✓ Capitalización de fecha: charAt(0).toUpperCase() — no CSS capitalize
+      ✓ Fecha efectiva: viene del servidor (effectiveDate en TodayContent)
+        para que DEV_DATE se refleje en el UI correctamente
+      ✓ Video: playsinline=1 en URL del iframe de YouTube
+      ✓ Portal max-width 640px centrado en desktop (background #e8e0e0)
+
+    ✓ Subsistema C — Admin layout:
+      ✓ app/admin/layout.tsx: sidebar sticky 220px, íconos Lucide
+      ✓ Nav: Dashboard / Clientes / Contenido / Mensajes / Onboarding
+      ✓ Estado activo: pathname.startsWith(href), fondo lavanda-tint
+      ✓ Stubs creados: /admin/dashboard, /clients, /messages, /onboarding-settings
+      ✓ Middleware ya enrutaba admin→/admin/dashboard (sin cambios)
+
+    ✓ Subsistema D — Admin CMS overview + grilla semanal:
+      ✓ /admin/content: lista de programas con billing model, duración, conteo
+      ✓ /admin/content/[programId]: acordeón de series con grilla 4×7
+      ✓ WeeklyGrid: celdas publicadas (lavanda), borrador (gris), vacías (dashed)
+      ✓ Bug doble título "Mes 1 — Mes 1" corregido: SeriesAccordion prepende
+        "Mes {N} —" y el seed ya NO incluye ese prefijo en el título
+      ✓ SQL a correr en Supabase Dashboard para sincronizar live DB:
+        UPDATE program_series SET title = 'Actividad Física'
+        WHERE id = '00000000-0000-0000-0003-000000000001';
+        (El seed ya tiene el título correcto para futuras instalaciones)
+
+    ○ Subsistema E — Editor de día (PENDIENTE — próximo paso):
+      Ruta edit:   /admin/content/[programId]/series/[seriesId]/days/[dayId]
+      Ruta create: /admin/content/[programId]/series/[seriesId]/days/new
+      Ver bloque de contexto: docs/superpowers/context/subsistema-e-editor-dia.md
+
+PENDIENTE:
+  ○ Subsistema E: editor de día (formulario metadata + bloques arrastrables)
+  ○ /api/admin/upload — endpoint para subir PDF/imagen a Supabase Storage
+  ○ Configurar Vercel + variables de entorno de producción
+  ○ Fix pre-existente: app/portal/activando/page.tsx TypeScript error
+    (Property 'onboarding_completed' on type 'never')
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 11. FASES DE DESARROLLO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Fase 0 — Fundación         (sem 1-2)   Next.js + Supabase + Stripe test + Vercel
-Fase 1 — Suscripción MVP   (sem 3-5)   Quiz→pago→onboarding→portal básico
-Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + progreso
+Fase 0 — Fundación         (sem 1-2)   Next.js + Supabase + Stripe test + Vercel  ✓ COMPLETADA
+Fase 1 — Suscripción MVP   (sem 3-5)   Quiz→pago→onboarding→portal básico          ✓ COMPLETADA
+Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + progreso  ◑ EN PROGRESO
+  ✓ Sub A: portal/today funcional     ✓ Sub B: UI/UX portal
+  ✓ Sub C: Admin layout + sidebar     ✓ Sub D: CMS overview + grilla semanal
+  ○ Sub E: Editor de día (siguiente)
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días
 Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas
 Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos
@@ -327,7 +431,10 @@ semana 5 no tiene contenido definido en la tabla. Decisión pendiente:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 P1: ¿Cuáles son los precios exactos en MXN de cada variante?
-    (Necesario antes de crear los Stripe Products/Prices)
+    RESUELTO TEMPORALMENTE: Se usarán precios simulados ($999 MXN) en Stripe
+    test mode durante el desarrollo. Antes del lanzamiento se crean los
+    Products/Prices reales en Stripe live mode y se actualizan los
+    stripe_price_id en la tabla program_variants con un query SQL.
 
 P2: ¿Qué pasa en semanas 5 de un mes? (ver Limitaciones arriba)
     Opciones: a) descanso automático  b) repetir contenido semana 4
@@ -338,9 +445,9 @@ P3: ¿La clienta puede EDITAR un registro pasado desde /portal/history/[logId]?
     correcciones posteriores.
 
 P4: ¿Cuáles son las preguntas del onboarding que Aura quiere hacer?
-    El sistema está preparado para cualquier set de preguntas (Aura las
-    configura desde el admin), pero sería útil tenerlas para poblar datos
-    de prueba en Fase 1.
+    RESUELTO TEMPORALMENTE: Se sembraron 3 preguntas de prueba en la
+    migración 002. Aura podrá gestionar las preguntas definitivas desde
+    el admin (/admin/onboarding-settings) cuando esté implementado en Fase 2+.
 
 P5: ¿El nombre de dominio ya está comprado? ¿app.auramaristany.com o similar?
 
@@ -371,6 +478,6 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Para continuar: leer SPEC.md completo, revisar los JSX del diseño,
-y comenzar con Fase 0 (inicializar Next.js 14).
+Para continuar: revisar los JSX del diseño en design-handoff-aura/prototype/
+y comenzar con Fase 2 (CMS grilla semanal + portal del día + progreso).
 ════════════════════════════════════════════════════════════════

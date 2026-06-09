@@ -166,6 +166,107 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["onboarding_responses"]["Insert"]>;
       };
+      program_series: {
+        Row: {
+          id: string;
+          program_id: string;
+          series_number: number;
+          title: string;
+          description: string | null;
+          published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          program_id: string;
+          series_number: number;
+          title: string;
+          description?: string | null;
+          published?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["program_series"]["Insert"]>;
+      };
+      program_days: {
+        Row: {
+          id: string;
+          series_id: string;
+          week_number: number;
+          day_of_week: string;
+          workout_focus: string | null;
+          title: string;
+          description: string | null;
+          day_type: string;
+          duration_minutes: number | null;
+          published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          series_id: string;
+          week_number: number;
+          day_of_week: string;
+          workout_focus?: string | null;
+          title: string;
+          description?: string | null;
+          day_type?: string;
+          duration_minutes?: number | null;
+          published?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["program_days"]["Insert"]>;
+      };
+      program_day_blocks: {
+        Row: {
+          id: string;
+          day_id: string;
+          block_type: string;
+          sort_order: number;
+          content: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          day_id: string;
+          block_type: string;
+          sort_order: number;
+          content: Json;
+        };
+        Update: Partial<Database["public"]["Tables"]["program_day_blocks"]["Insert"]>;
+      };
+      variant_series_map: {
+        Row: {
+          program_variant_id: string;
+          series_id: string;
+        };
+        Insert: {
+          program_variant_id: string;
+          series_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["variant_series_map"]["Insert"]>;
+      };
+      progress_logs: {
+        Row: {
+          id: string;
+          profile_id: string;
+          subscription_id: string;
+          program_day_id: string;
+          log_date: string;
+          completed: boolean;
+          exercises_done: Json | null;
+          general_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          subscription_id: string;
+          program_day_id: string;
+          log_date?: string;
+          completed?: boolean;
+          exercises_done?: Json | null;
+          general_notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["progress_logs"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

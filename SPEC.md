@@ -76,11 +76,11 @@ Sitio WordPress
 **Progresión:**
 ```
 CuarentaMás Principiante → Extra Intermedio (6 meses) → Extra Avanzado (indefinido)
-CuarentaMás Intermedio/Avanzado ─────────────────────────→ Extra Avanzado (acceso directo)
+CuarentaMás Intermedio/Avanzado ──────────────────────→ Extra Avanzado (acceso directo)
 ```
 
 | slug | Duración | Prerequisito |
-|-----|----------|-------------|
+|------|----------|--------------|
 | `cuarenta-mas-extra-intermedio` | 6 meses fijos | CuarentaMás completado (solo Principiante) |
 | `cuarenta-mas-extra-avanzado` | Indefinida (mensual rolling) | Extra Intermedio completado **O** CuarentaMás Intermedio/Avanzado completado |
 
@@ -91,7 +91,7 @@ CuarentaMás Intermedio/Avanzado ───────────────�
 ### 3. Strong & Fit — suscripción mensual indefinida, acumulativa
 
 | slug | Nivel |
-|-----|-------|
+|------|-------|
 | `strong-fit-principiante` | Principiante |
 | `strong-fit-intermedio` | Intermedio |
 | `strong-fit-avanzado` | Avanzado |
@@ -298,8 +298,9 @@ CREATE TABLE progress_logs (
   log_date DATE NOT NULL DEFAULT CURRENT_DATE,
   completed BOOLEAN DEFAULT false,
   exercises_done JSONB,
-  -- { "exercise-uuid": { "completed": true, "reps_done": 12,
-  --                      "weight_kg": 15.0, "notes": "..." } }
+  -- { "exercise-uuid": { "completed": true,
+  --                      "series": [{ "reps_done": 12, "weight_kg": 15.0 }, ...] } }
+  -- (N objetos en series = N sets; campos null si no se llenaron)
   general_notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -384,6 +385,8 @@ CREATE TABLE invoices (
 
   /portal                         ← guard: suscripción activa + onboarding_completed=true
     /today                        ← contenido del día + progreso integrado (1 sola pantalla)
+    /activando                    ← polling post-pago: espera webhook de Stripe antes de redirigir
+    /sin-suscripcion              ← página de aterrizaje cuando no hay suscripción activa
     /history                      ← desempeño (reps/peso), galería de fotos, historial de días
     /history/[logId]              ← detalle de un día anterior: contenido + registro guardado (lectura)
     /messages
@@ -405,10 +408,11 @@ CREATE TABLE invoices (
 
 ### Lógica de middleware (en orden)
 1. No autenticado → `/auth/login`
-2. Sin suscripción activa → preserva URL, redirige a checkout o `/programas`
-3. Suscripción activa + `onboarding_completed=false` → `/onboarding/questionnaire`
-4. Admin visitando `/portal` → `/admin/dashboard`
-5. Cliente visitando `/admin` → `/portal/today`
+2. Autenticado pero sin fila en `profiles` (`role=null`) → `/auth/login`
+3. Sin suscripción activa → `/portal/sin-suscripcion` (excepto `/portal/activando` y `/portal/sin-suscripcion`, que son accesibles sin suscripción)
+4. Suscripción activa + `onboarding_completed=false` → `/onboarding/questionnaire`
+5. Admin visitando `/portal` → `/admin/dashboard`
+6. Cliente visitando `/admin` → `/portal/today`
 
 ---
 

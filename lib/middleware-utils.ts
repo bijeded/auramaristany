@@ -24,6 +24,10 @@ export function getRedirectPath(params: RedirectParams): string | null {
     return null;
   }
 
+  if (hasSession && !role && isProtectedRoute) {
+    return "/auth/login";
+  }
+
   if (role === "admin" && pathname.startsWith("/portal")) {
     return "/admin/dashboard";
   }
@@ -33,8 +37,8 @@ export function getRedirectPath(params: RedirectParams): string | null {
   }
 
   if (role === "client" && (pathname.startsWith("/portal") || pathname.startsWith("/onboarding"))) {
-    if (pathname === "/portal/sin-suscripcion") {
-      return null; // Allow access — this is the "no subscription" page itself
+    if (pathname === "/portal/sin-suscripcion" || pathname === "/portal/activando") {
+      return null; // Allow access — no-subscription page and payment processing page
     }
     if (!hasActiveSubscription) {
       return "/portal/sin-suscripcion";

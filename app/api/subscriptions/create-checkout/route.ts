@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     payment_method_types: ["card"],
     mode: "subscription",
     line_items: [{ price: variant.stripe_price_id, quantity: 1 }],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/portal/today`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/portal/activando`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout/${variantSlug}`,
     metadata: {
       supabase_user_id: user.id,

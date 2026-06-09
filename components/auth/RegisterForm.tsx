@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function RegisterForm() {
+  const searchParams = useSearchParams();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +39,11 @@ export function RegisterForm() {
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: (() => {
+          const next = searchParams.get("next");
+          const base = `${window.location.origin}/auth/callback`;
+          return next && next.startsWith("/") ? `${base}?next=${encodeURIComponent(next)}` : base;
+        })(),
       },
     });
 
@@ -67,7 +73,7 @@ export function RegisterForm() {
           Te enviamos un enlace de confirmación a <strong>{email}</strong>. Haz clic en él para
           activar tu cuenta.
         </p>
-        <Link href="/auth/login">
+        <Link href={searchParams.get("next") ? `/auth/login?next=${encodeURIComponent(searchParams.get("next")!)}` : "/auth/login"}>
           <Button variant="outline" className="w-full">
             Volver al inicio de sesión
           </Button>

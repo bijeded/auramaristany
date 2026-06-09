@@ -1,3 +1,5 @@
+import { LogoutButton } from "@/components/auth/LogoutButton";
+
 export default function SinSuscripcionPage() {
   return (
     <div
@@ -21,11 +23,12 @@ export default function SinSuscripcionPage() {
         </p>
         <a
           href="https://demo.studiosdmm.com.mx/aura/"
-          className="block w-full text-center py-3 rounded-lg font-head uppercase tracking-wider text-sm text-white"
+          className="block w-full text-center py-3 rounded-lg font-head uppercase tracking-wider text-sm text-white mb-3"
           style={{ background: "var(--lavanda)" }}
         >
           Ir al sitio de Aura
         </a>
+        <LogoutButton />
       </div>
     </div>
   );
