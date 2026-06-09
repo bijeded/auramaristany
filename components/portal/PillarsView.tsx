@@ -2,13 +2,16 @@
 import { useState } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { BlockView } from "./blocks/BlockView";
+import { PortalHeader } from "./PortalHeader";
 import type { PillarWithBlocks } from "@/lib/content/pillars";
 
-export function PillarsView({ pillars }: { pillars: PillarWithBlocks[] }) {
+export function PillarsView({ pillars, dateLabel }: { pillars: PillarWithBlocks[]; dateLabel: string }) {
   const [open, setOpen] = useState<string | null>(pillars[0]?.id ?? null);
   if (pillars.length === 0) {
     return (
-      <div className="px-4 pt-4 pb-8">
+      <div style={{ background: "var(--blanco)" }}>
+        <PortalHeader dateLabel={dateLabel} />
+        <div className="px-4 pt-4 pb-8">
         <h1 className="font-head text-2xl mb-4">Pilares del mes</h1>
         <div className="rounded-xl p-8 text-center" style={{ background: "var(--rosa-soft)", border: "1px solid var(--gris-linea)" }}>
           <div className="flex items-center justify-center rounded-full mx-auto mb-4"
@@ -22,11 +25,14 @@ export function PillarsView({ pillars }: { pillars: PillarWithBlocks[] }) {
             Tu enfoque de este mes es la actividad física. Cuando haya contenido extra, aparecerá aquí.
           </p>
         </div>
+        </div>
       </div>
     );
   }
   return (
-    <div className="px-4 pt-4 pb-8 space-y-3">
+    <div style={{ background: "var(--blanco)" }}>
+      <PortalHeader dateLabel={dateLabel} />
+      <div className="px-4 pt-4 pb-8 space-y-3">
       <h1 className="font-head text-2xl mb-2">Pilares del mes</h1>
       {pillars.map((p) => (
         <div key={p.id} className="rounded-xl border bg-white" style={{ borderColor: "var(--gris-linea)" }}>
@@ -47,6 +53,7 @@ export function PillarsView({ pillars }: { pillars: PillarWithBlocks[] }) {
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
