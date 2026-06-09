@@ -7,6 +7,8 @@ import { YoutubeBlock } from "./blocks/YoutubeBlock";
 import { PdfBlock } from "./blocks/PdfBlock";
 import { ImageBlock } from "./blocks/ImageBlock";
 import { ExerciseListBlock } from "./blocks/ExerciseListBlock";
+import { CardioZone2Block } from "./blocks/CardioZone2Block";
+import { PortalHeader } from "./PortalHeader";
 import { useProgressForm } from "@/hooks/useProgressForm";
 import type { ExerciseSeriesEntry } from "@/hooks/useProgressForm";
 
@@ -107,13 +109,11 @@ function ProgramBanner({
 function DayHeader({
   title,
   workoutFocus,
-  dayType,
   durationMinutes,
   dayOfWeek,
 }: {
   title: string;
   workoutFocus: string | null;
-  dayType: string;
   durationMinutes: number | null;
   dayOfWeek: string;
 }) {
@@ -152,7 +152,7 @@ function DayHeader({
             {workoutFocus}
           </span>
         )}
-        {dayType === "workout" && durationMinutes && (
+        {durationMinutes && (
           <span
             className="flex items-center gap-1.5 font-body rounded-full px-3 py-1"
             style={{
@@ -308,6 +308,8 @@ function BlockRenderer({
           onUpdateSeries={onUpdateSeries}
         />
       );
+    case "cardio_zone2":
+      return <CardioZone2Block />;
     default:
       return null;
   }
@@ -330,30 +332,9 @@ export function TodayView({ content }: { content: TodayContent | null }) {
     });
 
   return (
-    <div style={{ background: "var(--rosa-soft)" }}>
+    <div style={{ background: "var(--blanco)" }}>
       {/* Sticky top bar — always visible */}
-      <div
-        className="sticky top-0 z-10 flex items-center justify-between px-4"
-        style={{
-          height: 52,
-          background: "rgba(255,255,255,0.94)",
-          backdropFilter: "blur(10px)",
-          borderBottom: "1px solid var(--gris-linea)",
-        }}
-      >
-        <span
-          className="font-head font-semibold tracking-widest uppercase"
-          style={{ fontSize: 16, letterSpacing: "0.18em" }}
-        >
-          AURA
-        </span>
-        <span
-          className="font-body"
-          style={{ fontSize: 13, color: "var(--gris-texto)" }}
-        >
-          {formatDate(content?.effectiveDate)}
-        </span>
-      </div>
+      <PortalHeader dateLabel={formatDate(content?.effectiveDate)} />
 
       {/* Scrollable content */}
       <div className="px-4 pt-4 pb-8">
@@ -367,16 +348,13 @@ export function TodayView({ content }: { content: TodayContent | null }) {
               programSlug={content.programSlug}
             />
 
-            {content.day.workout_focus === null ? (
-              <RestDayCard />
-            ) : content.blocks.length === 0 ? (
+            {content.blocks.length === 0 ? (
               <ContentNotAvailableCard />
             ) : (
               <>
                 <DayHeader
                   title={content.day.title}
                   workoutFocus={content.day.workout_focus}
-                  dayType={content.day.day_type}
                   durationMinutes={content.day.duration_minutes}
                   dayOfWeek={content.currentDayKey.day_of_week}
                 />

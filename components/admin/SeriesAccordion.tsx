@@ -1,17 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronUp, Layers } from "lucide-react";
 import { WeeklyGrid } from "./WeeklyGrid";
 import type { AdminSeries } from "@/lib/admin/queries";
 
 interface Props {
   series: AdminSeries;
   programId: string;
+  programSlug?: string;
   defaultOpen?: boolean;
 }
 
-export function SeriesAccordion({ series, programId, defaultOpen = false }: Props) {
+export function SeriesAccordion({ series, programId, programSlug, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen);
 
   const publishedCount = series.days.filter((d) => d.published).length;
@@ -79,6 +81,23 @@ export function SeriesAccordion({ series, programId, defaultOpen = false }: Prop
       {open && (
         <div style={{ padding: "0 20px 20px" }}>
           <div style={{ borderTop: "1px solid var(--gris-linea)", paddingTop: 16 }}>
+            {(programSlug === "cuarenta-mas" || programSlug === "cuarenta-mas-extra") && (
+              <div className="mb-3">
+                <Link
+                  href={`/admin/content/${programId}/series/${series.id}/pillars`}
+                  className="inline-flex items-center gap-1.5 font-body rounded-lg px-3 py-1.5"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: "var(--lavanda-soft)",
+                    color: "var(--lavanda-dark)",
+                    border: "1px solid var(--lavanda-soft)",
+                  }}
+                >
+                  <Layers size={14} /> Pilares del mes
+                </Link>
+              </div>
+            )}
             <WeeklyGrid
               days={series.days}
               programId={programId}

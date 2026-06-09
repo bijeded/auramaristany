@@ -1,5 +1,22 @@
 import type Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/service";
+import { stripe } from "@/lib/stripe";
+
+// Stripe API 2026+ moved the billing period onto subscription items.
+// The SubscriptionItem SDK type may not yet expose these fields, so read them defensively.
+type ItemPeriod = { current_period_start?: number; current_period_end?: number };
+
+function readPeriod(subscription: Stripe.Subscription) {
+  const item = subscription.items.data[0] as unknown as ItemPeriod | undefined;
+  return {
+    current_period_start: item?.current_period_start
+      ? new Date(item.current_period_start * 1000).toISOString()
+      : new Date().toISOString(),
+    current_period_end: item?.current_period_end
+      ? new Date(item.current_period_end * 1000).toISOString()
+      : null,
+  };
+}
 
 // Pure function — testable without DB
 export function computeMonthsUpdate(
@@ -42,6 +59,11 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
+  // Stripe API 2026+ exposes the billing period on subscription items, not the
+  // Subscription object — retrieve the subscription to source the period.
+  const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  const { current_period_start, current_period_end } = readPeriod(subscription);
+
   const { error } = await supabase.from("subscriptions").insert({
     profile_id: supabase_user_id,
     program_variant_id: variant_id,
@@ -50,6 +72,8 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     status: "active",
     months_elapsed: 1,
     enrollment_date: new Date().toISOString().split("T")[0],
+    current_period_start,
+    current_period_end,
   });
 
   if (error) console.error("[webhook] subscription insert error:", error);
@@ -125,12 +149,15 @@ async function recordInvoice(invoice: Stripe.Invoice, subscriptionDbId?: string)
 
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const supabase: AnyClient = createServiceClient();
-  // current_period_start/end removed from Subscription object in Stripe API 2026+
+  // Re-source the billing period from subscription items (Stripe API 2026+) so renewals stay fresh.
+  const { current_period_start, current_period_end } = readPeriod(subscription);
   const { error } = await supabase
     .from("subscriptions")
     .update({
       status: subscription.status,
       cancel_at_period_end: subscription.cancel_at_period_end,
+      current_period_start,
+      current_period_end,
     })
     .eq("stripe_subscription_id", subscription.id);
 
