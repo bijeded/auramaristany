@@ -37,3 +37,6 @@ next-env.d.ts
 
 # git worktrees
 .worktrees/
+
+# supabase CLI local state (project ref, pooler url — no commitear)
+supabase/.temp/
