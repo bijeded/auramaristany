@@ -90,3 +90,47 @@ export async function getAdminProgram(programId: string) {
 
   return { program: program as unknown as Omit<AdminProgram, "series_count">, series };
 }
+
+export interface BlockData {
+  id: string;
+  block_type: "text" | "youtube" | "pdf" | "image" | "exercise_list" | "cardio_zone2";
+  sort_order: number;
+  content: Record<string, unknown>;
+}
+
+export interface DayWithBlocks {
+  id: string;
+  series_id: string;
+  week_number: number;
+  day_of_week: string;
+  workout_focus: string | null;
+  title: string;
+  description: string | null;
+  day_type: string;
+  duration_minutes: number | null;
+  published: boolean;
+  blocks: BlockData[];
+}
+
+export async function getDayWithBlocks(dayId: string): Promise<DayWithBlocks | null> {
+  const supabase = await createClient();
+
+  const { data: rawDay } = await supabase
+    .from("program_days")
+    .select(
+      "id, series_id, week_number, day_of_week, workout_focus, title, description, day_type, duration_minutes, published"
+    )
+    .eq("id", dayId)
+    .single();
+
+  const day = rawDay as unknown as Omit<DayWithBlocks, "blocks"> | null;
+  if (!day) return null;
+
+  const { data: rawBlocks } = await supabase
+    .from("program_day_blocks")
+    .select("id, block_type, sort_order, content")
+    .eq("day_id", dayId)
+    .order("sort_order");
+
+  return { ...day, blocks: (rawBlocks as unknown as BlockData[]) ?? [] };
+}
