@@ -20,7 +20,7 @@ export function MessagesList({ items, auraWhatsapp }: { items: InboxItem[]; aura
 
       {auraWhatsapp && (
         <div style={{ padding: "0 16px 8px" }}>
-          <a href={whatsappUrl(auraWhatsapp, "Hola Aura 👋")} target="_blank" rel="noopener noreferrer"
+          <a href={whatsappUrl(auraWhatsapp, "Hola Aura")} target="_blank" rel="noopener noreferrer"
             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#25D366", color: "#fff", borderRadius: 10, padding: "10px 14px", fontWeight: 600, textDecoration: "none" }}>
             💬 Escríbele a Aura por WhatsApp
           </a>

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMessageDetail } from "@/lib/content/messages";
-import { markMessageRead } from "@/lib/portal/messageActions";
+import { MarkReadOnView } from "@/components/portal/MarkReadOnView";
 
 export default async function MessageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,10 +15,9 @@ export default async function MessageDetailPage({ params }: { params: Promise<{ 
   const msg = await getMessageDetail(user.id, id);
   if (!msg) notFound();
 
-  await markMessageRead(id);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <MarkReadOnView messageId={id} />
       <div style={{ padding: "16px 16px 8px" }}>
         <Link href="/portal/messages" style={{ color: "var(--gris-texto)", fontSize: 14, textDecoration: "none" }}>← Mensajes</Link>
       </div>
