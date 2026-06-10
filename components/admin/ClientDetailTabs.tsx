@@ -80,7 +80,7 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
                 {[
                   ["Fecha de inicio", dayLabel(s.enrollment_date)],
                   ["Progreso", subscriptionProgressLabel({ months_elapsed: s.months_elapsed }, { billing_model: s.billing_model, duration_months: s.duration_months })],
-                  ["Próximo cobro", s.current_period_end ? `${dayLabel(s.current_period_end)} · ${formatMXN(s.price_mxn)}` : "—"],
+                  ["Próximo cobro", s.current_period_end ? `${dayLabel(s.current_period_end.slice(0, 10))} · ${formatMXN(s.price_mxn)}` : "—"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between" style={{ marginBottom: 10 }}>
                     <span className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>{k}</span>
