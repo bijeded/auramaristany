@@ -567,10 +567,12 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
 - **Pagos recientes:** tabla (fecha, clienta, programa, monto, estado), últimas 10 filas de `invoices`. (Botón "Ver todos" + página de listado completo → Fase 6.)
 - **Capa de datos:** `lib/admin/finance-helpers.ts` (funciones puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin `is_admin()`). Fuente = tabla `invoices`, no Stripe API.
 
-### Gestión de Clientes — `/admin/clients` (stub hoy → Fase 6)
-- Lista con filtros: programa, estado de pago, fecha de inscripción
-- Detalle: respuestas de onboarding, progreso de ejercicios, métricas corporales, pagos, mensajes
-- CSV export de clientas (para newsletter/win-back de no-activas) — diferido aquí desde Fase 4.
+### Gestión de Clientes — `/admin/clients` (Fase 6 ✓ implementada)
+- **Lista** (`getClientsList`, una fila por clienta agrupando por `profile_id` y eligiendo la suscripción primaria): búsqueda por nombre/correo, filtros pill de programa **|** estado de pago, **paginación de 10**, **CSV export** (respeta filtros activos, vía `clientsToCSV`). Columna programa = pill con el programa + variante como subtítulo.
+- **Ficha individual** `/admin/clients/[clientId]` (`getClientDetail`): 6 tabs — Resumen (suscripciones + etiqueta de progreso por billing model + botón Eliminar), Onboarding, Progreso (`progress_logs`), **Fotos** (signed URLs + filtro por mes + **borrado admin**, cierra follow-up de Fase 3), Pagos (`invoices`), Mensajes (+ botón WhatsApp si hay `phone`). Métricas corporales no se muestran (`body_metrics` no se captura).
+- **Eliminar clienta**: endpoint `DELETE /api/admin/clients/[clientId]` con guard `canDeleteClient` (409 si tiene suscripción no cancelada — **no toca Stripe**), borra fotos de Storage y `auth.admin.deleteUser` → cascade vía migración **007** (`ON DELETE CASCADE` en la cadena de FKs de profiles/subscriptions). Endpoint de foto: `DELETE /api/admin/clients/[clientId]/photos/[photoId]`.
+- **CSV export** de clientas (para newsletter/win-back de no-activas) — incluido en la lista (diferido desde Fase 4).
+- **Capa de datos:** `lib/admin/clients-queries.ts` (server-only, RLS admin) + `lib/admin/clients-helpers.ts` (funciones puras, TDD: `filterClients`/`pickPrimarySubscription`/`subscriptionProgressLabel`/`canDeleteClient`/`clientsToCSV`/`paginate`) + `lib/admin/date-helpers.ts` (compartido con el portal).
 
 ### CMS de Contenido
 - Navegación: Programa → Serie/Mes → Grilla semanal → Día

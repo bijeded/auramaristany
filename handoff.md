@@ -621,9 +621,14 @@ Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + 
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días  ✓ COMPLETADA
 Fase 4 — Mensajería        (sem 12)    Comunicación Aura→clientas + email + WhatsApp  ✓ COMPLETADA (merge dbdb432)
 Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos                      ✓ COMPLETADA (merge a9ecb32)
-Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción  ← SIGUIENTE
-  Incluye: /admin/clients + ficha, CSV export de clientas, página /admin/payments
-  ("Ver todos" de pagos), pedir teléfono en onboarding, conectar Resend, deploy a Vercel.
+Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción  ← EN CURSO
+  ✓ Sub-bloque 1: Gestión de Clientes (merge 0d23c5e) — /admin/clients lista (búsqueda,
+    filtros programa|estado, paginación 10, CSV export) + ficha 6 tabs (Resumen, Onboarding,
+    Progreso, Fotos con borrado admin, Pagos, Mensajes+WhatsApp) + borrado total de clienta
+    (guard de sub activa → 409, no toca Stripe; cascade vía migración 007 ON DELETE CASCADE,
+    APLICADA y verificada). TDD en helpers (23 tests), 142/142, smoke E2E validado.
+  Pendiente: página /admin/payments ("Ver todos" de pagos), pedir teléfono en onboarding/checkout,
+    conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -711,10 +716,10 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Estado: Fases 0–5 COMPLETAS y en main; migraciones 001–006 aplicadas; backfill de
-invoices ejecutado; E2E validado. Siguiente: Fase 6 (Pulido + Launch).
-Para continuar Fase 6: /admin/clients + ficha individual, CSV export de clientas,
-página /admin/payments (botón "Ver todos"), pedir teléfono en onboarding, conectar
-Resend (API key + dominio), y deploy a Vercel (+ CRON_SECRET para el cron de retención).
-Usar el flujo brainstorm → plan → ejecución (superpowers) como en fases anteriores.
+Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloque 1 Gestión de Clientes
+mergeado, 0d23c5e). Migraciones 001–007 aplicadas (007 = ON DELETE CASCADE para borrado
+total de clienta); backfill de invoices ejecutado; E2E validado.
+Pendiente Fase 6: página /admin/payments (botón "Ver todos"), pedir teléfono en onboarding/checkout,
+conectar Resend (API key + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales,
+auditoría de seguridad. Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
