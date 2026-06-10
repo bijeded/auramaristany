@@ -13,7 +13,7 @@ const BASE_ITEMS = [
 
 const PILARES_ITEM = { href: "/portal/pilares", label: "Pilares", icon: Layers } as const;
 
-export function PortalNav({ showPilares }: { showPilares: boolean }) {
+export function PortalNav({ showPilares, unreadMessages = 0 }: { showPilares: boolean; unreadMessages?: number }) {
   const pathname = usePathname();
 
   const items = showPilares
@@ -40,7 +40,16 @@ export function PortalNav({ showPilares }: { showPilares: boolean }) {
               textDecoration: "none",
             }}
           >
-            <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
+            <div style={{ position: "relative" }}>
+              <Icon size={22} strokeWidth={active ? 2.2 : 1.8} />
+              {href === "/portal/messages" && unreadMessages > 0 && (
+                <span style={{ position: "absolute", top: -4, right: -8, minWidth: 16, height: 16, padding: "0 4px",
+                  borderRadius: 999, background: "var(--lavanda)", color: "#fff", fontSize: 10, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                  {unreadMessages > 9 ? "9+" : unreadMessages}
+                </span>
+              )}
+            </div>
             <span
               className="font-body"
               style={{
