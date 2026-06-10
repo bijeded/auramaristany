@@ -364,25 +364,32 @@ CREATE TABLE progress_photos (
 );
 
 -- MENSAJERÍA
+-- ⚠ DRIFT (corregido 9-jun-2026, pre-Fase 4): el bloque original de este SPEC
+-- listaba columnas que NO existen en la tabla aplicada (migración 001). Lo de
+-- abajo es el esquema REAL. El destino se modela SOLO vía message_recipients
+-- (no hay recipient_id ni broadcast_filter en messages). Si la Fase 4 decide
+-- agregar broadcast_filter/unique/created_at, será en una migración 006.
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id UUID REFERENCES profiles(id),
-  recipient_id UUID REFERENCES profiles(id), -- NULL si broadcast
-  subject TEXT,
+  subject TEXT NOT NULL,       -- ⚠ real: NOT NULL (el SPEC viejo lo daba nullable)
   body TEXT NOT NULL,
   is_broadcast BOOLEAN DEFAULT false,
-  broadcast_filter JSONB,      -- { "program_id": "uuid" } o NULL para todos
   created_at TIMESTAMPTZ DEFAULT now()
+  -- NO existe recipient_id ni broadcast_filter (el SPEC viejo los listaba).
 );
 
 CREATE TABLE message_recipients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id UUID REFERENCES messages(id),
-  profile_id UUID REFERENCES profiles(id),
-  read_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(message_id, profile_id)
+  recipient_id UUID REFERENCES profiles(id), -- ⚠ real: 'recipient_id' (no 'profile_id')
+  read_at TIMESTAMPTZ          -- null = no leído
+  -- NO existe created_at ni UNIQUE(message_id, recipient_id) declarado.
+  -- (candidatos a migración 006 si se necesitan; decidir en el brainstorm de Fase 4.)
 );
+-- ⚠ RLS pendiente: en 001 NO hay policy de SELECT sobre `messages` para clientas
+-- (solo messages_admin_write). La clienta necesita leer subject/body de los
+-- mensajes donde tiene fila en message_recipients → agregar en migración 006.
 
 -- FINANZAS
 CREATE TABLE invoices (
