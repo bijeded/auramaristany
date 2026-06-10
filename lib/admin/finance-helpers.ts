@@ -82,7 +82,7 @@ export function groupRevenueByMonth(
 export function groupClientsByProgram(subs: { program_name: string }[]): ProgramCount[] {
   const counts = new Map<string, number>();
   for (const s of subs) counts.set(s.program_name, (counts.get(s.program_name) ?? 0) + 1);
-  return [...counts.entries()]
+  return Array.from(counts.entries())
     .map(([program, count]) => ({ program, count }))
     .sort((a, b) => b.count - a.count);
 }
@@ -94,7 +94,7 @@ export function groupClientsByProgram(subs: { program_name: string }[]): Program
 export function groupRevenueByProgram(invoices: FinanceInvoiceRow[]): ProgramRevenue[] {
   const totals = new Map<string, number>();
   for (const inv of invoices) totals.set(inv.program_name, (totals.get(inv.program_name) ?? 0) + inv.amount_paid);
-  return [...totals.entries()]
+  return Array.from(totals.entries())
     .map(([program, total]) => ({ program, total }))
     .sort((a, b) => b.total - a.total);
 }
