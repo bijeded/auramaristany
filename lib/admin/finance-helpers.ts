@@ -1,7 +1,7 @@
 export interface FinanceSubRow {
   current_period_end: string | null; // ISO
   price_mxn: number;
-  program_name: string;
+  variant_name: string;
 }
 
 export interface FinanceInvoiceRow {
@@ -19,7 +19,7 @@ export interface RecentPaymentRow {
 }
 
 export interface MonthRevenue { key: string; label: string; total: number }
-export interface ProgramCount { program: string; count: number }
+export interface VariantCount { variant: string; count: number }
 export interface ProgramRevenue { program: string; total: number }
 
 // ---------------------------------------------------------------------------
@@ -76,14 +76,14 @@ export function groupRevenueByMonth(
 }
 
 // ---------------------------------------------------------------------------
-// Task 4: groupClientsByProgram
+// Task 4: groupClientsByVariant
 // ---------------------------------------------------------------------------
 
-export function groupClientsByProgram(subs: { program_name: string }[]): ProgramCount[] {
+export function groupClientsByVariant(subs: { variant_name: string }[]): VariantCount[] {
   const counts = new Map<string, number>();
-  for (const s of subs) counts.set(s.program_name, (counts.get(s.program_name) ?? 0) + 1);
+  for (const s of subs) counts.set(s.variant_name, (counts.get(s.variant_name) ?? 0) + 1);
   return Array.from(counts.entries())
-    .map(([program, count]) => ({ program, count }))
+    .map(([variant, count]) => ({ variant, count }))
     .sort((a, b) => b.count - a.count);
 }
 

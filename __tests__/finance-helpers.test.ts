@@ -3,7 +3,7 @@ import {
   formatMXN,
   computeMRR,
   groupRevenueByMonth,
-  groupClientsByProgram,
+  groupClientsByVariant,
   groupRevenueByProgram,
   computeRenewalsThisMonth,
 } from "@/lib/admin/finance-helpers";
@@ -66,23 +66,23 @@ describe("groupRevenueByMonth", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 4: groupClientsByProgram
+// Task 4: groupClientsByVariant
 // ---------------------------------------------------------------------------
 
-describe("groupClientsByProgram", () => {
-  it("cuenta suscripciones por programa, orden descendente", () => {
+describe("groupClientsByVariant", () => {
+  it("cuenta suscripciones por variante, orden descendente", () => {
     const subs = [
-      { program_name: "CuarentaMás" },
-      { program_name: "CuarentaMás" },
-      { program_name: "Strong & Fit" },
+      { variant_name: "CuarentaMás Principiante Poco Tiempo" },
+      { variant_name: "CuarentaMás Principiante Poco Tiempo" },
+      { variant_name: "Strong & Fit Intermedio" },
     ];
-    expect(groupClientsByProgram(subs)).toEqual([
-      { program: "CuarentaMás", count: 2 },
-      { program: "Strong & Fit", count: 1 },
+    expect(groupClientsByVariant(subs)).toEqual([
+      { variant: "CuarentaMás Principiante Poco Tiempo", count: 2 },
+      { variant: "Strong & Fit Intermedio", count: 1 },
     ]);
   });
   it("devuelve [] sin suscripciones", () => {
-    expect(groupClientsByProgram([])).toEqual([]);
+    expect(groupClientsByVariant([])).toEqual([]);
   });
 });
 

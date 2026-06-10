@@ -7,7 +7,7 @@ import {
 import {
   computeMRR,
   computeRenewalsThisMonth,
-  groupClientsByProgram,
+  groupClientsByVariant,
   groupRevenueByMonth,
   groupRevenueByProgram,
   formatMXN,
@@ -30,7 +30,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-function Kpi({ label, value, sub, danger, href }: { label: string; value: string; sub?: string; danger?: boolean; href?: string }) {
+function Kpi({ label, value, sub, danger, href }: { label: string; value: React.ReactNode; sub?: React.ReactNode; danger?: boolean; href?: string }) {
   return (
     <Card style={{ flex: 1 }}>
       <div className="font-body" style={{ fontWeight: 500, fontSize: 12.5, marginBottom: 10, color: "var(--gris-texto)" }}>{label}</div>
@@ -56,19 +56,20 @@ export default async function AdminDashboardPage() {
   const mrr = computeMRR(activeSubs);
   const renewals = computeRenewalsThisMonth(activeSubs, now);
   const byMonth = groupRevenueByMonth(invoices, 12, now);
-  const clientsByProgram = groupClientsByProgram(activeSubs);
+  const clientsByVariant = groupClientsByVariant(activeSubs);
   const revenueByProgram = groupRevenueByProgram(invoices);
-  const maxClients = Math.max(1, ...clientsByProgram.map((p) => p.count));
-  const monthLabel = now.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  const maxClients = Math.max(1, ...clientsByVariant.map((p) => p.count));
+  const rawMonth = now.toLocaleDateString("es-MX", { month: "long", year: "numeric" }); // "junio de 2026"
+  const monthLabel = rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1); // "Junio de 2026"
 
   return (
     <div style={{ padding: "28px 32px 40px", maxWidth: 1000 }}>
       <h1 className="font-head" style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Dashboard</h1>
-      <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13, marginBottom: 20, textTransform: "capitalize" }}>{monthLabel}</p>
+      <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13, marginBottom: 20 }}>{monthLabel}</p>
 
       {/* KPIs */}
       <div className="flex" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
-        <Kpi label="Ingreso mensual recurrente" value={formatMXN(mrr)} sub="MRR estimado de activas" />
+        <Kpi label="Ingreso mensual recurrente" value={formatMXN(mrr)} sub={<em style={{ fontStyle: "italic" }}>*Estimado</em>} />
         <Kpi label="Suscripciones activas" value={String(activeSubs.length)} />
         <Kpi label="Renuevan este mes" value={String(renewals.count)} sub={formatMXN(renewals.amount)} />
         <Kpi label="Requieren atención" value={String(pastDue)} danger sub="Ver clientes →" href="/admin/clients" />
@@ -83,13 +84,13 @@ export default async function AdminDashboardPage() {
       {/* Distribución */}
       <div className="flex" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
         <Card style={{ flex: 1 }}>
-          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Clientes por programa</h3>
+          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Clientes por variante</h3>
           <div className="flex flex-col" style={{ gap: 16 }}>
-            {clientsByProgram.length === 0 && <p className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>Sin suscripciones activas</p>}
-            {clientsByProgram.map((p) => (
-              <div key={p.program}>
+            {clientsByVariant.length === 0 && <p className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>Sin suscripciones activas</p>}
+            {clientsByVariant.map((p) => (
+              <div key={p.variant}>
                 <div className="flex" style={{ justifyContent: "space-between", marginBottom: 6 }}>
-                  <span className="font-body" style={{ fontSize: 13, fontWeight: 600 }}>{p.program}</span>
+                  <span className="font-body" style={{ fontSize: 13, fontWeight: 600 }}>{p.variant}</span>
                   <span className="font-body" style={{ fontSize: 13, fontWeight: 600 }}>{p.count}</span>
                 </div>
                 <div style={{ height: 8, borderRadius: 4, background: "var(--gris-claro)" }}>

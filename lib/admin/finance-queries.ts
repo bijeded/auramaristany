@@ -10,19 +10,19 @@ export async function getActiveSubscriptions(): Promise<FinanceSubRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
-    .select("current_period_end, program_variants(price_mxn, programs(name))")
+    .select("current_period_end, program_variants(name, price_mxn)")
     .eq("status", "active");
 
   type Raw = {
     current_period_end: string | null;
-    program_variants: { price_mxn: number; programs: { name: string } | null } | null;
+    program_variants: { name: string; price_mxn: number } | null;
   };
   return ((data ?? []) as unknown as Raw[])
     .filter((r) => r.program_variants)
     .map((r) => ({
       current_period_end: r.current_period_end,
       price_mxn: r.program_variants!.price_mxn,
-      program_name: r.program_variants!.programs?.name ?? "—",
+      variant_name: r.program_variants!.name,
     }));
 }
 
