@@ -4,9 +4,10 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
-  filterClients, paginate, clientsToCSV, canDeleteClient,
+  filterClients, clientsToCSV, canDeleteClient,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
+import { paginate } from "@/lib/admin/pagination";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
