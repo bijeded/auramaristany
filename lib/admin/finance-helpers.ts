@@ -120,3 +120,27 @@ export function computeRenewalsThisMonth(
   }
   return { count, amount };
 }
+
+// ---------------------------------------------------------------------------
+// Task 3 (payments): PaymentRow + filterPaymentsByStatus
+// ---------------------------------------------------------------------------
+
+export interface PaymentRow {
+  invoice_date: string;          // ISO (timestamptz)
+  profile_id: string | null;
+  client_name: string;
+  program_name: string;
+  variant_name: string;
+  amount_paid: number;           // en pesos
+  status: string;                // 'paid' | 'open' | 'void' | 'uncollectible'
+}
+
+export type PaymentStatusFilter = "todos" | "paid" | "open" | "void" | "uncollectible";
+
+export function filterPaymentsByStatus(
+  rows: PaymentRow[],
+  status: PaymentStatusFilter
+): PaymentRow[] {
+  if (status === "todos") return rows;
+  return rows.filter((r) => r.status === status);
+}

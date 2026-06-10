@@ -129,3 +129,31 @@ describe("computeRenewalsThisMonth", () => {
     expect(computeRenewalsThisMonth(subs, now)).toEqual({ count: 0, amount: 0 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 3 (payments): filterPaymentsByStatus
+// ---------------------------------------------------------------------------
+
+import { filterPaymentsByStatus, type PaymentRow } from "@/lib/admin/finance-helpers";
+
+const pmt = (status: string): PaymentRow => ({
+  invoice_date: "2026-06-01T00:00:00+00:00",
+  profile_id: "p1",
+  client_name: "Ana",
+  program_name: "CuarentaMás",
+  variant_name: "Base",
+  amount_paid: 999,
+  status,
+});
+
+describe("filterPaymentsByStatus", () => {
+  const rows = [pmt("paid"), pmt("open"), pmt("paid"), pmt("void")];
+  it("'todos' devuelve todas las filas", () => {
+    expect(filterPaymentsByStatus(rows, "todos")).toHaveLength(4);
+  });
+  it("filtra por estado exacto", () => {
+    expect(filterPaymentsByStatus(rows, "paid")).toHaveLength(2);
+    expect(filterPaymentsByStatus(rows, "void")).toHaveLength(1);
+    expect(filterPaymentsByStatus(rows, "uncollectible")).toHaveLength(0);
+  });
+});
