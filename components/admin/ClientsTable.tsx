@@ -102,7 +102,7 @@ export function ClientsTable({ rows }: { rows: ClientListRow[] }) {
           <div style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 14, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: "var(--gris-claro)" }}>
-                {["Clienta", "Programa", "Inscripción", "Próximo cobro", "Estado", ""].map((h, i) => (
+                {["Cliente", "Programa", "Inscripción", "Próximo cobro", "Estado", ""].map((h, i) => (
                   <th key={i} style={{ textAlign: "left", padding: "12px 20px", fontFamily: "var(--font-body)", fontWeight: 600, fontSize: 12, color: "var(--gris-texto)" }}>{h}</th>
                 ))}
               </tr></thead>

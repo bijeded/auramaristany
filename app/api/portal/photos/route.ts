@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Archivo faltante" }, { status: 400 });
   }
 
-  // Conteo actual de fotos de la clienta (para el tope).
+  // Conteo actual de fotos del cliente (para el tope).
   const { count } = await supabase
     .from("progress_photos")
     .select("id", { count: "exact", head: true })

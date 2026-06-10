@@ -28,7 +28,7 @@ export function ClientPhotosTab({ clientId, photos }: { clientId: string; photos
   }
 
   if (photos.length === 0) {
-    return <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 14 }}>Esta clienta no ha subido fotos.</p>;
+    return <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 14 }}>Este cliente no ha subido fotos.</p>;
   }
 
   return (

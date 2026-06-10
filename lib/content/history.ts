@@ -52,7 +52,7 @@ interface BlockRow {
 }
 
 /**
- * Lista cronológica (reciente primero) de días con progress_log de la clienta.
+ * Lista cronológica (reciente primero) de días con progress_log del cliente.
  */
 export async function getHistoryList(userId: string): Promise<HistoryListItem[]> {
   const supabase = await createClient();
@@ -186,7 +186,7 @@ interface DetailDayRow {
 }
 
 /**
- * Detalle read-only de un día pasado. Valida que el log sea de la clienta.
+ * Detalle read-only de un día pasado. Valida que el log sea del cliente.
  * Devuelve null si no existe o no le pertenece.
  */
 export async function getHistoryLog(

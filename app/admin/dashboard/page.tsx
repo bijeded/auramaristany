@@ -110,7 +110,7 @@ export default async function AdminDashboardPage() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--gris-claro)" }}>
-              {["Fecha", "Clienta", "Programa", "Monto", "Estado"].map((h) => (
+              {["Fecha", "Cliente", "Programa", "Monto", "Estado"].map((h) => (
                 <th key={h} className="font-body" style={{ textAlign: h === "Monto" ? "right" : "left", padding: "10px 22px", fontWeight: 600, fontSize: 12, color: "var(--gris-texto)" }}>{h}</th>
               ))}
             </tr>

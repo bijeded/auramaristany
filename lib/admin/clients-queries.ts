@@ -181,7 +181,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     }
   }
 
-  // Pagos (invoices de las suscripciones de la clienta)
+  // Pagos (invoices de las suscripciones del cliente)
   const { data: rawInvoices } = await supabase
     .from("invoices")
     .select("amount_paid, invoice_date, status, subscriptions!inner(profile_id)")

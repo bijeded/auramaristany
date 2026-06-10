@@ -164,7 +164,7 @@ export function MessagesAdmin({
 
             {mode === "individual" ? (
               <div style={{ marginBottom: 14 }}>
-                <label className="font-body" style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Clienta</label>
+                <label className="font-body" style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Cliente</label>
                 <select value={clientId} onChange={(e) => setClientId(e.target.value)}
                   style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid var(--gris-linea)" }}>
                   <option value="">Selecciona…</option>
@@ -184,7 +184,7 @@ export function MessagesAdmin({
                 <label className="font-body" style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Destinatarias</label>
                 <label style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0", cursor: "pointer" }}>
                   <input type="checkbox" checked={allClients} onChange={(e) => setAllClients(e.target.checked)} />
-                  <span className="font-body" style={{ fontWeight: 600 }}>Todas las clientas activas</span>
+                  <span className="font-body" style={{ fontWeight: 600 }}>Todos los clientes activos</span>
                 </label>
                 {!allClients && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
@@ -215,7 +215,7 @@ export function MessagesAdmin({
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>
-                Se enviará a <strong>{count}</strong> clienta{count !== 1 ? "s" : ""}
+                Se enviará a <strong>{count}</strong> cliente{count !== 1 ? "s" : ""}
               </span>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setOpen(false)} disabled={sending}
@@ -276,7 +276,7 @@ export function MessagesAdmin({
                 {confirmDelete ? (
                   <div style={{ background: "var(--rosa, #f8eeec)", borderRadius: 10, padding: 14 }}>
                     <p className="font-body" style={{ fontSize: 13, marginBottom: 10 }}>
-                      Esto elimina el mensaje y lo quita de la bandeja de las clientas. No se puede deshacer.
+                      Esto elimina el mensaje y lo quita de la bandeja de los clientes. No se puede deshacer.
                     </p>
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                       <button onClick={() => setConfirmDelete(false)} disabled={deleting}

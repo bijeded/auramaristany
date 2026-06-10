@@ -113,7 +113,7 @@ describe("canDeleteClient", () => {
 import { clientsToCSV } from "@/lib/admin/clients-helpers";
 
 describe("clientsToCSV", () => {
-  it("incluye encabezado y una fila por clienta", () => {
+  it("incluye encabezado y una fila por cliente", () => {
     const csv = clientsToCSV([base]);
     const lines = csv.split("\n");
     expect(lines[0]).toBe("Nombre,Email,Programa,Variante,Estado,Inscripción");

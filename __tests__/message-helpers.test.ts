@@ -19,7 +19,7 @@ const rows: ActiveSubRow[] = [
 ];
 
 describe("buildRecipientGroups", () => {
-  it("agrupa por variante y cuenta clientas distintas", () => {
+  it("agrupa por variante y cuenta clientes distintos", () => {
     const groups = buildRecipientGroups(rows);
     expect(groups).toEqual([
       { variantId: "v1", label: "CuarentaMás Principiante Poco Tiempo", programName: "CuarentaMás", count: 2 },
@@ -29,17 +29,17 @@ describe("buildRecipientGroups", () => {
 });
 
 describe("expandRecipients", () => {
-  it("individual devuelve solo esa clienta", () => {
+  it("individual devuelve solo ese cliente", () => {
     expect(expandRecipients(rows, { mode: "individual", profileId: "p1" })).toEqual(["p1"]);
   });
-  it("all devuelve clientas distintas (dedup)", () => {
+  it("all devuelve clientes distintos (dedup)", () => {
     expect(expandRecipients(rows, { mode: "all" }).sort()).toEqual(["p1", "p2"]);
   });
   it("groups filtra por variante y dedup entre variantes", () => {
     expect(expandRecipients(rows, { mode: "groups", variantIds: ["v1"] }).sort()).toEqual(["p1", "p2"]);
     expect(expandRecipients(rows, { mode: "groups", variantIds: ["v2"] })).toEqual(["p2"]);
   });
-  it("groups con varias variantes no duplica a la misma clienta", () => {
+  it("groups con varias variantes no duplica al mismo cliente", () => {
     expect(expandRecipients(rows, { mode: "groups", variantIds: ["v1", "v2"] }).sort()).toEqual(["p1", "p2"]);
   });
 });
@@ -49,8 +49,8 @@ describe("formatDestination", () => {
     expect(formatDestination(false, 1, "Ana")).toBe("Ana");
   });
   it("broadcast muestra conteo", () => {
-    expect(formatDestination(true, 12, null)).toBe("Difusión · 12 clientas");
-    expect(formatDestination(true, 1, null)).toBe("Difusión · 1 clienta");
+    expect(formatDestination(true, 12, null)).toBe("Difusión · 12 clientes");
+    expect(formatDestination(true, 1, null)).toBe("Difusión · 1 cliente");
   });
 });
 

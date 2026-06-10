@@ -58,7 +58,7 @@ export function PaymentsTable({ rows }: { rows: PaymentRow[] }) {
           <div style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 14, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: "var(--gris-claro)" }}>
-                {["Fecha", "Clienta", "Programa", "Monto", "Estado"].map((h) => (
+                {["Fecha", "Cliente", "Programa", "Monto", "Estado"].map((h) => (
                   <th key={h} className="font-body" style={{ textAlign: h === "Monto" ? "right" : "left", padding: "12px 20px", fontWeight: 600, fontSize: 12, color: "var(--gris-texto)" }}>{h}</th>
                 ))}
               </tr></thead>
