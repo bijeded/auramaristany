@@ -19,6 +19,11 @@ export interface SendMessageResult {
 }
 
 export async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
+  // Nota deliberada: usamos el cliente con contexto de usuario (no service-role).
+  // Las policies messages_admin_write / message_recipients_admin_write (migración 001)
+  // permiten la escritura del admin vía is_admin(), así que RLS hace de guard adicional.
+  // Si esas policies se endurecen en el futuro, revisar este insert. Los `as any` de
+  // abajo son por los tipos de Supabase desactualizados (convención del repo, ver dayActions).
   const supabase = await createClient();
 
   const {
