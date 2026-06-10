@@ -116,9 +116,22 @@ function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
 }
 
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  // Skip the first invoice (subscription_create) — months_elapsed already set to 1
+  // First invoice (subscription_create): la suscripción ya existe (creada por
+  // checkout.session.completed). Buscamos su id para registrar el primer pago.
   if (invoice.billing_reason === "subscription_create") {
-    await recordInvoice(invoice);
+    const subscriptionId = getSubscriptionIdFromInvoice(invoice);
+    if (!subscriptionId) {
+      console.error("[webhook] invoice.paid (create): no subscription id", invoice.id);
+      return;
+    }
+    const supabase: AnyClient = createServiceClient();
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("id")
+      .eq("stripe_subscription_id", subscriptionId)
+      .single();
+    if (sub) await recordInvoice(invoice, sub.id);
+    else console.error("[webhook] invoice.paid (create): subscription not found", subscriptionId);
     return;
   }
 
