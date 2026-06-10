@@ -31,7 +31,7 @@ export function buildRecipientGroups(rows: ActiveSubRow[]): RecipientGroup[] {
     }
     entry.clients.add(r.profile_id);
   }
-  return [...map.entries()]
+  return Array.from(map.entries())
     .map(([variantId, v]) => ({ variantId, label: v.label, programName: v.programName, count: v.clients.size }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
@@ -46,7 +46,7 @@ export function expandRecipients(rows: ActiveSubRow[], sel: RecipientSelection):
     const set = new Set(sel.variantIds);
     matched = rows.filter((r) => set.has(r.program_variant_id)).map((r) => r.profile_id);
   }
-  return [...new Set(matched)];
+  return Array.from(new Set(matched));
 }
 
 export function formatDestination(isBroadcast: boolean, total: number, singleName: string | null): string {

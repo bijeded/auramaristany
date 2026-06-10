@@ -17,6 +17,7 @@
 - Server actions: archivo con `"use server"` arriba (ver `lib/admin/dayActions.ts`). Queries server-only: `import "server-only"` + `createClient` (ver `lib/content/history.ts`).
 - Acceso admin a DB: `createClient()` (RLS) funciona para admin porque las policies usan `is_admin()`. Se añade un guard explícito de rol para errores limpios.
 - Escrituras Supabase usan el patrón `(supabase as any).from(...)` por los tipos generados desactualizados (mismo patrón que `dayActions.ts`). No es ideal, pero es la convención vigente; regenerar `types.ts` es follow-up fuera de esta fase.
+- ⚠ **tsconfig sin `target` explícito (target bajo):** NO usar spread de iteradores de `Map`/`Set` (`[...map.entries()]`, `[...new Set(x)]`, `[...map.values()]`) — produce error TS2802. Usar `Array.from(...)` en su lugar. (Spread de arrays normales sí es válido.)
 - Estilo UI: inline styles + clases utilitarias + CSS custom properties de marca (`var(--lavanda)`, `var(--rosa-soft)`, `var(--gris-linea)`, etc.), como en `components/portal/PortalNav.tsx`.
 
 ---
@@ -806,7 +807,7 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
 
   // Emails best-effort — un fallo no revierte el mensaje in-app.
   const idSet = new Set(recipientIds);
-  const emails = [...new Set(rows.filter((r) => idSet.has(r.profile_id)).map((r) => r.email).filter(Boolean))];
+  const emails = Array.from(new Set(rows.filter((r) => idSet.has(r.profile_id)).map((r) => r.email).filter(Boolean)));
   await sendNewMessageEmailBatch(emails, input.subject.trim());
 
   revalidatePath("/admin/messages");
@@ -1179,7 +1180,7 @@ export default async function AdminMessagesPage() {
       });
     }
   }
-  const clients = [...clientMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const clients = Array.from(clientMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
   return <MessagesAdmin sent={sent} groups={groups} clients={clients} />;
 }
