@@ -29,12 +29,12 @@ export interface ProgramRevenue { program: string; total: number }
 const MXN = new Intl.NumberFormat("es-MX", {
   style: "currency",
   currency: "MXN",
+  currencyDisplay: "narrowSymbol", // always "$" regardless of ICU build (avoids "MXN"/"MX$" drift)
   maximumFractionDigits: 0,
 });
 
 export function formatMXN(n: number): string {
-  // Intl uses "MX$" in some environments; normalize to "$" used in the prototype.
-  return MXN.format(Math.round(n)).replace(/^MX\$/, "$");
+  return MXN.format(Math.round(n));
 }
 
 // ---------------------------------------------------------------------------
