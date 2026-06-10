@@ -98,3 +98,25 @@ export function groupRevenueByProgram(invoices: FinanceInvoiceRow[]): ProgramRev
     .map(([program, total]) => ({ program, total }))
     .sort((a, b) => b.total - a.total);
 }
+
+// ---------------------------------------------------------------------------
+// Task 6: computeRenewalsThisMonth
+// ---------------------------------------------------------------------------
+
+export function computeRenewalsThisMonth(
+  subs: { current_period_end: string | null; price_mxn: number }[],
+  now: Date = new Date()
+): { count: number; amount: number } {
+  const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  let count = 0;
+  let amount = 0;
+  for (const s of subs) {
+    if (!s.current_period_end) continue;
+    const end = new Date(s.current_period_end);
+    if (end >= now && end <= horizon) {
+      count += 1;
+      amount += s.price_mxn;
+    }
+  }
+  return { count, amount };
+}
