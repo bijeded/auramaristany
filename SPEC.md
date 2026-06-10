@@ -395,8 +395,10 @@ CREATE TABLE message_recipients (
 -- ⚠ DRIFT (corregido 9-jun-2026, pre-Fase 5): el bloque original listaba
 -- amount_mxn/paid_at y invoice_date DATE, que NO coinciden con la tabla aplicada
 -- (migración 001). Lo de abajo es el esquema REAL (lo que escribe recordInvoice en
--- lib/webhooks/stripe-handlers.ts). El dashboard financiero (Fase 5) debe leer
+-- lib/webhooks/stripe-handlers.ts). El dashboard financiero (Fase 5 ✓) lee
 -- amount_paid + currency, e invoice_date es timestamptz. NO existe paid_at.
+-- ✓ Fase 5: corregido el bug por el que el PRIMER pago (billing_reason=
+-- 'subscription_create') no se registraba; backfill aplicado a los pagos previos.
 CREATE TABLE invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subscription_id UUID REFERENCES subscriptions(id),
@@ -557,15 +559,18 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
 
 ## Panel de Administración
 
-### Dashboard Financiero
-- MRR total y por programa (fuente: tabla `invoices`, no Stripe API)
-- Clientes activas por programa y variante
-- Gráfica de ingresos mensuales (12 meses)
-- Tabla de pagos recientes
+### Dashboard Financiero — `/admin/dashboard` (Fase 5 ✓ implementada)
+- **KPIs:** MRR (suma de suscripciones `active` × `program_variants.price_mxn`; predictivo, etiquetado "*Estimado", sin badge delta), total suscripciones activas, "Renuevan este mes" (vencen en ≤30 días + monto), "Requieren atención" (conteo `past_due`, enlaza a `/admin/clients`).
+- **Ingresos por mes:** gráfica de barras (Recharts), ventana fija de 12 meses (fuente: `invoices.amount_paid` agrupado por `invoice_date`, real cobrado — distinto del MRR a propósito).
+- **Clientes por variante:** barras horizontales (conteo de activas por `program_variants.name`).
+- **Ingresos por programa:** donut (`invoices.amount_paid` agrupado por programa).
+- **Pagos recientes:** tabla (fecha, clienta, programa, monto, estado), últimas 10 filas de `invoices`. (Botón "Ver todos" + página de listado completo → Fase 6.)
+- **Capa de datos:** `lib/admin/finance-helpers.ts` (funciones puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin `is_admin()`). Fuente = tabla `invoices`, no Stripe API.
 
-### Gestión de Clientes
+### Gestión de Clientes — `/admin/clients` (stub hoy → Fase 6)
 - Lista con filtros: programa, estado de pago, fecha de inscripción
 - Detalle: respuestas de onboarding, progreso de ejercicios, métricas corporales, pagos, mensajes
+- CSV export de clientas (para newsletter/win-back de no-activas) — diferido aquí desde Fase 4.
 
 ### CMS de Contenido
 - Navegación: Programa → Serie/Mes → Grilla semanal → Día
@@ -606,7 +611,7 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
 | Evento | Acción |
 |--------|--------|
 | `checkout.session.completed` | Crea `subscriptions` (months_elapsed=1), email de bienvenida |
-| `invoice.paid` | Incrementa months_elapsed, crea `invoices`, detecta `completed_at` (mes 6 en CuarentaMás y Extra Intermedio) |
+| `invoice.paid` | Crea `invoices` (incluye el PRIMER pago `subscription_create` — corregido en Fase 5); en renovaciones incrementa months_elapsed y detecta `completed_at` (mes 6 en CuarentaMás y Extra Intermedio) |
 | `customer.subscription.updated` | Actualiza status y cancel_at_period_end |
 | `customer.subscription.deleted` | Marca cancelada |
 | `invoice.payment_failed` | Actualiza a past_due, email de aviso |
@@ -697,3 +702,5 @@ NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
 *Versión 1.4 (9 de junio de 2026) — Fase 4 (Mensajería) implementada en rama `feature/fase-4-mensajeria` (NO mergeada; pendiente aplicar migración 006 al remoto + smoke). Mensajería unidireccional Aura→clientas in-app (individual + broadcast por programa/variante, modelo snapshot), bandeja read-only + marcar leído + badge de no-leídos. Infra de email `lib/email/` (Resend + React Email, best-effort, no-op sin key) con email de mensaje nuevo + **emails de ciclo de vida** en los webhooks de Stripe (bienvenida/pago-fallido/cancelación). Enlaces a **WhatsApp** (portal→Aura, admin→clienta). Corregido el drift de §messages (esquema real). **Migración 006**: policy SELECT de `messages` para clientas + UPDATE de `read_at` por la dueña + índices. CSV export de clientas diferido a Fase 5. Spec/plan en `docs/superpowers/`.*
 
 *Versión 1.3 (9 de junio de 2026) — Fase 3 (Historial) completada y mergeada a main. `/portal/history` con **2 tabs (Desempeño · Fotos)** según prototipo (no 3); **sin métricas corporales** (`body_metrics` sin captura); gráficas Recharts del **mes corriente** con relación de ejercicios **por nombre** (no uuid); detalle `/portal/history/[logId]` **solo lectura** (resuelve P3). Fotos en **bucket privado `progress`** con signed URLs, comentario opcional, compresión cliente 1280px, límites 5MB/**250 fotos** (badge `[N/250]`). Migración `005_progress_photos.sql` aplicada: bucket privado + RLS de storage + columna `caption`. Corrección de esquema: la columna real de `progress_photos` es **`taken_at`** (no `photo_date`) y **no** existe `angle`. Follow-ups: regenerar `lib/supabase/types.ts` (incluir `progress_photos`/`body_metrics`), UI admin para borrar fotos, notas de admin sobre el registro (diferido a Fase 4).*
+
+*Versión 1.5 (10 de junio de 2026) — Fase 5 (Dashboard Financiero) completada y **mergeada a main** (merge `a9ecb32`). `/admin/dashboard`: KPIs (MRR "*Estimado" = activas × `price_mxn`, sin badge delta; activas; renuevan en ≤30 días + monto; `past_due` → `/admin/clients`), ingresos por mes (barras Recharts, 12m fijo), **clientes por variante** (barras), ingresos por programa (donut), pagos recientes (últimas 10). Capa de datos: `lib/admin/finance-helpers.ts` (puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin). ✓ **Bug corregido:** el primer pago (`billing_reason='subscription_create'`) ya se registra en `invoices`; **backfill** aplicado (`scripts/backfill-first-invoices.ts`, idempotente). E2E validado con cuentas reales. Diferido a **Fase 6:** página `/admin/payments` + botón "Ver todos", `/admin/clients`+ficha, CSV export de clientas. Spec/plan en `docs/superpowers/` (`2026-06-10-fase-5-financiero-*`).*

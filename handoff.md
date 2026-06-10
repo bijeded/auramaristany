@@ -1,9 +1,10 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
-Fecha: 4 de junio de 2026 · Actualizado: 9 de junio de 2026
-Estado: Fases 0-4 en main (Fase 4 Mensajería mergeada, merge dbdb432; migr. 006
-        aplicada; 2 rondas de smoke OK). Siguiente: Fase 5 (Financiero).
-        Pendiente operativo: conectar Resend, deploy a Vercel (+ CRON_SECRET).
+Fecha: 4 de junio de 2026 · Actualizado: 10 de junio de 2026
+Estado: Fases 0-5 en main (Fase 5 Financiero mergeada, merge a9ecb32; migr. 001-006
+        aplicadas; backfill de invoices ejecutado; E2E validado). Siguiente: Fase 6
+        (Pulido + Launch). Pendiente operativo: conectar Resend, deploy a Vercel
+        (+ CRON_SECRET), pedir teléfono en onboarding.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -192,9 +193,11 @@ progress_photos        — fotos de progreso (storage_path, taken_at, caption). 
 messages               — mensajes Aura→clientas (individual o broadcast). subject NOT NULL,
                          is_broadcast; SIN recipient_id/broadcast_filter (destino vía message_recipients)
 message_recipients     — destinatarios: message_id + recipient_id + read_at (snapshot al enviar)
-invoices               — historial de pagos (fuente del dashboard financiero, Fase 5).
+invoices               — historial de pagos (fuente del dashboard financiero, Fase 5 ✓).
                          ⚠ columnas reales: amount_paid + currency + invoice_date(timestamptz) + status.
                          NO existen amount_mxn ni paid_at (el SPEC viejo los listaba — ya corregido).
+                         ✓ Fase 5: corregido el bug que omitía el PRIMER pago (subscription_create);
+                         backfill idempotente aplicado a los pagos previos.
 
 exercises_done JSONB estructura (v1.1 — por serie):
   { "exercise-uuid": { "completed": true,
@@ -230,9 +233,10 @@ exercise_list block JSONB estructura:
   /activando · /sin-suscripcion  — polling post-pago / acceso denegado
 
 /admin                           — guard: role='admin'
-  /dashboard                     — MRR, clientes activas, ingresos
-  /clients                       — lista de clientas
-  /clients/[clientId]            — ficha completa
+  /dashboard                     — MRR, ingresos por mes, clientes por variante, pagos  [Fase 5 ✓]
+  /clients                       — lista de clientas  [stub → Fase 6]
+  /clients/[clientId]            — ficha completa  [stub → Fase 6]
+  /payments                      — listado completo de pagos  [Fase 6, aún no existe]
   /content                       — overview de programas
   /content/[programId]           — grilla semanal de la serie
   /content/[programId]/series/[seriesId]/days/[dayId] — editor de día
@@ -326,6 +330,17 @@ Middleware (orden):
 /app/admin/messages/page.tsx        — server: getSentMessages + getActiveSubscriberRows → MessagesAdmin
 /lib/webhooks/stripe-handlers.ts (+) — emails de ciclo de vida best-effort (welcome/payment_failed/canceled)
 /app/api/cron/purge-messages/route.ts + vercel.json — retención 180 días (Vercel Cron, Bearer CRON_SECRET)
+-- Fase 5 — Dashboard Financiero (COMPLETADA, en main):
+/lib/admin/finance-helpers.ts       — funciones puras (computeMRR, groupRevenueByMonth,
+                                       groupClientsByVariant, groupRevenueByProgram,
+                                       computeRenewalsThisMonth, formatMXN) + tipos — TDD
+/lib/admin/finance-queries.ts       — getActiveSubscriptions/getPaidInvoices/getPastDueCount/
+                                       getRecentPayments (server-only, RLS admin)
+/components/admin/RevenueBarChart.tsx — barras de ingresos 12m (Recharts, client)
+/components/admin/ProgramRevenueDonut.tsx — donut de ingresos por programa (Recharts, client)
+/app/admin/dashboard/page.tsx       — Server Component: ensambla queries→helpers→UI
+/lib/webhooks/stripe-handlers.ts (+) — fix: registra el PRIMER invoice en subscription_create
+/scripts/backfill-first-invoices.ts — backfill idempotente de invoices faltantes (tsx, env-file)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -543,7 +558,7 @@ COMPLETADO:
         quién leyó; botones Clonar para reenviar (pre-llena composer) y Eliminar
         (borra message + message_recipients → también de la bandeja de las clientas;
         con confirmación). getSentMessageDetail/deleteMessage en messageActions.ts.
-    Follow-ups Fase 4: CSV export de clientas → Fase 5 (newsletter/win-back de
+    Follow-ups Fase 4: CSV export de clientas → Fase 6 (newsletter/win-back de
       no-activas, NO olvidar); pedir TELÉFONO en onboarding/checkout para que el botón
       WhatsApp del admin sea útil (hoy profiles.phone casi siempre null → no aparece);
       RESEND no conectado en pruebas (poner API key válida + RESEND_FROM_EMAIL=
@@ -554,6 +569,34 @@ COMPLETADO:
       app/api/cron/purge-messages (GET, service role, borra mensajes + recipients
       con >180 días; protegido por Authorization: Bearer CRON_SECRET) + vercel.json
       (schedule diario 3am). PENDIENTE en deploy: setear CRON_SECRET en env de Vercel.
+
+  ✓ FASE 5 — DASHBOARD FINANCIERO (COMPLETA y MERGEADA A MAIN, merge a9ecb32)
+    Spec: docs/superpowers/specs/2026-06-10-fase-5-financiero-design.md
+    Plan: docs/superpowers/plans/2026-06-10-fase-5-financiero.md
+    Gates: vitest 116/116, tsc limpio. Review holístico sin bloqueantes. E2E validado
+    con 2 cuentas reales (MRR/ingresos cuadran).
+    ✓ /admin/dashboard (antes stub) con:
+      - KPIs: MRR ("*Estimado" = suscripciones active × program_variants.price_mxn,
+        predictivo, SIN badge delta); total activas; "Renuevan este mes" (vencen en
+        ≤30 días + monto sumado); "Requieren atención" (conteo past_due → /admin/clients).
+      - Ingresos por mes: barras Recharts, ventana fija 12 meses (invoices.amount_paid
+        por invoice_date — real cobrado, distinto del MRR a propósito).
+      - Clientes por VARIANTE: barras horizontales (conteo de activas por variante).
+      - Ingresos por programa: donut. Pagos recientes: tabla últimas 10 de invoices.
+    ✓ Arquitectura 3 capas: finance-helpers.ts (puras, TDD) → finance-queries.ts
+      (server-only, RLS admin is_admin()) → page.tsx (Server Component) + 2 charts client.
+    ✓ Bug corregido: el PRIMER pago (billing_reason='subscription_create') NO se
+      registraba en invoices (recordInvoice se llamaba sin subscriptionDbId y retornaba).
+      Fix: busca la sub por stripe_subscription_id y registra el invoice + test.
+    ✓ Backfill: scripts/backfill-first-invoices.ts (idempotente vía stripe_invoice_id
+      unique). EJECUTADO contra datos reales (2 pagos $999 insertados).
+    Decisiones de scope (brainstorm): SOLO el dashboard. Diferido a Fase 6:
+      /admin/clients + ficha individual, CSV export de clientas, página /admin/payments
+      con botón "Ver todos". Sin badge delta en MRR (no hay snapshots históricos).
+    Ajustes post-validación del usuario: fecha "Junio de 2026" (capitaliza inicial en
+      JS, sin text-transform); KPI MRR subtítulo "*Estimado" en cursiva; clientes
+      agrupados por VARIANTE (no por programa). formatMXN usa currencyDisplay
+      "narrowSymbol" (robusto ante ICU de Vercel); badge "Pagado" usa token --exito.
 
 PENDIENTE:
   ○ Configurar Vercel + variables de entorno de producción (deploy)
@@ -577,8 +620,10 @@ Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + 
   ✓ Ronda de ajustes post-smoke (rediseño editor + fixes) — FASE 2 COMPLETADA
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días  ✓ COMPLETADA
 Fase 4 — Mensajería        (sem 12)    Comunicación Aura→clientas + email + WhatsApp  ✓ COMPLETADA (merge dbdb432)
-Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos                      ← SIGUIENTE
-Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción
+Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos                      ✓ COMPLETADA (merge a9ecb32)
+Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción  ← SIGUIENTE
+  Incluye: /admin/clients + ficha, CSV export de clientas, página /admin/payments
+  ("Ver todos" de pagos), pedir teléfono en onboarding, conectar Resend, deploy a Vercel.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -666,9 +711,10 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Estado: Fases 0–4 COMPLETAS y en main; migraciones 001–006 aplicadas; smokes OK.
-Para continuar: leer docs/superpowers/context/2026-06-09-fase-5-financiero.md
-y arrancar Fase 5 (Dashboard Financiero: MRR e ingresos) con brainstorm → plan → ejecución.
-⚠ Antes de Fase 5: la tabla invoices real usa amount_paid + currency + invoice_date(timestamptz)
-(NO amount_mxn/paid_at) — ya corregido en SPEC §schema. Prototipo UI: admin-dashboard.jsx.
+Estado: Fases 0–5 COMPLETAS y en main; migraciones 001–006 aplicadas; backfill de
+invoices ejecutado; E2E validado. Siguiente: Fase 6 (Pulido + Launch).
+Para continuar Fase 6: /admin/clients + ficha individual, CSV export de clientas,
+página /admin/payments (botón "Ver todos"), pedir teléfono en onboarding, conectar
+Resend (API key + dominio), y deploy a Vercel (+ CRON_SECRET para el cron de retención).
+Usar el flujo brainstorm → plan → ejecución (superpowers) como en fases anteriores.
 ════════════════════════════════════════════════════════════════
