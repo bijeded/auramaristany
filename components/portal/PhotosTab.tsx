@@ -5,28 +5,13 @@ import { useRouter } from "next/navigation";
 import { Camera, X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { compressImage } from "@/lib/portal/photo-compress";
 import { MAX_PHOTOS } from "@/lib/portal/photo-validation";
+import { monthKey, monthLabel, dayLabel } from "@/lib/admin/date-helpers";
 
 export interface PhotoItem {
   id: string;
   url: string; // signed URL
   photoDate: string; // "YYYY-MM-DD"
   caption: string | null;
-}
-
-function monthKey(iso: string): string {
-  return iso.slice(0, 7); // "YYYY-MM"
-}
-
-function monthLabel(key: string): string {
-  const d = new Date(`${key}-01T12:00:00`);
-  const s = d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function dayLabel(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  const s = d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function PhotosTab({ photos }: { photos: PhotoItem[] }) {
