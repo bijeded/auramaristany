@@ -72,3 +72,20 @@ describe("pickPrimarySubscription", () => {
     expect(pickPrimarySubscription([can, act])).toBe(act);
   });
 });
+
+import { subscriptionProgressLabel } from "@/lib/admin/clients-helpers";
+
+describe("subscriptionProgressLabel", () => {
+  it("programa de término fijo muestra 'Mes N de D'", () => {
+    expect(subscriptionProgressLabel(
+      { months_elapsed: 3 },
+      { billing_model: "fixed_term_monthly", duration_months: 6 }
+    )).toBe("Mes 3 de 6");
+  });
+  it("programa rolling muestra solo 'Mes N'", () => {
+    expect(subscriptionProgressLabel(
+      { months_elapsed: 5 },
+      { billing_model: "rolling_monthly", duration_months: null }
+    )).toBe("Mes 5");
+  });
+});

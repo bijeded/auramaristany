@@ -49,3 +49,13 @@ export function pickPrimarySubscription<T extends SubLike>(subs: T[]): T | null 
     s.enrollment_date > best.enrollment_date ? s : best
   );
 }
+
+export function subscriptionProgressLabel(
+  sub: { months_elapsed: number },
+  program: { billing_model: string; duration_months: number | null }
+): string {
+  if (program.billing_model === "fixed_term_monthly" && program.duration_months) {
+    return `Mes ${sub.months_elapsed} de ${program.duration_months}`;
+  }
+  return `Mes ${sub.months_elapsed}`;
+}
