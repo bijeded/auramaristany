@@ -59,3 +59,13 @@ export function subscriptionProgressLabel(
   }
   return `Mes ${sub.months_elapsed}`;
 }
+
+export function canDeleteClient(
+  subs: { status: SubStatus }[]
+): { ok: boolean; reason?: string } {
+  const live = subs.some((s) => s.status !== "canceled");
+  if (live) {
+    return { ok: false, reason: "Tiene una suscripción activa. Cancélala en Stripe antes de eliminar." };
+  }
+  return { ok: true };
+}

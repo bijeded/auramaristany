@@ -89,3 +89,23 @@ describe("subscriptionProgressLabel", () => {
     )).toBe("Mes 5");
   });
 });
+
+import { canDeleteClient } from "@/lib/admin/clients-helpers";
+
+describe("canDeleteClient", () => {
+  it("permite borrar si no hay suscripciones", () => {
+    expect(canDeleteClient([])).toEqual({ ok: true });
+  });
+  it("permite borrar si todas están canceladas", () => {
+    expect(canDeleteClient([{ status: "canceled" }, { status: "canceled" }])).toEqual({ ok: true });
+  });
+  it("bloquea si hay una activa", () => {
+    const r = canDeleteClient([{ status: "canceled" }, { status: "active" }]);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBeTruthy();
+  });
+  it("bloquea si hay past_due o unpaid", () => {
+    expect(canDeleteClient([{ status: "past_due" }]).ok).toBe(false);
+    expect(canDeleteClient([{ status: "unpaid" }]).ok).toBe(false);
+  });
+});
