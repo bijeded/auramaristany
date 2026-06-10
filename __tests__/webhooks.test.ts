@@ -28,6 +28,7 @@ import {
   computeMonthsUpdate,
   handleCheckoutCompleted,
   handleSubscriptionUpdated,
+  handleInvoicePaid,
 } from "@/lib/webhooks/stripe-handlers";
 import type Stripe from "stripe";
 
@@ -90,6 +91,38 @@ describe("handleCheckoutCompleted", () => {
     expect(payload.current_period_end).toBe(
       new Date(1751932800 * 1000).toISOString()
     );
+  });
+});
+
+describe("handleInvoicePaid - subscription_create", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    insertMock.mockReturnValue({ error: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue({ data: { id: "db-sub-1" }, error: null } as any);
+  });
+
+  it("registra el primer invoice con el subscription_id de la BD", async () => {
+    const invoice = {
+      id: "in_first_123",
+      billing_reason: "subscription_create",
+      amount_paid: 99000,
+      currency: "mxn",
+      status: "paid",
+      created: 1749340800,
+      parent: {
+        type: "subscription_details",
+        subscription_details: { subscription: "sub_123" },
+      },
+    } as unknown as Stripe.Invoice;
+
+    await handleInvoicePaid(invoice);
+
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    const payload = insertMock.mock.calls[0][0];
+    expect(payload.subscription_id).toBe("db-sub-1");
+    expect(payload.stripe_invoice_id).toBe("in_first_123");
+    expect(payload.amount_paid).toBe(990);
   });
 });
 
