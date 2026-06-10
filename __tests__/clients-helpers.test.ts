@@ -109,3 +109,22 @@ describe("canDeleteClient", () => {
     expect(canDeleteClient([{ status: "unpaid" }]).ok).toBe(false);
   });
 });
+
+import { clientsToCSV } from "@/lib/admin/clients-helpers";
+
+describe("clientsToCSV", () => {
+  it("incluye encabezado y una fila por clienta", () => {
+    const csv = clientsToCSV([base]);
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe("Nombre,Email,Programa,Variante,Estado,Inscripción");
+    expect(lines[1]).toBe("Ana López,ana@example.com,CuarentaMás,Base,Activa,2026-01-01");
+  });
+  it("escapa comas y comillas envolviendo en comillas dobles", () => {
+    const csv = clientsToCSV([{ ...base, full_name: 'Díaz, "La" Ana' }]);
+    expect(csv.split("\n")[1].startsWith('"Díaz, ""La"" Ana",')).toBe(true);
+  });
+  it("traduce el status a etiqueta en español", () => {
+    const csv = clientsToCSV([{ ...base, status: "past_due" }]);
+    expect(csv.split("\n")[1]).toContain("Pago fallido");
+  });
+});

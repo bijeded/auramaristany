@@ -69,3 +69,27 @@ export function canDeleteClient(
   }
   return { ok: true };
 }
+
+const STATUS_ES: Record<SubStatus, string> = {
+  active: "Activa",
+  past_due: "Pago fallido",
+  unpaid: "Impaga",
+  canceled: "Cancelada",
+};
+
+function csvCell(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export function clientsToCSV(rows: ClientListRow[]): string {
+  const header = "Nombre,Email,Programa,Variante,Estado,Inscripción";
+  const lines = rows.map((r) =>
+    [r.full_name, r.email, r.program_name, r.variant_name, STATUS_ES[r.status], r.enrollment_date]
+      .map(csvCell)
+      .join(",")
+  );
+  return [header, ...lines].join("\n");
+}
