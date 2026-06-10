@@ -44,3 +44,33 @@ export function formatMXN(n: number): string {
 export function computeMRR(subs: { price_mxn: number }[]): number {
   return subs.reduce((sum, s) => sum + s.price_mxn, 0);
 }
+
+// ---------------------------------------------------------------------------
+// Task 3: groupRevenueByMonth
+// ---------------------------------------------------------------------------
+
+function monthKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function groupRevenueByMonth(
+  invoices: FinanceInvoiceRow[],
+  monthsBack = 12,
+  now: Date = new Date()
+): MonthRevenue[] {
+  const buckets: MonthRevenue[] = [];
+  const index = new Map<string, MonthRevenue>();
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = monthKey(d);
+    const label = d.toLocaleDateString("es-MX", { month: "short", timeZone: "UTC" }).replace(".", "");
+    const bucket = { key, label, total: 0 };
+    buckets.push(bucket);
+    index.set(key, bucket);
+  }
+  for (const inv of invoices) {
+    const bucket = index.get(monthKey(new Date(inv.invoice_date)));
+    if (bucket) bucket.total += inv.amount_paid;
+  }
+  return buckets;
+}
