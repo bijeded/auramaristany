@@ -512,9 +512,21 @@ COMPLETADO:
          + push. SIN ESTO la clienta no puede leer mensajes (RLS lo bloquea).
       2) Smoke test (individual/broadcast, marcar leído, badge, WhatsApp, email).
       3) Merge a main.
+    ✓ Ajustes post-smoke (1ra ronda):
+      - Badge de no-leídos ahora se limpia al abrir el mensaje: markMessageRead corre
+        en cliente (MarkReadOnView) + revalidatePath('/portal','layout') + router.refresh().
+      - Quitado el emoji del texto pre-llenado de WhatsApp (se veía roto).
+      - Admin: tarjeta de enviado clicable → detalle read-only con destinatarias y
+        quién leyó; botones Clonar para reenviar (pre-llena composer) y Eliminar
+        (borra message + message_recipients → también de la bandeja de las clientas;
+        con confirmación). getSentMessageDetail/deleteMessage en messageActions.ts.
     Follow-ups Fase 4: CSV export de clientas → Fase 5 (newsletter/win-back de
-      no-activas, NO olvidar); getSentMessages carga todos los message_recipients
-      (escala, ok por ahora); verificar dominio en Resend (prerequisito de lanzamiento);
+      no-activas, NO olvidar); pedir TELÉFONO en onboarding/checkout para que el botón
+      WhatsApp del admin sea útil (hoy profiles.phone casi siempre null → no aparece);
+      RESEND no conectado en pruebas (poner API key válida + RESEND_FROM_EMAIL=
+      onboarding@resend.dev; verificar dominio = prerequisito de lanzamiento);
+      auto-eliminar mensajes >90 días (pg_cron en Supabase, PENDIENTE de decisión);
+      getSentMessages carga todos los message_recipients (escala, ok por ahora);
       Zapier on-subscribe diferido.
 
 PENDIENTE:
