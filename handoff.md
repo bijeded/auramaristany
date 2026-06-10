@@ -627,8 +627,12 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     Progreso, Fotos con borrado admin, Pagos, Mensajes+WhatsApp) + borrado total de clienta
     (guard de sub activa → 409, no toca Stripe; cascade vía migración 007 ON DELETE CASCADE,
     APLICADA y verificada). TDD en helpers (23 tests), 142/142, smoke E2E validado.
-  Pendiente: página /admin/payments ("Ver todos" de pagos), pedir teléfono en onboarding/checkout,
-    conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
+  ✓ Sub-bloque 3: Página de Pagos (merge d52f224) — /admin/payments (listado completo de invoices,
+    filtro por estado, paginación 10, cliente→ficha, "← Dashboard") + enlace "Ver todos →" en el
+    dashboard. Extrae paginate y STATUS_LABEL a módulos compartidos. Incluye pasada de LENGUAJE
+    NEUTRO ('clienta(s)' → 'cliente(s)' en toda la UI). 144/144 tests, build verde, smoke validado.
+  Pendiente: pedir teléfono en onboarding/checkout, conectar Resend, deploy a Vercel (+ CRON_SECRET),
+    Stripe live + precios reales, auditoría seguridad.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -716,10 +720,11 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloque 1 Gestión de Clientes
-mergeado, 0d23c5e). Migraciones 001–007 aplicadas (007 = ON DELETE CASCADE para borrado
-total de clienta); backfill de invoices ejecutado; E2E validado.
-Pendiente Fase 6: página /admin/payments (botón "Ver todos"), pedir teléfono en onboarding/checkout,
-conectar Resend (API key + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales,
-auditoría de seguridad. Usar el flujo brainstorm → plan → ejecución (superpowers).
+Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques 1 Gestión de Clientes
+0d23c5e y 3 Página de Pagos d52f224 mergeados). Migraciones 001–007 aplicadas (007 = ON DELETE
+CASCADE para borrado total de cliente); backfill de invoices ejecutado; E2E validado. UI con
+lenguaje neutro ('cliente').
+Pendiente Fase 6: pedir teléfono en onboarding/checkout, conectar Resend (API key + dominio),
+deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad.
+Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════

@@ -564,8 +564,13 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
 - **Ingresos por mes:** gráfica de barras (Recharts), ventana fija de 12 meses (fuente: `invoices.amount_paid` agrupado por `invoice_date`, real cobrado — distinto del MRR a propósito).
 - **Clientes por variante:** barras horizontales (conteo de activas por `program_variants.name`).
 - **Ingresos por programa:** donut (`invoices.amount_paid` agrupado por programa).
-- **Pagos recientes:** tabla (fecha, clienta, programa, monto, estado), últimas 10 filas de `invoices`. (Botón "Ver todos" + página de listado completo → Fase 6.)
+- **Pagos recientes:** tabla (fecha, cliente, programa, monto, estado), últimas 10 filas de `invoices`. Botón **"Ver todos →"** enlaza a `/admin/payments` (Fase 6 ✓).
 - **Capa de datos:** `lib/admin/finance-helpers.ts` (funciones puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin `is_admin()`). Fuente = tabla `invoices`, no Stripe API.
+
+### Página de Pagos — `/admin/payments` (Fase 6 ✓ implementada)
+- Listado completo de `invoices` (`getAllPayments`, orden `invoice_date` desc): Fecha · Cliente (enlace a su ficha) · Programa·variante · Monto · Estado.
+- **Filtro por estado** (Todos/Pagado/Pendiente/Anulado/Fallido) + **paginación de 10**; botón "← Dashboard". Filtro/paginación client-side (volumen bajo).
+- **Capa compartida:** `lib/admin/pagination.ts` (`paginate`, reusado con `/admin/clients`) + `lib/admin/payment-status.ts` (`STATUS_LABEL`, reusado con el dashboard) + `filterPaymentsByStatus` puro (TDD).
 
 ### Gestión de Clientes — `/admin/clients` (Fase 6 ✓ implementada)
 - **Lista** (`getClientsList`, una fila por clienta agrupando por `profile_id` y eligiendo la suscripción primaria): búsqueda por nombre/correo, filtros pill de programa **|** estado de pago, **paginación de 10**, **CSV export** (respeta filtros activos, vía `clientsToCSV`). Columna programa = pill con el programa + variante como subtítulo.
