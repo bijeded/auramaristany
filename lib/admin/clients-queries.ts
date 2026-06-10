@@ -1,10 +1,14 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import {
   pickPrimarySubscription,
+  canDeleteClient,
   type ClientListRow,
   type SubStatus,
 } from "./clients-helpers";
+import { countCompleted } from "@/lib/content/history-helpers";
+import type { ExercisesDone } from "@/lib/content/history-helpers";
 
 interface RawSubRow {
   profile_id: string;
@@ -56,11 +60,6 @@ export async function getClientsList(): Promise<ClientListRow[]> {
   result.sort((a, b) => a.full_name.localeCompare(b.full_name, "es"));
   return result;
 }
-
-import { createServiceClient } from "@/lib/supabase/service";
-import { canDeleteClient } from "./clients-helpers";
-import { countCompleted } from "@/lib/content/history-helpers";
-import type { ExercisesDone } from "@/lib/content/history-helpers";
 
 export interface ClientSubscription {
   id: string;
