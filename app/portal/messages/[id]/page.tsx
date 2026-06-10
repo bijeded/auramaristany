@@ -3,6 +3,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMessageDetail } from "@/lib/content/messages";
 import { MarkReadOnView } from "@/components/portal/MarkReadOnView";
+import { PortalHeader } from "@/components/portal/PortalHeader";
+
+// Etiqueta de fecha para el PortalHeader (respeta DEV_DATE en dev, como /pilares).
+function todayLabel(): string {
+  const base = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
+  const s = base.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default async function MessageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,6 +26,7 @@ export default async function MessageDetailPage({ params }: { params: Promise<{ 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <MarkReadOnView messageId={id} />
+      <PortalHeader dateLabel={todayLabel()} />
       <div style={{ padding: "16px 16px 8px" }}>
         <Link href="/portal/messages" style={{ color: "var(--gris-texto)", fontSize: 14, textDecoration: "none" }}>← Mensajes</Link>
       </div>

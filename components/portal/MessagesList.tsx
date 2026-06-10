@@ -3,12 +3,22 @@
 import Link from "next/link";
 import type { InboxItem } from "@/lib/content/messages";
 import { whatsappUrl } from "@/lib/admin/message-helpers";
+import { PortalHeader } from "./PortalHeader";
 
-export function MessagesList({ items, auraWhatsapp }: { items: InboxItem[]; auraWhatsapp: string | null }) {
+export function MessagesList({
+  items,
+  auraWhatsapp,
+  dateLabel,
+}: {
+  items: InboxItem[];
+  auraWhatsapp: string | null;
+  dateLabel: string;
+}) {
   const unread = items.filter((m) => !m.read).length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <PortalHeader dateLabel={dateLabel} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 8px" }}>
         <h1 className="font-head" style={{ fontSize: 20, fontWeight: 700 }}>Mensajes</h1>
         {unread > 0 && (
