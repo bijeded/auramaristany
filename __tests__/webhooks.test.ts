@@ -4,7 +4,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const insertMock = vi.fn((_payload: Record<string, unknown>) => ({ error: null }));
 const updateEqMock = vi.fn((_col: string, _val: string) => ({ error: null }));
 const updateMock = vi.fn((_payload: Record<string, unknown>) => ({ eq: updateEqMock }));
-const fromMock = vi.fn((_table: string) => ({ insert: insertMock, update: updateMock }));
+const selectEqSingleMock = vi.fn(() => ({ data: null }));
+const selectEqMock = vi.fn(() => ({ single: selectEqSingleMock }));
+const selectMock = vi.fn(() => ({ eq: selectEqMock, single: selectEqSingleMock }));
+const fromMock = vi.fn((_table: string) => ({ insert: insertMock, update: updateMock, select: selectMock }));
+
+vi.mock("@/lib/email/send", () => ({
+  sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
+  sendPaymentFailedEmail: vi.fn().mockResolvedValue(undefined),
+  sendSubscriptionEndedEmail: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => ({ from: fromMock }),
