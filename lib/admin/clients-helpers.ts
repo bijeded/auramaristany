@@ -29,3 +29,23 @@ export function filterClients(
     return true;
   });
 }
+
+export interface SubLike {
+  status: SubStatus;
+  current_period_end: string | null;
+  enrollment_date: string;
+  created_at: string;
+}
+
+export function pickPrimarySubscription<T extends SubLike>(subs: T[]): T | null {
+  if (subs.length === 0) return null;
+  const actives = subs.filter((s) => s.status === "active");
+  if (actives.length > 0) {
+    return actives.reduce((best, s) =>
+      (s.current_period_end ?? "") > (best.current_period_end ?? "") ? s : best
+    );
+  }
+  return subs.reduce((best, s) =>
+    s.enrollment_date > best.enrollment_date ? s : best
+  );
+}

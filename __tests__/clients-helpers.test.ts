@@ -46,3 +46,29 @@ describe("filterClients", () => {
     expect(r.map((x) => x.profile_id)).toEqual(["p2"]);
   });
 });
+
+import { pickPrimarySubscription, type SubLike } from "@/lib/admin/clients-helpers";
+
+describe("pickPrimarySubscription", () => {
+  const mk = (o: Partial<SubLike>): SubLike => ({
+    status: "active", current_period_end: null, enrollment_date: "2026-01-01", created_at: "2026-01-01T00:00:00Z", ...o,
+  });
+  it("devuelve null sin suscripciones", () => {
+    expect(pickPrimarySubscription([])).toBeNull();
+  });
+  it("prefiere la activa con current_period_end más lejano", () => {
+    const a = mk({ status: "active", current_period_end: "2026-07-01" });
+    const b = mk({ status: "active", current_period_end: "2026-09-01" });
+    expect(pickPrimarySubscription([a, b])).toBe(b);
+  });
+  it("si no hay activa, toma la más reciente por enrollment_date", () => {
+    const a = mk({ status: "canceled", enrollment_date: "2025-01-01" });
+    const b = mk({ status: "canceled", enrollment_date: "2026-01-01" });
+    expect(pickPrimarySubscription([a, b])).toBe(b);
+  });
+  it("una activa gana a una cancelada más reciente", () => {
+    const act = mk({ status: "active", current_period_end: "2026-07-01", enrollment_date: "2025-01-01" });
+    const can = mk({ status: "canceled", enrollment_date: "2026-06-01" });
+    expect(pickPrimarySubscription([can, act])).toBe(act);
+  });
+});
