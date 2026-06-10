@@ -66,7 +66,7 @@ Basada en el prototipo `admin-clients.jsx`:
 - Filtros pill: programa (`Todas` / nombres de programa) **`|` (separador visible)** y estado (`Activas` / `Vencidas` / `Con pago fallido`), con `filterClients`. El separador `|` deja claro que son dos grupos de filtros distintos (el prototipo ya tenía un divisor; se hace explícito).
 - Tabla: Clienta (avatar + nombre + correo), Programa·variante (badge), Inscripción, Próximo cobro + monto, Estado (badge), acción "Ver" → `/admin/clients/[clientId]`.
 - **Paginación cada 10 clientas** (`paginate`, client-side sobre la lista filtrada): controles Anterior/Siguiente + "Mostrando A–B de N". Al cambiar filtros/búsqueda se vuelve a la página 1.
-- **Eliminar clienta**: cada fila tiene una acción de eliminar (ícono papelera) que abre un **diálogo de confirmación** (nombre + advertencia "se borrarán todos sus datos, fotos y registros; es irreversible"). Deshabilitada (con tooltip explicativo) si `canDeleteClient` es `false`. Al confirmar: `DELETE /api/admin/clients/[clientId]` + `router.refresh()`. Si el endpoint responde 409, se muestra el motivo (suscripción activa).
+- **Eliminar**: cada fila tiene una acción de eliminar (ícono papelera, label "Eliminar") que abre un **diálogo de confirmación** (nombre + advertencia "se borrarán todos los datos, fotos y registros; es irreversible"). Deshabilitada (con tooltip explicativo) si `canDeleteClient` es `false`. Al confirmar: `DELETE /api/admin/clients/[clientId]` + `router.refresh()`. Si el endpoint responde 409, se muestra el motivo (suscripción activa).
 - Estado vacío con botón "Limpiar filtros".
 - **Botón "Exportar CSV"** (encabezado): genera el CSV con `clientsToCSV(filasFiltradas)` (respeta filtros activos) y dispara descarga vía `Blob` + `<a download>`. Columnas: nombre, email, programa, variante, estado, inscripción.
 
@@ -74,11 +74,11 @@ Basada en el prototipo `admin-clients.jsx`:
 
 ## 4. Ficha individual — 6 tabs (`ClientDetailTabs`)
 
-Header: **breadcrumb** al inicio (`Clientes ›  {nombre}`, mismo patrón que el editor de series — `nav` + `Link` + `ChevronRight`, en lugar del botón "← Clientes" del prototipo) + avatar + nombre + correo + badge de estado. Tabs: Resumen · Onboarding · Progreso · Fotos · Pagos · Mensajes.
+Header: botón "← Clientes" (vuelve a la lista, como el prototipo) + avatar + nombre + correo + badge de estado. Tabs: Resumen · Onboarding · Progreso · Fotos · Pagos · Mensajes.
 
 | Tab | Contenido |
 |-----|-----------|
-| **Resumen** | Card de programa: programa·variante, fecha de inicio, etiqueta de progreso (`subscriptionProgressLabel`), próximo cobro + monto. Si la clienta tiene >1 suscripción, se listan todas. Card lateral con CTA "Enviar mensaje" → `/admin/messages`. **Botón "Eliminar clienta"** (estilo destructivo, al pie del Resumen) con el mismo diálogo de confirmación y guard que en la lista (`canDeleteClient`); al confirmar el borrado redirige a `/admin/clients`. |
+| **Resumen** | Card de programa: programa·variante, fecha de inicio, etiqueta de progreso (`subscriptionProgressLabel`), próximo cobro + monto. Si la clienta tiene >1 suscripción, se listan todas. Card lateral con CTA "Enviar mensaje" → `/admin/messages`. **Botón "Eliminar"** (estilo destructivo, al pie del Resumen) con el mismo diálogo de confirmación y guard que en la lista (`canDeleteClient`); al confirmar el borrado redirige a `/admin/clients`. |
 | **Onboarding** | Cada pregunta activa con su respuesta (`responses[question.id]`); arrays se muestran unidos por `·`; "—" si sin respuesta. |
 | **Progreso** | **Lista** de días registrados (similar a `/portal/history`): fecha, título/enfoque del día, estado completo/parcial según `progress_logs.completed` + conteo de ejercicios hechos. Reusa helpers de `lib/content/history-helpers.ts` donde aplique. Estado vacío si no hay registros. |
 | **Fotos** | Galería con **filtro por mes** (pills `Todas` + meses, mismo UX que el cliente en su historial, usando `monthKey`/`monthLabel`). Lightbox para ver. **Botón borrar** por foto con confirmación → `DELETE /api/admin/clients/[clientId]/photos/[photoId]` + `router.refresh()`. Sin botón de subir (la admin no sube fotos). Estado vacío si no hay fotos. |
