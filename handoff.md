@@ -525,9 +525,12 @@ COMPLETADO:
       WhatsApp del admin sea útil (hoy profiles.phone casi siempre null → no aparece);
       RESEND no conectado en pruebas (poner API key válida + RESEND_FROM_EMAIL=
       onboarding@resend.dev; verificar dominio = prerequisito de lanzamiento);
-      auto-eliminar mensajes >90 días (pg_cron en Supabase, PENDIENTE de decisión);
       getSentMessages carga todos los message_recipients (escala, ok por ahora);
       Zapier on-subscribe diferido.
+    ✓ Retención: cron de Vercel listo-pero-inactivo (corre al desplegar):
+      app/api/cron/purge-messages (GET, service role, borra mensajes + recipients
+      con >180 días; protegido por Authorization: Bearer CRON_SECRET) + vercel.json
+      (schedule diario 3am). PENDIENTE en deploy: setear CRON_SECRET en env de Vercel.
 
 PENDIENTE:
   ○ Configurar Vercel + variables de entorno de producción (deploy)
