@@ -117,7 +117,8 @@ export function ClientsTable({ rows }: { rows: ClientListRow[] }) {
                         <div className="font-body" style={{ color: "var(--gris-suave)", fontSize: 12 }}>{c.email}</div>
                       </td>
                       <td style={{ padding: "12px 20px" }}>
-                        <span className="font-body" style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: "var(--lavanda-soft)", color: "var(--lavanda-dark)" }}>{c.program_name} · {c.variant_name}</span>
+                        <span className="font-body" style={{ display: "inline-block", fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: "var(--lavanda-soft)", color: "var(--lavanda-dark)", whiteSpace: "nowrap" }}>{c.program_name}</span>
+                        <div className="font-body" style={{ color: "var(--gris-suave)", fontSize: 12, marginTop: 4 }}>{c.variant_name}</div>
                       </td>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--gris-texto)" }}>{dayLabel(c.enrollment_date)}</td>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--gris-texto)" }}>
