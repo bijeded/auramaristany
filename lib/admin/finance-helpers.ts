@@ -74,3 +74,15 @@ export function groupRevenueByMonth(
   }
   return buckets;
 }
+
+// ---------------------------------------------------------------------------
+// Task 4: groupClientsByProgram
+// ---------------------------------------------------------------------------
+
+export function groupClientsByProgram(subs: { program_name: string }[]): ProgramCount[] {
+  const counts = new Map<string, number>();
+  for (const s of subs) counts.set(s.program_name, (counts.get(s.program_name) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([program, count]) => ({ program, count }))
+    .sort((a, b) => b.count - a.count);
+}
