@@ -169,8 +169,11 @@ Additivo sobre los handlers de Stripe **ya existentes y probados** (`app/api/web
 
 ## 8. Variables de entorno (nuevas/relevantes)
 - `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (ya en `.env.local`; **verificar dominio verificado en Resend** o los emails no salen).
-- `NEXT_PUBLIC_AURA_WHATSAPP` (nueva) — número de WhatsApp de Aura en formato internacional solo-dígitos (ej. `52155...`).
+- `NEXT_PUBLIC_AURA_WHATSAPP` (nueva) — número de WhatsApp en formato internacional solo-dígitos (ej. `52155...`). **En pruebas arranca con el número del desarrollador; se cambia al de Aura editando la env var, sin tocar código.**
 - `NEXT_PUBLIC_APP_URL` (ya existe) — para los CTA de los emails.
+
+### Notas operativas de prueba (no bloquean el desarrollo)
+- **Resend sin dominio verificado:** `auramaristany.com` **aún no está verificado** en Resend. El cliente es no-op/best-effort, así que la ausencia de verificación **no rompe** ningún flujo (mensajería ni webhooks). Para ver emails reales en dev, usar `RESEND_FROM_EMAIL=onboarding@resend.dev`, que Resend entrega **solo a la dirección de la cuenta Resend** sin verificar dominio. **Verificar el dominio es prerequisito de lanzamiento** (no de esta fase).
 
 ---
 
