@@ -32,11 +32,11 @@ Layout en `app/admin/dashboard/page.tsx`, `maxWidth ~1000`, header "Dashboard" +
    - **Total suscripciones activas** — conteo.
    - **Renuevan este mes** — conteo de subs que vencen en ≤30 días + monto sumado.
    - **Requieren atención** — conteo de subs `past_due` (estilo `danger`); sub-link "Ver clientes →" a `/admin/clients` (stub existente, no rompe).
-2. **Ingresos por mes** — gráfica de barras (Recharts), con selector **6 / 12 meses**.
+2. **Ingresos por mes** — gráfica de barras (Recharts), ventana fija de **12 meses** (sin selector).
 3. **Distribución (2 cards lado a lado):**
    - **Clientes por programa** — barras horizontales (conteo).
    - **Ingresos por programa** — donut (Recharts).
-4. **Pagos recientes** — tabla (Fecha, Clienta, Programa, Monto, Estado), últimas 10 filas de `invoices`. Sin link "Ver todos" en v1 (no hay página destino).
+4. **Pagos recientes** — tabla (Fecha, Clienta, Programa, Monto, Estado), últimas 10 filas de `invoices`. Sin link "Ver todos" en v1 (no hay página destino; se agrega en Fase 6 junto con la página de pagos).
 
 Estilo: tokens de marca / inline-style del admin (mismo patrón que el resto de `/admin`). Las gráficas reusan **Recharts** (ya instalado; ver `components/portal/PerformanceChart.tsx`).
 
@@ -52,7 +52,7 @@ Separación deliberada entre **MRR predictivo** (estado actual de suscripciones)
 | **Suscripciones activas** | `subscriptions` | `count(status='active')`. |
 | **Renuevan este mes** | `subscriptions` activas | Subs con `current_period_end` dentro de los próximos 30 días; card muestra conteo + suma de `price_mxn`. |
 | **Requieren atención** | `subscriptions` | `count(status='past_due')`. |
-| **Ingresos por mes** | `invoices.amount_paid` | Agrupado por mes de `invoice_date`, ventana 6/12 meses. Real cobrado. |
+| **Ingresos por mes** | `invoices.amount_paid` | Agrupado por mes de `invoice_date`, ventana fija de 12 meses. Real cobrado. |
 | **Ingresos por programa (donut)** | `invoices` join subs→variants→programs | Suma `amount_paid` por programa, ventana 12 meses. |
 | **Clientes por programa** | `subscriptions` activas join variants→programs | Conteo por programa. |
 | **Pagos recientes** | `invoices` join subs→profiles/variants | Últimas 10 por `invoice_date desc`: fecha, nombre clienta, programa, monto (MXN), estado. |
@@ -65,7 +65,7 @@ Moneda: `amount_paid`/`price_mxn` ya están en pesos. Formatear como MXN en pres
 
 **Capa pura — `lib/admin/finance-helpers.ts`** (TDD, sin DB):
 - `computeMRR(activeSubs): number`
-- `groupRevenueByMonth(invoices, monthsBack): { month: string; total: number }[]` — rellena meses sin pagos con 0.
+- `groupRevenueByMonth(invoices, monthsBack=12): { month: string; total: number }[]` — rellena meses sin pagos con 0.
 - `groupClientsByProgram(activeSubs): { program: string; count: number }[]`
 - `groupRevenueByProgram(invoices): { program: string; total: number }[]`
 - `computeRenewalsThisMonth(activeSubs, now): { count: number; amount: number }`
@@ -80,7 +80,7 @@ Moneda: `amount_paid`/`price_mxn` ya están en pesos. Formatear como MXN en pres
 Devuelven filas crudas; la agregación vive en los helpers.
 
 **Capa de presentación — `app/admin/dashboard/page.tsx`** (Server Component): llama queries → helpers → renderiza. Gráficas como Client Components:
-- `components/admin/RevenueBarChart.tsx` — barras + estado del selector 6/12m (recibe 12 meses, slicea a 6).
+- `components/admin/RevenueBarChart.tsx` — barras, 12 meses (sin selector).
 - `components/admin/ProgramRevenueDonut.tsx` — donut.
 
 ---
@@ -117,6 +117,7 @@ Devuelven filas crudas; la agregación vive en los helpers.
 ## 8. Follow-ups (no bloquean Fase 5)
 
 - Pantallas `/admin/clients` + ficha y CSV export → Fase 6.
+- **Link "Ver todos" en Pagos recientes** → Fase 6, junto con la página de listado completo de pagos.
 - Pedir teléfono en onboarding/checkout; conectar Resend; deploy a Vercel (+ `CRON_SECRET`).
 - Regenerar `lib/supabase/types.ts` (quitar `as any`); unificar `formatDate` duplicado.
 
