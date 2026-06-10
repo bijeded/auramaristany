@@ -120,7 +120,7 @@ export async function getSentMessageDetail(messageId: string): Promise<SentMessa
 }
 
 // Elimina un mensaje y sus filas de message_recipients (desaparece también de la
-// bandeja de las clientas). Borra las destinatarias primero por la FK (sin cascade).
+// bandeja de los clientes). Borra las destinatarias primero por la FK (sin cascade).
 export async function deleteMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { ok: false, error: auth.error };

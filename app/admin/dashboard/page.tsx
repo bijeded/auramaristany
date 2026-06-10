@@ -14,13 +14,8 @@ import {
 } from "@/lib/admin/finance-helpers";
 import { RevenueBarChart } from "@/components/admin/RevenueBarChart";
 import { ProgramRevenueDonut } from "@/components/admin/ProgramRevenueDonut";
-
-const STATUS_LABEL: Record<string, { text: string; bg: string; color: string }> = {
-  paid: { text: "Pagado", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  open: { text: "Pendiente", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
-  void: { text: "Anulado", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
-  uncollectible: { text: "Fallido", bg: "var(--error-tint)", color: "var(--error)" },
-};
+import Link from "next/link";
+import { STATUS_LABEL } from "@/lib/admin/payment-status";
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
@@ -108,11 +103,14 @@ export default async function AdminDashboardPage() {
 
       {/* Pagos recientes */}
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, padding: "18px 22px 12px" }}>Pagos recientes</h3>
+        <div className="flex items-center justify-between" style={{ padding: "18px 22px 12px" }}>
+          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600 }}>Pagos recientes</h3>
+          <Link href="/admin/payments" className="font-body" style={{ color: "var(--lavanda)", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>Ver todos →</Link>
+        </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--gris-claro)" }}>
-              {["Fecha", "Clienta", "Programa", "Monto", "Estado"].map((h) => (
+              {["Fecha", "Cliente", "Programa", "Monto", "Estado"].map((h) => (
                 <th key={h} className="font-body" style={{ textAlign: h === "Monto" ? "right" : "left", padding: "10px 22px", fontWeight: 600, fontSize: 12, color: "var(--gris-texto)" }}>{h}</th>
               ))}
             </tr>

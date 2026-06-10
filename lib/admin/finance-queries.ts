@@ -4,6 +4,7 @@ import type {
   FinanceSubRow,
   FinanceInvoiceRow,
   RecentPaymentRow,
+  PaymentRow,
 } from "./finance-helpers";
 
 export async function getActiveSubscriptions(): Promise<FinanceSubRow[]> {
@@ -78,6 +79,36 @@ export async function getRecentPayments(limit = 10): Promise<RecentPaymentRow[]>
     invoice_date: r.invoice_date,
     client_name: r.subscriptions?.profiles?.full_name ?? "—",
     program_name: r.subscriptions?.program_variants?.programs?.name ?? "—",
+    amount_paid: r.amount_paid,
+    status: r.status,
+  }));
+}
+
+export async function getAllPayments(): Promise<PaymentRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("invoices")
+    .select(
+      "amount_paid, invoice_date, status, subscriptions(profile_id, profiles(full_name), program_variants(name, programs(name)))"
+    )
+    .order("invoice_date", { ascending: false });
+
+  type Raw = {
+    amount_paid: number;
+    invoice_date: string;
+    status: string;
+    subscriptions: {
+      profile_id: string;
+      profiles: { full_name: string | null } | null;
+      program_variants: { name: string; programs: { name: string } | null } | null;
+    } | null;
+  };
+  return ((data ?? []) as unknown as Raw[]).map((r) => ({
+    invoice_date: r.invoice_date,
+    profile_id: r.subscriptions?.profile_id ?? null,
+    client_name: r.subscriptions?.profiles?.full_name ?? "—",
+    program_name: r.subscriptions?.program_variants?.programs?.name ?? "—",
+    variant_name: r.subscriptions?.program_variants?.name ?? "—",
     amount_paid: r.amount_paid,
     status: r.status,
   }));

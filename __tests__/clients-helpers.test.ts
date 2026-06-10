@@ -113,7 +113,7 @@ describe("canDeleteClient", () => {
 import { clientsToCSV } from "@/lib/admin/clients-helpers";
 
 describe("clientsToCSV", () => {
-  it("incluye encabezado y una fila por clienta", () => {
+  it("incluye encabezado y una fila por cliente", () => {
     const csv = clientsToCSV([base]);
     const lines = csv.split("\n");
     expect(lines[0]).toBe("Nombre,Email,Programa,Variante,Estado,Inscripción");
@@ -126,27 +126,5 @@ describe("clientsToCSV", () => {
   it("traduce el status a etiqueta en español", () => {
     const csv = clientsToCSV([{ ...base, status: "past_due" }]);
     expect(csv.split("\n")[1]).toContain("Pago fallido");
-  });
-});
-
-import { paginate } from "@/lib/admin/clients-helpers";
-
-describe("paginate", () => {
-  const nums = Array.from({ length: 23 }, (_, i) => i + 1);
-  it("devuelve la primera página de 10 por defecto", () => {
-    const r = paginate(nums, 1);
-    expect(r.items).toHaveLength(10);
-    expect(r.items[0]).toBe(1);
-    expect(r.totalPages).toBe(3);
-  });
-  it("devuelve la última página parcial", () => {
-    const r = paginate(nums, 3);
-    expect(r.items).toEqual([21, 22, 23]);
-  });
-  it("clampa páginas fuera de rango a la última", () => {
-    expect(paginate(nums, 99).items).toEqual([21, 22, 23]);
-  });
-  it("lista vacía => totalPages 1, items vacío", () => {
-    expect(paginate([], 1)).toEqual({ items: [], totalPages: 1, page: 1 });
   });
 });

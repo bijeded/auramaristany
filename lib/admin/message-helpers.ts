@@ -51,7 +51,7 @@ export function expandRecipients(rows: ActiveSubRow[], sel: RecipientSelection):
 
 export function formatDestination(isBroadcast: boolean, total: number, singleName: string | null): string {
   if (!isBroadcast) return singleName ?? "—";
-  return `Difusión · ${total} ${total === 1 ? "clienta" : "clientas"}`;
+  return `Difusión · ${total} ${total === 1 ? "cliente" : "clientes"}`;
 }
 
 export function formatReadCount(readCount: number, total: number): string {

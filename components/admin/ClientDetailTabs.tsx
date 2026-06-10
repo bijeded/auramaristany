@@ -102,7 +102,7 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
       {tab === "resumen" && (
         <div style={{ marginTop: 24 }}>
           <button onClick={handleDelete} disabled={!detail.canDelete.ok || deleting}
-            title={detail.canDelete.ok ? "Eliminar clienta" : detail.canDelete.reason}
+            title={detail.canDelete.ok ? "Eliminar cliente" : detail.canDelete.reason}
             className="font-body flex items-center gap-2"
             style={{ background: detail.canDelete.ok ? "var(--error-tint)" : "var(--gris-claro)", color: detail.canDelete.ok ? "var(--error)" : "var(--gris-suave)", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 600, fontSize: 13.5, cursor: detail.canDelete.ok ? "pointer" : "not-allowed" }}>
             <Trash2 size={16} /> Eliminar
