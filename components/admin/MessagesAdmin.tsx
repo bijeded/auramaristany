@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { SentMessage } from "@/lib/admin/queries";
 import type { RecipientGroup } from "@/lib/admin/message-helpers";
 import { whatsappUrl } from "@/lib/admin/message-helpers";
-import { sendMessage } from "@/lib/admin/messageActions";
+import { sendMessage, getSentMessageDetail, deleteMessage, type SentMessageDetail } from "@/lib/admin/messageActions";
 
 export interface ClientOption {
   id: string;
@@ -33,7 +34,46 @@ export function MessagesAdmin({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Detalle de un mensaje enviado (ver / clonar / eliminar)
+  const [detail, setDetail] = useState<SentMessageDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const router = useRouter();
+
   const selectedClient = clients.find((c) => c.id === clientId) ?? null;
+
+  async function openDetail(id: string) {
+    setDetailLoading(true);
+    setConfirmDelete(false);
+    const d = await getSentMessageDetail(id);
+    setDetail(d);
+    setDetailLoading(false);
+  }
+
+  function cloneToComposer() {
+    if (!detail) return;
+    setSubject(detail.subject);
+    setBody(detail.body);
+    setError(null);
+    setDetail(null);
+    setOpen(true);
+  }
+
+  async function handleDelete() {
+    if (!detail) return;
+    setDeleting(true);
+    const res = await deleteMessage(detail.id);
+    setDeleting(false);
+    if (!res.ok) {
+      setError(res.error ?? "Error al eliminar");
+      return;
+    }
+    setDetail(null);
+    setConfirmDelete(false);
+    router.refresh();
+  }
 
   const count =
     mode === "individual"
@@ -68,6 +108,7 @@ export function MessagesAdmin({
     setBody("");
     setClientId("");
     setVariantIds([]);
+    router.refresh();
   }
 
   return (
@@ -85,8 +126,8 @@ export function MessagesAdmin({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sent.map((m) => (
-            <div key={m.id}
-              style={{ display: "flex", gap: 16, alignItems: "center", background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 12, padding: 16 }}>
+            <button key={m.id} onClick={() => openDetail(m.id)}
+              style={{ display: "flex", gap: 16, alignItems: "center", textAlign: "left", cursor: "pointer", width: "100%", background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 12, padding: 16 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: m.isBroadcast ? "var(--lavanda-tint, #efeaff)" : "var(--rosa)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {m.isBroadcast ? "📢" : "👤"}
               </div>
@@ -98,7 +139,7 @@ export function MessagesAdmin({
                 <div>{new Date(m.createdAt).toLocaleDateString("es-MX")}</div>
                 <div>{m.readLabel}</div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -187,6 +228,87 @@ export function MessagesAdmin({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {(detail || detailLoading) && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(26,26,26,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}
+          onClick={() => {
+            if (deleting) return;
+            setDetail(null);
+            setDetailLoading(false);
+            setConfirmDelete(false);
+          }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto" }}>
+            {detailLoading || !detail ? (
+              <p className="font-body" style={{ color: "var(--gris-texto)" }}>Cargando…</p>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
+                  <h2 className="font-head" style={{ fontSize: 20, fontWeight: 700 }}>{detail.subject}</h2>
+                  <span style={{ fontSize: 12, color: "var(--gris-suave)", whiteSpace: "nowrap" }}>
+                    {detail.isBroadcast ? "📢 Difusión" : "👤 Individual"}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--gris-suave)", marginBottom: 14 }}>
+                  {new Date(detail.createdAt).toLocaleString("es-MX")}
+                </div>
+                <p className="font-body" style={{ whiteSpace: "pre-line", fontSize: 15, lineHeight: "23px", color: "var(--negro)", marginBottom: 18 }}>{detail.body}</p>
+
+                <div className="font-body" style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                  Destinatarias ({detail.recipients.filter((r) => r.read).length} de {detail.recipients.length} leído{detail.recipients.length === 1 ? "" : "s"})
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 20, maxHeight: 200, overflowY: "auto" }}>
+                  {detail.recipients.map((r, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, padding: "4px 0", borderBottom: "1px solid var(--gris-linea)" }}>
+                      <span className="font-body">{r.name}</span>
+                      <span style={{ color: r.read ? "var(--lavanda)" : "var(--gris-suave)", fontWeight: 600 }}>
+                        {r.read ? "✓ Leído" : "Sin leer"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {error && <p style={{ color: "var(--error, #c0392b)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+
+                {confirmDelete ? (
+                  <div style={{ background: "var(--rosa, #f8eeec)", borderRadius: 10, padding: 14 }}>
+                    <p className="font-body" style={{ fontSize: 13, marginBottom: 10 }}>
+                      Esto elimina el mensaje y lo quita de la bandeja de las clientas. No se puede deshacer.
+                    </p>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button onClick={() => setConfirmDelete(false)} disabled={deleting}
+                        style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--gris-linea)", background: "#fff", cursor: "pointer" }}>
+                        Cancelar
+                      </button>
+                      <button onClick={handleDelete} disabled={deleting}
+                        style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "var(--error, #c0392b)", color: "#fff", fontWeight: 600, cursor: "pointer", opacity: deleting ? 0.6 : 1 }}>
+                        {deleting ? "Eliminando…" : "Sí, eliminar"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <button onClick={() => setConfirmDelete(true)}
+                      style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid var(--error, #c0392b)", background: "#fff", color: "var(--error, #c0392b)", fontWeight: 600, cursor: "pointer" }}>
+                      Eliminar
+                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { setDetail(null); setConfirmDelete(false); }}
+                        style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid var(--gris-linea)", background: "#fff", cursor: "pointer" }}>
+                        Cerrar
+                      </button>
+                      <button onClick={cloneToComposer}
+                        style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "var(--lavanda)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+                        Clonar para reenviar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
