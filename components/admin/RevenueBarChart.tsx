@@ -17,7 +17,7 @@ export function RevenueBarChart({ data }: { data: MonthRevenue[] }) {
         <CartesianGrid stroke="#f0eae9" vertical={false} />
         <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--gris-suave)" }} tickLine={false} axisLine={false} />
         <YAxis tick={{ fontSize: 10, fill: "var(--gris-suave)" }} tickLine={false} axisLine={false} width={48}
-          tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+          tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`)} />
         <Tooltip
           formatter={(v: unknown) => [`$${Number(v).toLocaleString("es-MX")}`, "Ingresos"]}
           contentStyle={{ borderRadius: 8, fontSize: 12, fontFamily: "var(--font-body)" }}
