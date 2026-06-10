@@ -36,3 +36,11 @@ export function formatMXN(n: number): string {
   // Intl uses "MX$" in some environments; normalize to "$" used in the prototype.
   return MXN.format(Math.round(n)).replace(/^MX\$/, "$");
 }
+
+// ---------------------------------------------------------------------------
+// Task 2: computeMRR
+// ---------------------------------------------------------------------------
+
+export function computeMRR(subs: { price_mxn: number }[]): number {
+  return subs.reduce((sum, s) => sum + s.price_mxn, 0);
+}
