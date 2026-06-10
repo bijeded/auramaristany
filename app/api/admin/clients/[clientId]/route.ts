@@ -17,8 +17,12 @@ export async function DELETE(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
+  const admin = createServiceClient();
+
   // Guard: bloquear si hay suscripción no cancelada.
-  const { data: rawSubs } = await supabase
+  // Se usa el service client (no RLS) para que el guard SIEMPRE vea todas las
+  // suscripciones; un borrado irreversible no debe depender de que RLS las exponga.
+  const { data: rawSubs } = await admin
     .from("subscriptions")
     .select("status")
     .eq("profile_id", params.clientId);
@@ -27,8 +31,6 @@ export async function DELETE(
   if (!guard.ok) {
     return NextResponse.json({ error: guard.reason }, { status: 409 });
   }
-
-  const admin = createServiceClient();
 
   // Borrar objetos de Storage de las fotos (no cascadean con la FK de BD).
   const { data: rawPhotos } = await admin
