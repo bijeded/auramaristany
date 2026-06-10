@@ -392,15 +392,21 @@ CREATE TABLE message_recipients (
 -- mensajes donde tiene fila en message_recipients → agregar en migración 006.
 
 -- FINANZAS
+-- ⚠ DRIFT (corregido 9-jun-2026, pre-Fase 5): el bloque original listaba
+-- amount_mxn/paid_at y invoice_date DATE, que NO coinciden con la tabla aplicada
+-- (migración 001). Lo de abajo es el esquema REAL (lo que escribe recordInvoice en
+-- lib/webhooks/stripe-handlers.ts). El dashboard financiero (Fase 5) debe leer
+-- amount_paid + currency, e invoice_date es timestamptz. NO existe paid_at.
 CREATE TABLE invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subscription_id UUID REFERENCES subscriptions(id),
   stripe_invoice_id TEXT UNIQUE NOT NULL,
-  amount_mxn NUMERIC(10,2) NOT NULL,
+  amount_paid NUMERIC(10,2) NOT NULL,  -- ⚠ real: 'amount_paid' (no 'amount_mxn')
+  currency TEXT DEFAULT 'mxn',         -- ⚠ real: existe 'currency' (el SPEC viejo no lo tenía)
   status TEXT NOT NULL,        -- 'paid' | 'open' | 'void' | 'uncollectible'
-  invoice_date DATE NOT NULL,
-  paid_at TIMESTAMPTZ,
+  invoice_date TIMESTAMPTZ NOT NULL,   -- ⚠ real: timestamptz (no DATE)
   created_at TIMESTAMPTZ DEFAULT now()
+  -- NO existe paid_at (el SPEC viejo lo listaba).
 );
 ```
 
@@ -431,7 +437,8 @@ CREATE TABLE invoices (
     /sin-suscripcion              ← página de aterrizaje cuando no hay suscripción activa
     /history                      ← "Mi Progreso": tabs Desempeño (Recharts) + Fotos
     /history/[logId]              ← detalle de un día anterior: contenido + registro guardado (lectura)
-    /messages                     ← (Fase 4)
+    /messages                     ← bandeja read-only Aura→clienta (Fase 4) + WhatsApp a Aura
+    /messages/[id]                ← detalle del mensaje (marca read_at) (Fase 4)
     /settings                     ← (pendiente)
 
   /admin                          ← guard: role='admin'
@@ -449,7 +456,11 @@ CREATE TABLE invoices (
     /portal/progress              ← upsert del registro del día (auto-guardado)
     /portal/photos                ← POST subir foto (bucket privado 'progress')
     /portal/photos/[id]           ← DELETE borrar foto propia
+    /cron/purge-messages          ← (Fase 4) Vercel Cron: borra mensajes >180 días (Bearer CRON_SECRET)
 ```
+
+> **Mensajería (Fase 4):** el envío (admin), marcar leído y eliminar usan **server actions**
+> (`lib/admin/messageActions.ts`, `lib/portal/messageActions.ts`), no route handlers.
 
 ### Lógica de middleware (en orden)
 1. No autenticado → `/auth/login`
@@ -624,7 +635,11 @@ STRIPE_WEBHOOK_SECRET=
 
 # Resend
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=noreply@auramaristany.com
+RESEND_FROM_EMAIL=noreply@auramaristany.com   # en dev sin dominio verificado: onboarding@resend.dev
+
+# Mensajería (Fase 4)
+NEXT_PUBLIC_AURA_WHATSAPP=                      # número de Aura, formato internacional solo dígitos
+CRON_SECRET=                                    # secreto del Vercel Cron de retención de mensajes (prod)
 
 # App
 NEXT_PUBLIC_APP_URL=https://app.auramaristany.com

@@ -189,9 +189,12 @@ progress_logs          — registro diario: program_day_id + exercises_done JSON
 body_metrics           — peso/cintura/cadera (definido en schema; NO se captura en Fase 3)
 progress_photos        — fotos de progreso (storage_path, taken_at, caption). Columna 'angle'
                          existe pero SIN uso; body_metrics_id queda null (fotos independientes)
-messages               — mensajes Aura→clientas (individual o broadcast)
-message_recipients     — destinatarios + read_at
-invoices               — historial de pagos (fuente del dashboard financiero)
+messages               — mensajes Aura→clientas (individual o broadcast). subject NOT NULL,
+                         is_broadcast; SIN recipient_id/broadcast_filter (destino vía message_recipients)
+message_recipients     — destinatarios: message_id + recipient_id + read_at (snapshot al enviar)
+invoices               — historial de pagos (fuente del dashboard financiero, Fase 5).
+                         ⚠ columnas reales: amount_paid + currency + invoice_date(timestamptz) + status.
+                         NO existen amount_mxn ni paid_at (el SPEC viejo los listaba — ya corregido).
 
 exercises_done JSONB estructura (v1.1 — por serie):
   { "exercise-uuid": { "completed": true,
@@ -221,7 +224,8 @@ exercise_list block JSONB estructura:
   /pilares                       — pilares mensuales (gate CuarentaMás/Extra)
   /history                       — "Mi Progreso": tabs Desempeño + Fotos (Fase 3)
   /history/[logId]               — día pasado en modo lectura
-  /messages                      — solo lectura (Aura → clienta)  [Fase 4]
+  /messages                      — bandeja read-only (Aura→clienta) + WhatsApp a Aura  [Fase 4 ✓]
+  /messages/[id]                 — detalle del mensaje (marca read_at)  [Fase 4 ✓]
   /settings                      — perfil + Stripe Customer Portal  [pendiente]
   /activando · /sin-suscripcion  — polling post-pago / acceso denegado
 
@@ -243,6 +247,10 @@ exercise_list block JSONB estructura:
   /portal/progress               — upsert del registro del día (auto-guardado)
   /portal/photos                 — POST subir foto (bucket privado 'progress')
   /portal/photos/[id]            — DELETE borrar foto propia
+  /cron/purge-messages           — [Fase 4] Vercel Cron: borra mensajes >180 días (Bearer CRON_SECRET)
+
+  Nota: el envío/marcar-leído/eliminar de mensajes usan SERVER ACTIONS
+  (lib/admin/messageActions.ts, lib/portal/messageActions.ts), no route handlers.
 
 Middleware (orden):
   1. No autenticado → /auth/login
@@ -302,6 +310,22 @@ Middleware (orden):
 /components/portal/blocks/ExerciseListLogged.tsx — ejercicios con valores registrados por serie
 /components/portal/blocks/BlockView.tsx — +prop loggedExercises (dispatch a ExerciseListLogged)
 /supabase/migrations/005_progress_photos.sql — bucket privado 'progress' + RLS storage + columna caption (APLICADA)
+-- Fase 4 — Mensajería (COMPLETADA, en main):
+/supabase/migrations/006_messaging.sql — RLS SELECT de messages para clientas + UPDATE de read_at por la dueña + índices (APLICADA)
+/lib/admin/message-helpers.ts       — funciones puras (expandRecipients/buildRecipientGroups/formatDestination/whatsapp) — TDD
+/lib/admin/queries.ts (+)           — getActiveSubscriberRows, getSentMessages
+/lib/admin/messageActions.ts        — sendMessage, getSentMessageDetail, deleteMessage (admin-gated, RLS)
+/lib/content/messages.ts            — getInboxMessages/getUnreadCount/getMessageDetail (portal, server-only)
+/lib/portal/messageActions.ts       — markMessageRead (idempotente + revalidatePath layout)
+/lib/email/client.ts                — cliente Resend no-op sin key + fromAddress/appUrl
+/lib/email/send.ts                  — helpers best-effort + sendNewMessageEmailBatch (≤100) — TDD
+/lib/email/templates/*.tsx          — Layout + NewMessage/Welcome/PaymentFailed/SubscriptionEnded (React Email)
+/components/admin/MessagesAdmin.tsx  — composer (individual/difusión) + enviados + detalle (quién leyó)/clonar/eliminar
+/components/portal/MessagesList.tsx + MarkReadOnView.tsx — lista + marca leído en cliente
+/app/portal/messages/page.tsx + /[id]/page.tsx — lista (PortalHeader) + detalle read-only
+/app/admin/messages/page.tsx        — server: getSentMessages + getActiveSubscriberRows → MessagesAdmin
+/lib/webhooks/stripe-handlers.ts (+) — emails de ciclo de vida best-effort (welcome/payment_failed/canceled)
+/app/api/cron/purge-messages/route.ts + vercel.json — retención 180 días (Vercel Cron, Bearer CRON_SECRET)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -314,8 +338,11 @@ STRIPE_SECRET_KEY
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 STRIPE_WEBHOOK_SECRET
 RESEND_API_KEY
-RESEND_FROM_EMAIL=noreply@auramaristany.com
+RESEND_FROM_EMAIL=noreply@auramaristany.com   (dev sin dominio verificado: onboarding@resend.dev)
+NEXT_PUBLIC_AURA_WHATSAPP           (Fase 4: número de Aura, internacional solo dígitos; prueba 525512620404)
+CRON_SECRET                         (Fase 4: secreto del Vercel Cron de retención; setear en Vercel al desplegar)
 NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
+DEV_DATE=YYYY-MM-DD                 (solo dev, server-only, gitignored; remover en prod)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 10. ESTADO ACTUAL DEL PROYECTO
@@ -549,8 +576,8 @@ Fase 2 — Contenido         (sem 6-9)   CMS grilla semanal + portal del día + 
   ✓ Sub E: Editor de día             ✓ Sub F: Gestión de días + Pilares
   ✓ Ronda de ajustes post-smoke (rediseño editor + fixes) — FASE 2 COMPLETADA
 Fase 3 — Historial         (sem 10-11) Gráficas desempeño + fotos + historial de días  ✓ COMPLETADA
-Fase 4 — Mensajería        (sem 12)    Comunicación Aura↔clientas                    ← SIGUIENTE
-Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos
+Fase 4 — Mensajería        (sem 12)    Comunicación Aura→clientas + email + WhatsApp  ✓ COMPLETADA (merge dbdb432)
+Fase 5 — Financiero        (sem 13)    Dashboard MRR e ingresos                      ← SIGUIENTE
 Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + producción
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -639,9 +666,9 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Estado: Fases 0–3 COMPLETAS y en main; migración 005 aplicada; smoke OK.
-Para continuar: leer docs/superpowers/context/2026-06-09-fase-4-mensajeria.md
-y arrancar Fase 4 (Mensajería Aura↔clientas) con brainstorm → plan → ejecución.
-Prototipos UI de referencia: design-handoff-aura/prototype/aura/ (client-messages.jsx,
-admin-messages.jsx).
+Estado: Fases 0–4 COMPLETAS y en main; migraciones 001–006 aplicadas; smokes OK.
+Para continuar: leer docs/superpowers/context/2026-06-09-fase-5-financiero.md
+y arrancar Fase 5 (Dashboard Financiero: MRR e ingresos) con brainstorm → plan → ejecución.
+⚠ Antes de Fase 5: la tabla invoices real usa amount_paid + currency + invoice_date(timestamptz)
+(NO amount_mxn/paid_at) — ya corregido en SPEC §schema. Prototipo UI: admin-dashboard.jsx.
 ════════════════════════════════════════════════════════════════
