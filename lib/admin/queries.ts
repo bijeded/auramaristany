@@ -1,5 +1,10 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import {
+  type ActiveSubRow,
+  formatDestination,
+  formatReadCount,
+} from "./message-helpers";
 
 export interface AdminProgram {
   id: string;
@@ -182,4 +187,85 @@ export async function getPillarWithBlocks(seriesId: string, pillarKey: string): 
     .eq("pillar_id", pillar.id).order("sort_order");
 
   return { ...pillar, blocks: (rawBlocks as unknown as BlockData[]) ?? [] };
+}
+
+export interface SentMessage {
+  id: string;
+  subject: string;
+  isBroadcast: boolean;
+  createdAt: string;
+  total: number;
+  readCount: number;
+  destination: string;
+  readLabel: string;
+}
+
+export async function getActiveSubscriberRows(): Promise<ActiveSubRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("subscriptions")
+    .select(
+      "profile_id, program_variant_id, profiles(full_name, email, phone), program_variants(name, program_id, programs(name))"
+    )
+    .eq("status", "active");
+
+  type Raw = {
+    profile_id: string;
+    program_variant_id: string;
+    profiles: { full_name: string | null; email: string; phone: string | null } | null;
+    program_variants: { name: string; program_id: string; programs: { name: string } | null } | null;
+  };
+
+  return ((data ?? []) as unknown as Raw[])
+    .filter((r) => r.profiles && r.program_variants)
+    .map((r) => ({
+      profile_id: r.profile_id,
+      full_name: r.profiles!.full_name,
+      email: r.profiles!.email,
+      phone: r.profiles!.phone,
+      program_variant_id: r.program_variant_id,
+      variant_name: r.program_variants!.name,
+      program_id: r.program_variants!.program_id,
+      program_name: r.program_variants!.programs?.name ?? "",
+    }));
+}
+
+export async function getSentMessages(): Promise<SentMessage[]> {
+  const supabase = await createClient();
+  const { data: msgs } = await supabase
+    .from("messages")
+    .select("id, subject, is_broadcast, created_at")
+    .order("created_at", { ascending: false });
+
+  const { data: recips } = await supabase
+    .from("message_recipients")
+    .select("message_id, read_at, recipient_id, profiles(full_name)");
+
+  type RecRow = { message_id: string; read_at: string | null; profiles: { full_name: string | null } | null };
+  const byMessage = new Map<string, { total: number; read: number; singleName: string | null }>();
+  for (const r of ((recips ?? []) as unknown as RecRow[])) {
+    let e = byMessage.get(r.message_id);
+    if (!e) {
+      e = { total: 0, read: 0, singleName: null };
+      byMessage.set(r.message_id, e);
+    }
+    e.total += 1;
+    if (r.read_at) e.read += 1;
+    e.singleName = r.profiles?.full_name ?? e.singleName;
+  }
+
+  type MsgRow = { id: string; subject: string; is_broadcast: boolean; created_at: string };
+  return ((msgs ?? []) as unknown as MsgRow[]).map((m) => {
+    const agg = byMessage.get(m.id) ?? { total: 0, read: 0, singleName: null };
+    return {
+      id: m.id,
+      subject: m.subject,
+      isBroadcast: m.is_broadcast,
+      createdAt: m.created_at,
+      total: agg.total,
+      readCount: agg.read,
+      destination: formatDestination(m.is_broadcast, agg.total, agg.singleName),
+      readLabel: formatReadCount(agg.read, agg.total),
+    };
+  });
 }

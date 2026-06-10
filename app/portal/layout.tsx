@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { hasPillarsAccess } from "@/lib/content/pillars";
+import { getUnreadCount } from "@/lib/content/messages";
 import { PortalNav } from "@/components/portal/PortalNav";
 
 export default async function PortalLayout({
@@ -11,7 +12,9 @@ export default async function PortalLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const showPilares = user ? await hasPillarsAccess(user.id) : false;
+  const [showPilares, unreadMessages] = user
+    ? await Promise.all([hasPillarsAccess(user.id), getUnreadCount(user.id)])
+    : [false, 0];
 
   return (
     <div style={{ background: "#e8e0e0", minHeight: "100dvh" }}>
@@ -21,7 +24,7 @@ export default async function PortalLayout({
       >
         <main className="flex-1 overflow-y-auto">{children}</main>
 
-        <PortalNav showPilares={showPilares} />
+        <PortalNav showPilares={showPilares} unreadMessages={unreadMessages} />
       </div>
     </div>
   );

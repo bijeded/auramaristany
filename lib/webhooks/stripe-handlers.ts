@@ -1,6 +1,11 @@
 import type Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { stripe } from "@/lib/stripe";
+import {
+  sendWelcomeEmail,
+  sendPaymentFailedEmail,
+  sendSubscriptionEndedEmail,
+} from "@/lib/email/send";
 
 // Stripe API 2026+ moved the billing period onto subscription items.
 // The SubscriptionItem SDK type may not yet expose these fields, so read them defensively.
@@ -34,6 +39,23 @@ export function computeMonthsUpdate(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
+
+async function getProfileContact(supabase: AnyClient, profileId: string): Promise<{ email: string; name: string } | null> {
+  const { data } = await supabase.from("profiles").select("email, full_name").eq("id", profileId).single();
+  if (!data?.email) return null;
+  return { email: data.email, name: data.full_name ?? "" };
+}
+
+async function getContactBySubscription(supabase: AnyClient, stripeSubscriptionId: string): Promise<{ email: string; name: string } | null> {
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("profiles(email, full_name)")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .single();
+  const p = data?.profiles as { email: string; full_name: string | null } | null;
+  if (!p?.email) return null;
+  return { email: p.email, name: p.full_name ?? "" };
+}
 
 export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const supabase: AnyClient = createServiceClient();
@@ -77,6 +99,11 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   });
 
   if (error) console.error("[webhook] subscription insert error:", error);
+
+  if (!error) {
+    const contact = await getProfileContact(supabase, supabase_user_id);
+    if (contact) await sendWelcomeEmail({ to: contact.email, name: contact.name });
+  }
 }
 
 function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
@@ -172,6 +199,9 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
     .eq("stripe_subscription_id", subscription.id);
 
   if (error) console.error("[webhook] subscription.deleted error:", error);
+
+  const contact = await getContactBySubscription(supabase, subscription.id);
+  if (contact) await sendSubscriptionEndedEmail({ to: contact.email, name: contact.name });
 }
 
 export async function handlePaymentFailed(invoice: Stripe.Invoice) {
@@ -188,4 +218,7 @@ export async function handlePaymentFailed(invoice: Stripe.Invoice) {
     .eq("stripe_subscription_id", subscriptionId);
 
   if (error) console.error("[webhook] payment_failed update error:", error);
+
+  const contact = await getContactBySubscription(supabase, subscriptionId);
+  if (contact) await sendPaymentFailedEmail({ to: contact.email, name: contact.name });
 }

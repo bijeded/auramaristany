@@ -1,7 +1,9 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 9 de junio de 2026
-Estado: Fase 3 COMPLETADA y smoke-tested (Historial) — Fases 0-3 en main; pendiente deploy
+Estado: Fases 0-3 en main. Fase 4 (Mensajería) IMPLEMENTADA en rama
+        feature/fase-4-mensajeria (gates verdes, NO mergeada). Pendiente:
+        aplicar migración 006 al remoto + smoke + merge; deploy a Vercel.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -481,10 +483,57 @@ COMPLETADO:
     eliminar fotos de clientas (RLS ya lo permite, falta UI — futura ficha de cliente);
     notas de admin sobre el registro del día (diferido, evaluar en Fase 4).
 
+  ◐ FASE 4 — MENSAJERÍA (IMPLEMENTADA en rama feature/fase-4-mensajeria, NO mergeada)
+    Spec: docs/superpowers/specs/2026-06-09-fase-4-mensajeria-design.md
+    Plan: docs/superpowers/plans/2026-06-09-fase-4-mensajeria.md
+    Gates: vitest 102/102, tsc/lint/build OK. Review final sin bloqueantes.
+    ✓ Mensajería in-app unidireccional Aura→clientas (individual + broadcast por
+      programa/variante o "todas las activas"), modelo snapshot (expande a
+      message_recipients al enviar; sin broadcast_filter).
+      - Admin /admin/messages: composer + enviados ("leídos de N").
+        lib/admin/messageActions.ts (sendMessage, cliente admin-context con RLS),
+        getActiveSubscriberRows/getSentMessages, message-helpers.ts (puras, TDD).
+      - Portal /portal/messages + /[id] read-only (marca read_at al abrir, 404 si
+        no es suya). Badge de no-leídos en PortalNav (conteo server en layout).
+        lib/content/messages.ts + lib/portal/messageActions.ts.
+    ✓ Email lib/email/ (Resend + React Email): no-op sin RESEND_API_KEY, best-effort
+      (nunca rompe webhook/envío), broadcast en batch ≤100. Plantillas con branding.
+    ✓ Emails de ciclo de vida en webhooks (stripe-handlers.ts): bienvenida
+      (checkout.completed), pago fallido (payment_failed), cancelación (sub.deleted).
+      Recibo invoice.paid OFF (Stripe ya envía). Recordatorio pre-cobro → Stripe.
+    ✓ WhatsApp: botón portal→Aura y admin→clienta (wa.me). Env NEXT_PUBLIC_AURA_WHATSAPP
+      (prueba 525512620404; cambiar al de Aura en prod).
+    ✓ Drift de SPEC §messages corregido (tabla real: subject NOT NULL; sin
+      recipient_id/broadcast_filter; message_recipients.recipient_id, sin created_at/unique).
+    ⚠ PENDIENTE antes de merge:
+      1) APLICAR migración 006_messaging.sql al Supabase remoto (policy SELECT de
+         messages para clientas + UPDATE de read_at por la dueña + índices). La CLI
+         no está logueada → aplicar desde el dashboard de Supabase o `supabase login`
+         + push. SIN ESTO la clienta no puede leer mensajes (RLS lo bloquea).
+      2) Smoke test (individual/broadcast, marcar leído, badge, WhatsApp, email).
+      3) Merge a main.
+    ✓ Ajustes post-smoke (1ra ronda):
+      - Badge de no-leídos ahora se limpia al abrir el mensaje: markMessageRead corre
+        en cliente (MarkReadOnView) + revalidatePath('/portal','layout') + router.refresh().
+      - Quitado el emoji del texto pre-llenado de WhatsApp (se veía roto).
+      - Admin: tarjeta de enviado clicable → detalle read-only con destinatarias y
+        quién leyó; botones Clonar para reenviar (pre-llena composer) y Eliminar
+        (borra message + message_recipients → también de la bandeja de las clientas;
+        con confirmación). getSentMessageDetail/deleteMessage en messageActions.ts.
+    Follow-ups Fase 4: CSV export de clientas → Fase 5 (newsletter/win-back de
+      no-activas, NO olvidar); pedir TELÉFONO en onboarding/checkout para que el botón
+      WhatsApp del admin sea útil (hoy profiles.phone casi siempre null → no aparece);
+      RESEND no conectado en pruebas (poner API key válida + RESEND_FROM_EMAIL=
+      onboarding@resend.dev; verificar dominio = prerequisito de lanzamiento);
+      getSentMessages carga todos los message_recipients (escala, ok por ahora);
+      Zapier on-subscribe diferido.
+    ✓ Retención: cron de Vercel listo-pero-inactivo (corre al desplegar):
+      app/api/cron/purge-messages (GET, service role, borra mensajes + recipients
+      con >180 días; protegido por Authorization: Bearer CRON_SECRET) + vercel.json
+      (schedule diario 3am). PENDIENTE en deploy: setear CRON_SECRET en env de Vercel.
+
 PENDIENTE:
   ○ Configurar Vercel + variables de entorno de producción (deploy)
-  ○ Siguiente fase de desarrollo: FASE 4 — Mensajería (Aura ↔ clientas).
-    Bloque de arranque: docs/superpowers/context/2026-06-09-fase-4-mensajeria.md
   ○ Follow-ups menores (no bloquean): try/catch en stripe.subscriptions.retrieve;
     unificar formatDate duplicado; alinear SPEC/types.ts (dicen general_notes) con la
     columna real 'notes'; saveBlocks/savePillarBlocks no transaccionales; tests de
