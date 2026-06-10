@@ -1,9 +1,9 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 9 de junio de 2026
-Estado: Fases 0-3 en main. Fase 4 (Mensajería) IMPLEMENTADA en rama
-        feature/fase-4-mensajeria (gates verdes, NO mergeada). Pendiente:
-        aplicar migración 006 al remoto + smoke + merge; deploy a Vercel.
+Estado: Fases 0-4 en main (Fase 4 Mensajería mergeada, merge dbdb432; migr. 006
+        aplicada; 2 rondas de smoke OK). Siguiente: Fase 5 (Financiero).
+        Pendiente operativo: conectar Resend, deploy a Vercel (+ CRON_SECRET).
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -483,7 +483,7 @@ COMPLETADO:
     eliminar fotos de clientas (RLS ya lo permite, falta UI — futura ficha de cliente);
     notas de admin sobre el registro del día (diferido, evaluar en Fase 4).
 
-  ◐ FASE 4 — MENSAJERÍA (IMPLEMENTADA en rama feature/fase-4-mensajeria, NO mergeada)
+  ✓ FASE 4 — MENSAJERÍA (COMPLETA y MERGEADA A MAIN, merge dbdb432; migr. 006 aplicada; 2 smokes OK)
     Spec: docs/superpowers/specs/2026-06-09-fase-4-mensajeria-design.md
     Plan: docs/superpowers/plans/2026-06-09-fase-4-mensajeria.md
     Gates: vitest 102/102, tsc/lint/build OK. Review final sin bloqueantes.
@@ -505,13 +505,9 @@ COMPLETADO:
       (prueba 525512620404; cambiar al de Aura en prod).
     ✓ Drift de SPEC §messages corregido (tabla real: subject NOT NULL; sin
       recipient_id/broadcast_filter; message_recipients.recipient_id, sin created_at/unique).
-    ⚠ PENDIENTE antes de merge:
-      1) APLICAR migración 006_messaging.sql al Supabase remoto (policy SELECT de
-         messages para clientas + UPDATE de read_at por la dueña + índices). La CLI
-         no está logueada → aplicar desde el dashboard de Supabase o `supabase login`
-         + push. SIN ESTO la clienta no puede leer mensajes (RLS lo bloquea).
-      2) Smoke test (individual/broadcast, marcar leído, badge, WhatsApp, email).
-      3) Merge a main.
+    ✓ Migración 006_messaging.sql aplicada en Supabase (policy SELECT de messages
+      para clientas + UPDATE de read_at por la dueña + índices). 2 rondas de smoke
+      OK. Mergeada a main (dbdb432).
     ✓ Ajustes post-smoke (1ra ronda):
       - Badge de no-leídos ahora se limpia al abrir el mensaje: markMessageRead corre
         en cliente (MarkReadOnView) + revalidatePath('/portal','layout') + router.refresh().
