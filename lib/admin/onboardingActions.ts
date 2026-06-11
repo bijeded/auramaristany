@@ -1,0 +1,76 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import { validateQuestion, type QuestionInput } from "./onboarding-helpers";
+
+function revalidate() {
+  revalidatePath("/admin/onboarding-settings");
+  revalidatePath("/onboarding/questionnaire");
+}
+
+export async function saveQuestion(input: QuestionInput): Promise<{ id: string; error?: string }> {
+  const v = validateQuestion(input);
+  if (!v.ok) return { id: input.id ?? "", error: v.error };
+
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const row = {
+    question_text: input.question_text.trim(),
+    question_type: input.question_type,
+    options: v.cleanedOptions,
+    is_required: input.is_required,
+  };
+
+  if (input.id) {
+    const { error } = await client.from("onboarding_questions").update(row).eq("id", input.id);
+    if (error) return { id: input.id, error: error.message };
+    revalidate();
+    return { id: input.id };
+  }
+
+  // Nueva: sort_order = (max actual) + 1, is_active = true.
+  const { data: maxRow } = await client
+    .from("onboarding_questions")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextOrder = ((maxRow?.sort_order as number | undefined) ?? -1) + 1;
+
+  const { data: inserted, error } = await client
+    .from("onboarding_questions")
+    .insert({ ...row, sort_order: nextOrder, is_active: true })
+    .select("id")
+    .single();
+  if (error) return { id: "", error: error.message };
+  revalidate();
+  return { id: inserted.id };
+}
+
+export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+  for (let i = 0; i < orderedIds.length; i++) {
+    const { error } = await client
+      .from("onboarding_questions")
+      .update({ sort_order: i })
+      .eq("id", orderedIds[i]);
+    if (error) return { error: error.message };
+  }
+  revalidate();
+  return {};
+}
+
+export async function setQuestionActive(id: string, active: boolean): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+  const { error } = await client.from("onboarding_questions").update({ is_active: active }).eq("id", id);
+  if (error) return { error: error.message };
+  revalidate();
+  return {};
+}

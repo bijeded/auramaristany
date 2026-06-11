@@ -1,12 +1,14 @@
-export default function AdminOnboardingSettingsPage() {
-  return (
-    <div className="p-8">
-      <h1 className="font-head" style={{ fontSize: 26, fontWeight: 700, marginBottom: 8 }}>
-        Configuración de Onboarding
-      </h1>
-      <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 14 }}>
-        Gestión de preguntas del cuestionario — próximamente.
-      </p>
-    </div>
-  );
+import { createClient } from "@/lib/supabase/server";
+import { OnboardingBuilder } from "@/components/admin/OnboardingBuilder";
+import type { OnboardingQuestion } from "@/lib/admin/onboarding-helpers";
+
+export default async function AdminOnboardingSettingsPage() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("onboarding_questions")
+    .select("id, question_text, question_type, options, is_required, is_active, sort_order")
+    .order("sort_order");
+
+  const questions = (data as unknown as OnboardingQuestion[] | null) ?? [];
+  return <OnboardingBuilder questions={questions} />;
 }
