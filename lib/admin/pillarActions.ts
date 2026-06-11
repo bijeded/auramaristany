@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import type { SaveBlockInput } from "./dayActions";
 import { requireAdmin } from "./auth";
+import { validateBlock } from "./content-validation";
 
 export async function savePillar(data: {
   seriesId: string; pillarKey: string; title: string; published: boolean;
@@ -27,6 +28,10 @@ export async function savePillarBlocks(pillarId: string, blocks: SaveBlockInput[
   const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+  for (const b of blocks) {
+    const v = validateBlock(b);
+    if (!v.ok) return { error: v.error };
+  }
   const { error: delErr } = await client.from("program_pillar_blocks").delete().eq("pillar_id", pillarId);
   if (delErr) return { error: delErr.message };
   if (blocks.length > 0) {

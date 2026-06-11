@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "./auth";
+import { validateDayInput, validateBlock } from "./content-validation";
 
 export interface SaveDayInput {
   id?: string;
@@ -19,6 +20,11 @@ export async function saveDay(data: SaveDayInput): Promise<{ dayId: string; erro
   const auth = await requireAdmin();
   if (!auth.ok) return { dayId: data.id ?? "", error: auth.error };
   const supabase = auth.supabase;
+  const valid = validateDayInput({
+    title: data.title, weekNumber: data.weekNumber, dayType: data.dayType,
+    durationMinutes: data.durationMinutes, workoutFocus: data.workoutFocus,
+  });
+  if (!valid.ok) return { dayId: data.id ?? "", error: valid.error };
   const row = {
     series_id: data.seriesId,
     week_number: data.weekNumber,
@@ -56,6 +62,11 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
   const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+
+  for (const b of blocks) {
+    const v = validateBlock(b);
+    if (!v.ok) return { error: v.error };
+  }
 
   const { error: delError } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
   if (delError) return { error: delError.message };
