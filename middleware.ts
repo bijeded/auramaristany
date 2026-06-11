@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { ACCESS_STATES } from "@/lib/content/subscription-access";
 import { getRedirectPath } from "@/lib/middleware-utils";
 import type { UserRole } from "@/lib/supabase/types";
 
@@ -52,7 +53,7 @@ export async function middleware(request: NextRequest) {
         .from("subscriptions")
         .select("id")
         .eq("profile_id", user.id)
-        .eq("status", "active")
+        .in("status", ACCESS_STATES as readonly string[])
         .maybeSingle();
 
       hasActiveSubscription = !!sub;
