@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "./auth";
 import { validateDayInput, validateBlock } from "./content-validation";
+import { sanitizeRichText } from "./sanitize-html";
 
 export interface SaveDayInput {
   id?: string;
@@ -76,7 +77,10 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
       day_id: dayId,
       block_type: b.block_type,
       sort_order: i,
-      content: b.content,
+      content:
+        b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
+          ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
+          : b.content,
     }));
     const { error: insError } = await client.from("program_day_blocks").insert(rows);
     if (insError) return { error: insError.message };
