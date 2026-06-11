@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingBuilder } from "@/components/admin/OnboardingBuilder";
 import type { OnboardingQuestion } from "@/lib/admin/onboarding-helpers";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 export default async function AdminOnboardingSettingsPage() {
+  await requireAdminPage();
   const supabase = await createClient();
   const { data } = await supabase
     .from("onboarding_questions")

@@ -1,8 +1,10 @@
 import { getSentMessages, getActiveSubscriberRows } from "@/lib/admin/queries";
 import { buildRecipientGroups, normalizeWhatsappNumber } from "@/lib/admin/message-helpers";
 import { MessagesAdmin, type ClientOption } from "@/components/admin/MessagesAdmin";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 export default async function AdminMessagesPage() {
+  await requireAdminPage();
   const [sent, rows] = await Promise.all([getSentMessages(), getActiveSubscriberRows()]);
   const groups = buildRecipientGroups(rows);
 
