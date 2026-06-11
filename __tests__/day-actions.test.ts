@@ -3,23 +3,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const calls: { table: string; op: string; payload?: unknown }[] = [];
 
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(async () => ({
-    from: (table: string) => ({
-      insert: (payload: unknown) => {
-        calls.push({ table, op: "insert", payload });
-        return { select: () => ({ single: () => Promise.resolve({ data: { id: "new-id" }, error: null }) }) };
-      },
-      update: (payload: unknown) => {
-        calls.push({ table, op: "update", payload });
-        return { eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "d1" }, error: null }) }) }) };
-      },
-      delete: () => {
-        calls.push({ table, op: "delete" });
-        return { eq: () => Promise.resolve({ error: null }) };
-      },
-    }),
-  })),
+const fakeSupabase = {
+  from: (table: string) => ({
+    insert: (payload: unknown) => {
+      calls.push({ table, op: "insert", payload });
+      return { select: () => ({ single: () => Promise.resolve({ data: { id: "new-id" }, error: null }) }) };
+    },
+    update: (payload: unknown) => {
+      calls.push({ table, op: "update", payload });
+      return { eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: "d1" }, error: null }) }) }) };
+    },
+    delete: () => {
+      calls.push({ table, op: "delete" });
+      return { eq: () => Promise.resolve({ error: null }) };
+    },
+  }),
+};
+vi.mock("@/lib/admin/auth", () => ({
+  requireAdmin: vi.fn(async () => ({ ok: true, supabase: fakeSupabase, user: { id: "admin1" } })),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 

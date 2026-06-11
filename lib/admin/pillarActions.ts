@@ -1,12 +1,14 @@
 "use server";
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { SaveBlockInput } from "./dayActions";
+import { requireAdmin } from "./auth";
 
 export async function savePillar(data: {
   seriesId: string; pillarKey: string; title: string; published: boolean;
 }): Promise<{ pillarId: string; error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { pillarId: "", error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: row, error } = await (supabase as any)
     .from("program_series_pillars")
@@ -20,7 +22,9 @@ export async function savePillar(data: {
 }
 
 export async function savePillarBlocks(pillarId: string, blocks: SaveBlockInput[]): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error: delErr } = await client.from("program_pillar_blocks").delete().eq("pillar_id", pillarId);

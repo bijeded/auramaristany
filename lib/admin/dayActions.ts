@@ -1,7 +1,7 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "./auth";
 
 export interface SaveDayInput {
   id?: string;
@@ -16,7 +16,9 @@ export interface SaveDayInput {
 }
 
 export async function saveDay(data: SaveDayInput): Promise<{ dayId: string; error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { dayId: data.id ?? "", error: auth.error };
+  const supabase = auth.supabase;
   const row = {
     series_id: data.seriesId,
     week_number: data.weekNumber,
@@ -49,7 +51,9 @@ export interface SaveBlockInput {
 }
 
 export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
@@ -72,7 +76,9 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
 }
 
 export async function deleteDay(dayId: string): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error: blockErr } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
@@ -88,7 +94,9 @@ export async function cloneDay(
   target: { seriesId: string; weekNumber: number; dayOfWeek: string },
   overwrite: boolean
 ): Promise<{ dayId?: string; error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
@@ -138,7 +146,9 @@ export async function cloneDay(
 export async function cloneWeek(
   seriesId: string, sourceWeek: number, targetWeek: number, overwrite: boolean
 ): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: days } = await (supabase as any).from("program_days")
     .select("id, day_of_week").eq("series_id", seriesId).eq("week_number", sourceWeek);
