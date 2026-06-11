@@ -18,6 +18,15 @@ export function validateDayInput(input: unknown): ValidationResult {
   return r.success ? { ok: true } : { ok: false, error: "Datos del día inválidos" };
 }
 
+const pillarSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+});
+
+export function validatePillarInput(input: { title: string }): ValidationResult {
+  const r = pillarSchema.safeParse(input);
+  return r.success ? { ok: true } : { ok: false, error: "Datos del pilar inválidos" };
+}
+
 export function validateBlock(block: { block_type: string; content: Record<string, unknown> }): ValidationResult {
   if (!(BLOCK_TYPES as readonly string[]).includes(block.block_type)) {
     return { ok: false, error: "Tipo de bloque no permitido" };

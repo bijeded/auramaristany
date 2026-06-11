@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { validateDayInput, validateBlock } from "@/lib/admin/content-validation";
+import { validateDayInput, validateBlock, validatePillarInput } from "@/lib/admin/content-validation";
+
+describe("validatePillarInput", () => {
+  it("acepta title válido", () => {
+    expect(validatePillarInput({ title: "Nutrición" }).ok).toBe(true);
+  });
+  it("rechaza title vacío", () => {
+    expect(validatePillarInput({ title: "  " }).ok).toBe(false);
+  });
+  it("rechaza title >200", () => {
+    expect(validatePillarInput({ title: "x".repeat(201) }).ok).toBe(false);
+  });
+});
 
 describe("validateDayInput", () => {
   const base = { title: "Día 1", weekNumber: 1, dayType: "workout", durationMinutes: 30, workoutFocus: "Fuerza" };

@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import type { SaveBlockInput } from "./dayActions";
 import { requireAdmin } from "./auth";
-import { validateBlock } from "./content-validation";
+import { validateBlock, validatePillarInput } from "./content-validation";
 import { sanitizeRichText } from "./sanitize-html";
 
 export async function savePillar(data: {
@@ -10,6 +10,8 @@ export async function savePillar(data: {
 }): Promise<{ pillarId: string; error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { pillarId: "", error: auth.error };
+  const valid = validatePillarInput({ title: data.title });
+  if (!valid.ok) return { pillarId: "", error: valid.error };
   const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: row, error } = await (supabase as any)
