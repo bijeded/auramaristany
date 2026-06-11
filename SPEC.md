@@ -605,9 +605,10 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
 - Historial de enviados
 - Notificación por email al destinatario (Resend)
 
-### Configuración de Onboarding
-- Crear, editar, reordenar preguntas del cuestionario
-- Tipos: texto libre, número, selección única, selección múltiple
+### Configuración de Onboarding — `/admin/onboarding-settings` (Fase 6 ✓ implementada)
+- Constructor (`OnboardingBuilder`): crear, editar (modal `OnboardingQuestionEditor`), **reordenar con drag** (dnd-kit) y **activar/desactivar** preguntas. Solo desactivar (`is_active=false`), sin borrado físico, para no dejar respuestas huérfanas en el jsonb.
+- Tipos: texto libre, número, selección única, selección múltiple (los dos últimos con editor de opciones).
+- **Capa de datos:** `lib/admin/onboarding-helpers.ts` (`validateQuestion`/`reindexOrder`, puras TDD) + `lib/admin/onboardingActions.ts` (server actions `saveQuestion`/`reorderQuestions`/`setQuestionActive`, RLS admin, sin migración). El cuestionario del cliente (`/onboarding/questionnaire`) refleja las activas ordenadas, sin cambios.
 
 ---
 

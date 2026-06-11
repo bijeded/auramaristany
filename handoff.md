@@ -631,8 +631,12 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     filtro por estado, paginación 10, cliente→ficha, "← Dashboard") + enlace "Ver todos →" en el
     dashboard. Extrae paginate y STATUS_LABEL a módulos compartidos. Incluye pasada de LENGUAJE
     NEUTRO ('clienta(s)' → 'cliente(s)' en toda la UI). 144/144 tests, build verde, smoke validado.
-  Pendiente: pedir teléfono en onboarding/checkout, conectar Resend, deploy a Vercel (+ CRON_SECRET),
-    Stripe live + precios reales, auditoría seguridad.
+  ✓ Sub-bloque 4b: Constructor de Onboarding (merge 9477a8c) — /admin/onboarding-settings: admin CRUD
+    sobre onboarding_questions (crear/editar modal 4 tipos + opciones, reordenar drag dnd-kit,
+    activar/desactivar — solo desactivar). Helpers TDD + server actions (RLS admin, sin migración).
+    151/151 tests, build verde, smoke validado.
+  Pendiente: (4a) teléfono OBLIGATORIO en /auth/register → profiles.phone (decisión; activa WhatsApp),
+    conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -720,11 +724,11 @@ Diseño UI (prototipos JSX listos para implementar):
 
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
-Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques 1 Gestión de Clientes
-0d23c5e y 3 Página de Pagos d52f224 mergeados). Migraciones 001–007 aplicadas (007 = ON DELETE
-CASCADE para borrado total de cliente); backfill de invoices ejecutado; E2E validado. UI con
-lenguaje neutro ('cliente').
-Pendiente Fase 6: pedir teléfono en onboarding/checkout, conectar Resend (API key + dominio),
+Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados: 1 Gestión de Clientes
+0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c). Migraciones 001–007
+aplicadas (007 = ON DELETE CASCADE para borrado total de cliente); backfill de invoices ejecutado;
+E2E validado. UI con lenguaje neutro ('cliente').
+Pendiente Fase 6: (4a) teléfono obligatorio en /auth/register, conectar Resend (API key + dominio),
 deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad.
 Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
