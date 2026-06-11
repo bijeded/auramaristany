@@ -1,11 +1,11 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 10 de junio de 2026
-Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 3 sub-bloques mergeados:
+Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 4 sub-bloques mergeados:
         1 Gestión de Clientes (0d23c5e), 3 Página de Pagos + lenguaje neutro (d52f224),
-        4b Constructor de Onboarding (9477a8c). Migr. 001-007 aplicadas (007 = ON DELETE
-        CASCADE para borrado total de cliente); backfill de invoices ejecutado; E2E validado.
-        Pendiente Fase 6: (4a) teléfono obligatorio en /auth/register, conectar Resend,
+        4b Constructor de Onboarding (9477a8c), 4a Núm. Celular en registro (bdb4e83).
+        Migr. 001-008 aplicadas (007 = ON DELETE CASCADE; 008 = handle_new_user copia phone);
+        backfill de invoices ejecutado; E2E validado. Pendiente Fase 6: conectar Resend,
         deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
 ════════════════════════════════════════════════════════════════
 
@@ -366,6 +366,9 @@ Middleware (orden):
 /components/admin/OnboardingBuilder.tsx · OnboardingQuestionEditor.tsx — constructor + modal
 /app/admin/clients/page.tsx · /clients/[clientId]/page.tsx · /payments/page.tsx · /onboarding-settings/page.tsx
 /app/api/admin/clients/[clientId]/route.ts (+ /photos/[photoId]/route.ts) — borrado de cliente y fotos
+/lib/auth/phone.ts                  — normalizePhone/validatePhone (registro, TDD)
+/components/auth/RegisterForm.tsx (+) — campo Núm. Celular obligatorio (con lada) → signUp metadata
+/supabase/migrations/008_handle_new_user_phone.sql — handle_new_user copia phone a profiles.phone. APLICADA.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -630,11 +633,13 @@ COMPLETADO:
       NEUTRO ('cliente') en toda la UI. Extrae paginate/STATUS_LABEL a módulos compartidos. 144 tests.
     ✓ Sub-bloque 4b: Constructor de Onboarding (merge 9477a8c) — /admin/onboarding-settings
       (CRUD de onboarding_questions; sin migración). 151 tests.
-    Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder).
+    ✓ Sub-bloque 4a: Núm. Celular en /auth/register (merge bdb4e83) — campo obligatorio con lada
+      (lib/auth/phone, TDD) → migración 008 (handle_new_user copia phone a profiles.phone, aplicada).
+      Activa el botón WhatsApp admin→cliente. 159 tests.
+    Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder /
+    telefono-registro).
 
 PENDIENTE (Fase 6):
-  ○ (4a) Teléfono OBLIGATORIO en /auth/register → profiles.phone (DECISIÓN del usuario: al crear
-    la cuenta, no en onboarding/checkout; activa el botón WhatsApp admin→cliente, hoy inactivo).
   ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — prerequisito de lanzamiento.
   ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
   ○ Stripe live + precios reales (P1): crear los 10 Prices en live y actualizar program_variants.
@@ -674,8 +679,12 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     sobre onboarding_questions (crear/editar modal 4 tipos + opciones, reordenar drag dnd-kit,
     activar/desactivar — solo desactivar). Helpers TDD + server actions (RLS admin, sin migración).
     151/151 tests, build verde, smoke validado.
-  Pendiente: (4a) teléfono OBLIGATORIO en /auth/register → profiles.phone (decisión; activa WhatsApp),
-    conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
+  ✓ Sub-bloque 4a: Núm. Celular en registro (merge bdb4e83) — campo obligatorio con lada de país en
+    /auth/register (lib/auth/phone validatePhone, 11-15 dígitos, TDD) → signUp metadata → migración 008
+    (handle_new_user copia phone a profiles.phone, APLICADA y verificada end-to-end). Activa el botón
+    WhatsApp admin→cliente. 159/159 tests.
+  Pendiente: conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales,
+    auditoría seguridad.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -764,10 +773,9 @@ Diseño UI (prototipos JSX listos para implementar):
 ════════════════════════════════════════════════════════════════
 FIN DEL DOCUMENTO DE TRASPASO
 Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados: 1 Gestión de Clientes
-0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c). Migraciones 001–007
-aplicadas (007 = ON DELETE CASCADE para borrado total de cliente); backfill de invoices ejecutado;
-E2E validado. UI con lenguaje neutro ('cliente').
-Pendiente Fase 6: (4a) teléfono obligatorio en /auth/register, conectar Resend (API key + dominio),
-deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad.
-Usar el flujo brainstorm → plan → ejecución (superpowers).
+0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c, 4a Núm. Celular en registro
+bdb4e83). Migraciones 001–008 aplicadas (007 = ON DELETE CASCADE; 008 = handle_new_user copia phone);
+backfill de invoices ejecutado; E2E validado. UI con lenguaje neutro ('cliente').
+Pendiente Fase 6: conectar Resend (API key + dominio), deploy a Vercel (+ CRON_SECRET),
+Stripe live + precios reales, auditoría de seguridad. Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════

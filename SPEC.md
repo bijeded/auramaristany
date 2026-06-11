@@ -133,7 +133,9 @@ CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
   email TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
-  phone TEXT,
+  phone TEXT,                  -- capturado en /auth/register (obligatorio en el form, con lada de
+                               -- país, normalizado a dígitos) vía el trigger handle_new_user (migr.
+                               -- 008). Nullable a nivel DB: cuentas viejas/por-API pueden tenerlo null.
   birth_date DATE,
   avatar_url TEXT,
   role TEXT NOT NULL DEFAULT 'client', -- 'client' | 'admin'
@@ -429,7 +431,7 @@ CREATE TABLE invoices (
 
   /auth
     /login
-    /register
+    /register                     ← nombre + Núm. Celular (con lada, obligatorio) + correo + contraseña
     /callback
     /reset-password
 
@@ -721,4 +723,4 @@ NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
 
 *Versión 1.5 (10 de junio de 2026) — Fase 5 (Dashboard Financiero) completada y **mergeada a main** (merge `a9ecb32`). `/admin/dashboard`: KPIs (MRR "*Estimado" = activas × `price_mxn`, sin badge delta; activas; renuevan en ≤30 días + monto; `past_due` → `/admin/clients`), ingresos por mes (barras Recharts, 12m fijo), **clientes por variante** (barras), ingresos por programa (donut), pagos recientes (últimas 10). Capa de datos: `lib/admin/finance-helpers.ts` (puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin). ✓ **Bug corregido:** el primer pago (`billing_reason='subscription_create'`) ya se registra en `invoices`; **backfill** aplicado (`scripts/backfill-first-invoices.ts`, idempotente). E2E validado con cuentas reales. Diferido a **Fase 6:** página `/admin/payments` + botón "Ver todos", `/admin/clients`+ficha, CSV export de clientas. Spec/plan en `docs/superpowers/` (`2026-06-10-fase-5-financiero-*`).*
 
-*Versión 1.6 (10 de junio de 2026) — Fase 6 (Pulido + Launch) EN CURSO, sub-bloques mergeados a main: **(1) Gestión de Clientes** (merge `0d23c5e`) — `/admin/clients` lista (filtros, paginación 10, CSV) + ficha de 6 tabs (incl. borrado admin de fotos) + **borrado total de cliente** (`DELETE /api/admin/clients/[clientId]`, guard 409 si sub no cancelada, **migración 007 `ON DELETE CASCADE`** aplicada); **(3) Página de Pagos** (merge `d52f224`) — `/admin/payments` + "Ver todos →" en el dashboard; extrae `paginate`/`STATUS_LABEL` a módulos compartidos; **lenguaje neutro** ('clienta(s)' → 'cliente(s)') en toda la UI; **(4b) Constructor de Onboarding** (merge `9477a8c`) — `/admin/onboarding-settings` (CRUD de `onboarding_questions`: modal 4 tipos, reordenar drag, activar/desactivar; sin migración). Drift corregido: `body_metrics` real usa `metric_date`/`numeric(5,1)`/sin UNIQUE. **Pendiente Fase 6:** (4a) teléfono obligatorio en `/auth/register`, conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad. 151/151 tests. Specs/planes en `docs/superpowers/` (`2026-06-10-gestion-clientes-*`, `2026-06-10-admin-payments-*`, `2026-06-10-onboarding-builder-*`).*
+*Versión 1.6 (10 de junio de 2026) — Fase 6 (Pulido + Launch) EN CURSO, sub-bloques mergeados a main: **(1) Gestión de Clientes** (merge `0d23c5e`) — `/admin/clients` lista (filtros, paginación 10, CSV) + ficha de 6 tabs (incl. borrado admin de fotos) + **borrado total de cliente** (`DELETE /api/admin/clients/[clientId]`, guard 409 si sub no cancelada, **migración 007 `ON DELETE CASCADE`** aplicada); **(3) Página de Pagos** (merge `d52f224`) — `/admin/payments` + "Ver todos →" en el dashboard; extrae `paginate`/`STATUS_LABEL` a módulos compartidos; **lenguaje neutro** ('clienta(s)' → 'cliente(s)') en toda la UI; **(4b) Constructor de Onboarding** (merge `9477a8c`) — `/admin/onboarding-settings` (CRUD de `onboarding_questions`: modal 4 tipos, reordenar drag, activar/desactivar; sin migración). Drift corregido: `body_metrics` real usa `metric_date`/`numeric(5,1)`/sin UNIQUE. **(4a) Núm. Celular obligatorio en `/auth/register`** (merge `bdb4e83`) — campo con lada de país (validado `lib/auth/phone.ts`, 11–15 dígitos, normalizado) → `signUp` metadata → **migración 008** (`handle_new_user` copia phone a `profiles.phone`, aplicada y verificada). Activa el botón WhatsApp admin→cliente. **Pendiente Fase 6:** conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad. 159/159 tests. Specs/planes en `docs/superpowers/` (`2026-06-10-gestion-clientes-*`, `2026-06-10-admin-payments-*`, `2026-06-10-onboarding-builder-*`, `2026-06-10-telefono-registro-*`).*
