@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { validatePhone } from "@/lib/auth/phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 export function RegisterForm() {
   const searchParams = useSearchParams();
   const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,6 +24,12 @@ export function RegisterForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const phoneCheck = validatePhone(phone);
+    if (!phoneCheck.ok) {
+      setError(phoneCheck.error!);
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
@@ -38,7 +46,7 @@ export function RegisterForm() {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, phone: phoneCheck.normalized },
         emailRedirectTo: (() => {
           const next = searchParams.get("next");
           const base = `${window.location.origin}/auth/callback`;
@@ -99,6 +107,21 @@ export function RegisterForm() {
             onChange={(e) => setFullName(e.target.value)}
             required
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="phone">Núm. Celular (con lada de país)</Label>
+          <Input
+            id="phone"
+            type="tel"
+            placeholder="+52 55 1234 5678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            autoComplete="tel"
+          />
+          <p className="text-xs" style={{ color: "var(--gris-texto)" }}>
+            Incluye la lada de país. Ej: +52 55 1234 5678
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="email">Correo electrónico</Label>
