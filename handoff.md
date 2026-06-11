@@ -1,10 +1,12 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 10 de junio de 2026
-Estado: Fases 0-5 en main (Fase 5 Financiero mergeada, merge a9ecb32; migr. 001-006
-        aplicadas; backfill de invoices ejecutado; E2E validado). Siguiente: Fase 6
-        (Pulido + Launch). Pendiente operativo: conectar Resend, deploy a Vercel
-        (+ CRON_SECRET), pedir teléfono en onboarding.
+Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 3 sub-bloques mergeados:
+        1 Gestión de Clientes (0d23c5e), 3 Página de Pagos + lenguaje neutro (d52f224),
+        4b Constructor de Onboarding (9477a8c). Migr. 001-007 aplicadas (007 = ON DELETE
+        CASCADE para borrado total de cliente); backfill de invoices ejecutado; E2E validado.
+        Pendiente Fase 6: (4a) teléfono obligatorio en /auth/register, conectar Resend,
+        deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -234,24 +236,29 @@ exercise_list block JSONB estructura:
 
 /admin                           — guard: role='admin'
   /dashboard                     — MRR, ingresos por mes, clientes por variante, pagos  [Fase 5 ✓]
-  /clients                       — lista de clientas  [stub → Fase 6]
-  /clients/[clientId]            — ficha completa  [stub → Fase 6]
-  /payments                      — listado completo de pagos  [Fase 6, aún no existe]
+  /clients                       — lista de clientes (filtros, paginación, CSV)  [Fase 6 ✓]
+  /clients/[clientId]            — ficha de 6 tabs (incl. borrado admin de fotos)  [Fase 6 ✓]
+  /payments                      — listado completo de pagos (filtro estado + paginación)  [Fase 6 ✓]
   /content                       — overview de programas
   /content/[programId]           — grilla semanal de la serie
   /content/[programId]/series/[seriesId]/days/[dayId] — editor de día
   /messages                      — composición y enviados
-  /onboarding-settings           — gestión de preguntas del cuestionario
+  /onboarding-settings           — constructor del cuestionario (CRUD preguntas)  [Fase 6 ✓]
 
 /api
   /webhooks/stripe
   /subscriptions/create-checkout
   /subscriptions/customer-portal
   /admin/upload                  — upload admin a bucket público 'content'
+  /admin/clients/[clientId]                  — DELETE clienta (guard 409 + cascade 007)  [Fase 6 ✓]
+  /admin/clients/[clientId]/photos/[photoId] — DELETE foto de clienta (admin, service client)  [Fase 6 ✓]
   /portal/progress               — upsert del registro del día (auto-guardado)
   /portal/photos                 — POST subir foto (bucket privado 'progress')
   /portal/photos/[id]            — DELETE borrar foto propia
   /cron/purge-messages           — [Fase 4] Vercel Cron: borra mensajes >180 días (Bearer CRON_SECRET)
+
+  Nota: onboarding (saveQuestion/reorderQuestions/setQuestionActive) y borrado de
+  clienta usan endpoints/server-actions admin-gated; ver sección 8 (Fase 6).
 
   Nota: el envío/marcar-leído/eliminar de mensajes usan SERVER ACTIONS
   (lib/admin/messageActions.ts, lib/portal/messageActions.ts), no route handlers.
@@ -341,6 +348,24 @@ Middleware (orden):
 /app/admin/dashboard/page.tsx       — Server Component: ensambla queries→helpers→UI
 /lib/webhooks/stripe-handlers.ts (+) — fix: registra el PRIMER invoice en subscription_create
 /scripts/backfill-first-invoices.ts — backfill idempotente de invoices faltantes (tsx, env-file)
+-- Fase 6 — Pulido + Launch (EN CURSO, en main):
+/supabase/migrations/007_cascade_on_profile_delete.sql — ON DELETE CASCADE en la cadena de FKs de
+                                       profiles/subscriptions (borrado total de cliente). APLICADA.
+/lib/admin/clients-helpers.ts       — puras TDD (filterClients, pickPrimarySubscription,
+                                       subscriptionProgressLabel, canDeleteClient, clientsToCSV)
+/lib/admin/clients-queries.ts       — getClientsList (una fila por cliente) + getClientDetail (6 tabs)
+/lib/admin/date-helpers.ts          — monthKey/monthLabel/dayLabel (compartido con el portal)
+/lib/admin/pagination.ts            — paginate<T> genérico (compartido clientes/pagos)
+/lib/admin/payment-status.ts        — STATUS_LABEL de invoices (compartido dashboard/pagos)
+/lib/admin/finance-helpers.ts (+)   — PaymentRow + filterPaymentsByStatus (TDD)
+/lib/admin/finance-queries.ts (+)   — getAllPayments
+/lib/admin/onboarding-helpers.ts    — validateQuestion/reindexOrder + tipos (TDD)
+/lib/admin/onboardingActions.ts     — saveQuestion/reorderQuestions/setQuestionActive (server actions)
+/components/admin/ClientsTable.tsx · ClientDetailTabs.tsx · ClientPhotosTab.tsx — lista + ficha + fotos
+/components/admin/PaymentsTable.tsx — listado de pagos (filtro estado + paginación)
+/components/admin/OnboardingBuilder.tsx · OnboardingQuestionEditor.tsx — constructor + modal
+/app/admin/clients/page.tsx · /clients/[clientId]/page.tsx · /payments/page.tsx · /onboarding-settings/page.tsx
+/app/api/admin/clients/[clientId]/route.ts (+ /photos/[photoId]/route.ts) — borrado de cliente y fotos
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -598,12 +623,26 @@ COMPLETADO:
       agrupados por VARIANTE (no por programa). formatMXN usa currencyDisplay
       "narrowSymbol" (robusto ante ICU de Vercel); badge "Pagado" usa token --exito.
 
-PENDIENTE:
-  ○ Configurar Vercel + variables de entorno de producción (deploy)
-  ○ Follow-ups menores (no bloquean): try/catch en stripe.subscriptions.retrieve;
-    unificar formatDate duplicado; alinear SPEC/types.ts (dicen general_notes) con la
-    columna real 'notes'; saveBlocks/savePillarBlocks no transaccionales; tests de
-    cloneDay/cloneWeek.
+  ✓ FASE 6 — PULIDO + LAUNCH (EN CURSO, en main — detalle por sub-bloque en sección 11)
+    ✓ Sub-bloque 1: Gestión de Clientes (merge 0d23c5e) — /admin/clients lista + ficha 6 tabs
+      + borrado total de cliente (migración 007 ON DELETE CASCADE, aplicada y verificada). 142 tests.
+    ✓ Sub-bloque 3: Página de Pagos (merge d52f224) — /admin/payments + "Ver todos" + LENGUAJE
+      NEUTRO ('cliente') en toda la UI. Extrae paginate/STATUS_LABEL a módulos compartidos. 144 tests.
+    ✓ Sub-bloque 4b: Constructor de Onboarding (merge 9477a8c) — /admin/onboarding-settings
+      (CRUD de onboarding_questions; sin migración). 151 tests.
+    Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder).
+
+PENDIENTE (Fase 6):
+  ○ (4a) Teléfono OBLIGATORIO en /auth/register → profiles.phone (DECISIÓN del usuario: al crear
+    la cuenta, no en onboarding/checkout; activa el botón WhatsApp admin→cliente, hoy inactivo).
+  ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — prerequisito de lanzamiento.
+  ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
+  ○ Stripe live + precios reales (P1): crear los 10 Prices en live y actualizar program_variants.
+  ○ Auditoría de seguridad + edge cases (pasada de RLS, middleware).
+  ○ Follow-ups menores (no bloquean): regenerar lib/supabase/types.ts (quitar `as any`/`as unknown as`,
+    incluye clients-queries); try/catch en stripe.subscriptions.retrieve; unificar formatDate
+    duplicado; alinear types.ts (general_notes) con la columna real 'notes'; saveBlocks/
+    savePillarBlocks no transaccionales; tests de cloneDay/cloneWeek.
   ○ Setup local: correr `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
     para probar checkout (ver sección 12).
 
@@ -691,9 +730,9 @@ P3: ¿La clienta puede EDITAR un registro pasado desde /portal/history/[logId]?
     pasados. Si se quisiera, sería una decisión/feature posterior.
 
 P4: ¿Cuáles son las preguntas del onboarding que Aura quiere hacer?
-    RESUELTO TEMPORALMENTE: Se sembraron 3 preguntas de prueba en la
-    migración 002. Aura podrá gestionar las preguntas definitivas desde
-    el admin (/admin/onboarding-settings) cuando esté implementado en Fase 2+.
+    INFRA LISTA (Fase 6 ✓): el constructor /admin/onboarding-settings ya permite a Aura
+    crear/editar/reordenar/activar sus preguntas (4 tipos). Quedan las 3 seed de prueba
+    (migración 002) hasta que Aura defina y cargue su set definitivo desde el admin.
 
 P5: ¿El nombre de dominio ya está comprado? ¿app.auramaristany.com o similar?
 

@@ -340,16 +340,20 @@ CREATE TABLE progress_logs (
   UNIQUE(profile_id, program_day_id) -- 1 registro por (clienta, día); el upsert usa este onConflict
 );
 
+-- ⚠ DRIFT (corregido 10-jun-2026): el bloque viejo listaba 'measured_at' +
+-- UNIQUE(profile_id, measured_at) + waist/hip NUMERIC(5,2), que NO coinciden con
+-- la tabla aplicada (migración 001). Lo de abajo es el esquema REAL. No se captura
+-- en ninguna fase (body_metrics queda vacío); el dato existe solo para futuro.
 CREATE TABLE body_metrics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id),
-  measured_at DATE NOT NULL,
+  metric_date DATE NOT NULL,           -- ⚠ real: 'metric_date' (no 'measured_at')
   weight_kg NUMERIC(5,2),
-  waist_cm NUMERIC(5,2),
-  hip_cm NUMERIC(5,2),
+  waist_cm NUMERIC(5,1),               -- ⚠ real: NUMERIC(5,1)
+  hip_cm NUMERIC(5,1),                 -- ⚠ real: NUMERIC(5,1)
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(profile_id, measured_at)
+  created_at TIMESTAMPTZ DEFAULT now()
+  -- NO existe UNIQUE(profile_id, measured_at).
 );
 
 CREATE TABLE progress_photos (
@@ -445,16 +449,20 @@ CREATE TABLE invoices (
 
   /admin                          ← guard: role='admin'
     /dashboard
-    /clients/[clientId]
+    /clients                      ← lista de clientes (filtros, paginación, CSV)  [Fase 6 ✓]
+    /clients/[clientId]           ← ficha de 6 tabs  [Fase 6 ✓]
+    /payments                     ← listado completo de invoices  [Fase 6 ✓]
     /content/[programId]/series/[seriesId]/days/[dayId]
     /messages
-    /onboarding-settings
+    /onboarding-settings          ← constructor del cuestionario  [Fase 6 ✓]
 
   /api
     /webhooks/stripe
     /subscriptions/create-checkout
     /subscriptions/customer-portal
     /admin/upload                 ← upload admin a bucket público 'content'
+    /admin/clients/[clientId]                 ← DELETE clienta (guard + cascade 007)  [Fase 6 ✓]
+    /admin/clients/[clientId]/photos/[photoId] ← DELETE foto de clienta (admin)  [Fase 6 ✓]
     /portal/progress              ← upsert del registro del día (auto-guardado)
     /portal/photos                ← POST subir foto (bucket privado 'progress')
     /portal/photos/[id]           ← DELETE borrar foto propia
@@ -712,3 +720,5 @@ NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
 *Versión 1.3 (9 de junio de 2026) — Fase 3 (Historial) completada y mergeada a main. `/portal/history` con **2 tabs (Desempeño · Fotos)** según prototipo (no 3); **sin métricas corporales** (`body_metrics` sin captura); gráficas Recharts del **mes corriente** con relación de ejercicios **por nombre** (no uuid); detalle `/portal/history/[logId]` **solo lectura** (resuelve P3). Fotos en **bucket privado `progress`** con signed URLs, comentario opcional, compresión cliente 1280px, límites 5MB/**250 fotos** (badge `[N/250]`). Migración `005_progress_photos.sql` aplicada: bucket privado + RLS de storage + columna `caption`. Corrección de esquema: la columna real de `progress_photos` es **`taken_at`** (no `photo_date`) y **no** existe `angle`. Follow-ups: regenerar `lib/supabase/types.ts` (incluir `progress_photos`/`body_metrics`), UI admin para borrar fotos, notas de admin sobre el registro (diferido a Fase 4).*
 
 *Versión 1.5 (10 de junio de 2026) — Fase 5 (Dashboard Financiero) completada y **mergeada a main** (merge `a9ecb32`). `/admin/dashboard`: KPIs (MRR "*Estimado" = activas × `price_mxn`, sin badge delta; activas; renuevan en ≤30 días + monto; `past_due` → `/admin/clients`), ingresos por mes (barras Recharts, 12m fijo), **clientes por variante** (barras), ingresos por programa (donut), pagos recientes (últimas 10). Capa de datos: `lib/admin/finance-helpers.ts` (puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin). ✓ **Bug corregido:** el primer pago (`billing_reason='subscription_create'`) ya se registra en `invoices`; **backfill** aplicado (`scripts/backfill-first-invoices.ts`, idempotente). E2E validado con cuentas reales. Diferido a **Fase 6:** página `/admin/payments` + botón "Ver todos", `/admin/clients`+ficha, CSV export de clientas. Spec/plan en `docs/superpowers/` (`2026-06-10-fase-5-financiero-*`).*
+
+*Versión 1.6 (10 de junio de 2026) — Fase 6 (Pulido + Launch) EN CURSO, sub-bloques mergeados a main: **(1) Gestión de Clientes** (merge `0d23c5e`) — `/admin/clients` lista (filtros, paginación 10, CSV) + ficha de 6 tabs (incl. borrado admin de fotos) + **borrado total de cliente** (`DELETE /api/admin/clients/[clientId]`, guard 409 si sub no cancelada, **migración 007 `ON DELETE CASCADE`** aplicada); **(3) Página de Pagos** (merge `d52f224`) — `/admin/payments` + "Ver todos →" en el dashboard; extrae `paginate`/`STATUS_LABEL` a módulos compartidos; **lenguaje neutro** ('clienta(s)' → 'cliente(s)') en toda la UI; **(4b) Constructor de Onboarding** (merge `9477a8c`) — `/admin/onboarding-settings` (CRUD de `onboarding_questions`: modal 4 tipos, reordenar drag, activar/desactivar; sin migración). Drift corregido: `body_metrics` real usa `metric_date`/`numeric(5,1)`/sin UNIQUE. **Pendiente Fase 6:** (4a) teléfono obligatorio en `/auth/register`, conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad. 151/151 tests. Specs/planes en `docs/superpowers/` (`2026-06-10-gestion-clientes-*`, `2026-06-10-admin-payments-*`, `2026-06-10-onboarding-builder-*`).*
