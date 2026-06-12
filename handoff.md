@@ -8,8 +8,9 @@ Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 5 sub-bloques m
         Migr. 001-009 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
         seguridad: with check RLS + search_path is_admin + phone normalizado en trigger).
         backfill de invoices ejecutado; E2E validado. ✓ BUG G4 RESUELTO (1e838d7: primer invoice
-        se registra en checkout.session.completed). Pendiente Fase 6: logout en UI, /portal/settings,
-        Resend (+ SMTP confirmación), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+        se registra en checkout.session.completed). ✓ B1 logout MERGEADO (0dde433). Pendiente Fase 6:
+        B2 /portal/settings con edición, Resend (+ SMTP confirmación), deploy a Vercel (+ CRON_SECRET),
+        Stripe live + precios reales.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -658,8 +659,11 @@ PENDIENTE (Fase 6):
     (único creador de la fila de sub) → invoice descartado. Fix: registrar el primer invoice en
     handleCheckoutCompleted (expand latest_invoice) + recordInvoice idempotente (upsert). Backfill
     de 2 subs huérfanas aplicado. Smoke OK.
-  ○ Logout en UI (admin y portal) — hoy no hay "Cerrar sesión". Sub-bloque corto. (SIGUIENTE)
-  ○ /portal/settings — pantalla de ajustes del cliente, NECESARIA para el MVP.
+  ✓ B1 Logout en UI MERGEADO (0dde433): LogoutButton en sidebar admin (quitado link roto
+    "Ver portal de cliente") + /portal/settings MÍNIMO (datos de cuenta solo-lectura + logout,
+    arregla la pestaña Configuración que era 404). Reusa components/auth/LogoutButton.tsx.
+  ○ B2 /portal/settings con EDICIÓN (nombre/teléfono/contraseña, etc.) — NECESARIA para el MVP
+    (el esqueleto ya existe). (SIGUIENTE)
   ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — también activa el SMTP de
     confirmación de correo (hoy el registro con correo nuevo no envía confirmación).
   ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
@@ -712,7 +716,8 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     + G3 (autenticado no puede re-login en /auth). 195/195 tests, build verde, smoke+re-smoke OK.
   ✓ A1 (BUG G4) RESUELTO (merge 1e838d7): primer invoice se registra en checkout.session.completed
     (no en invoice.paid, que llega antes); recordInvoice idempotente; backfill aplicado. 197 tests.
-  Pendiente: logout en UI, /portal/settings (necesario MVP), Resend (+ SMTP confirmación),
+  ✓ B1 Logout en UI MERGEADO (merge 0dde433): logout en sidebar admin + /portal/settings mínimo.
+  Pendiente: B2 /portal/settings con edición (necesario MVP), Resend (+ SMTP confirmación),
     deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -806,7 +811,8 @@ Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados:
 bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894). Migraciones 001–009 aplicadas
 (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad); backfill de invoices
 ejecutado; E2E validado. UI con lenguaje neutro ('cliente'). 197/197 tests. ✓ BUG G4 resuelto (1e838d7).
-Pendiente Fase 6 (orden acordado): logout en UI → /portal/settings (necesario MVP) → 8 bajos de
+✓ B1 logout en UI mergeado (0dde433).
+Pendiente Fase 6 (orden acordado): B2 /portal/settings con edición (necesario MVP) → 8 bajos de
 auditoría + limpieza → en paralelo pedir a Aura precios (P1)/dominio (P5) → bloque ops: Resend
 (+ SMTP confirmación + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 Usar el flujo brainstorm → plan → ejecución (superpowers).
