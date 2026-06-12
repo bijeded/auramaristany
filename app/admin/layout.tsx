@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import {
   LayoutDashboard,
   Users,
@@ -90,16 +91,10 @@ export default function AdminLayout({
 
         {/* Footer */}
         <div
-          className="px-6 py-4"
+          className="px-3 py-4"
           style={{ borderTop: "1px solid var(--gris-linea)" }}
         >
-          <Link
-            href="/portal/today"
-            className="font-body"
-            style={{ fontSize: 12, color: "var(--gris-suave)", textDecoration: "none" }}
-          >
-            ← Ver portal de cliente
-          </Link>
+          <LogoutButton />
         </div>
       </aside>
 
