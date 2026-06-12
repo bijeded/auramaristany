@@ -702,8 +702,14 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     /auth/register (lib/auth/phone validatePhone, 11-15 dígitos, TDD) → signUp metadata → migración 008
     (handle_new_user copia phone a profiles.phone, APLICADA y verificada end-to-end). Activa el botón
     WhatsApp admin→cliente. 159/159 tests.
-  Pendiente: conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales,
-    auditoría seguridad.
+  ✓ Sub-bloque A: Auditoría de seguridad + ciclo de corrección (merge bb05894) — reporte read-only
+    (4 auditores paralelos, 0 críticos) → corregidos 5 medios + bonus: DEF-1 (requireAdmin/
+    requireAdminPage en lib/admin/auth.ts), SUB-1 (subscriptionGrantsAccess = active/trialing/past_due
+    en middleware/getTodayContent/getPerformanceData/pillars + banner WhatsApp), INP-2 (validación zod
+    + sanitize-html), INP-3 (msg genérico registro + phone normalizado), RLS-1/2+HYG-1 (migración 009).
+    + G3 (autenticado no puede re-login en /auth). 195/195 tests, build verde, smoke+re-smoke OK.
+  Pendiente: ⚠ BUG G4 (pago no se registra con stripe listen activo), logout en UI, Resend (+ SMTP
+    confirmación), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, /portal/settings.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -793,8 +799,10 @@ Diseño UI (prototipos JSX listos para implementar):
 FIN DEL DOCUMENTO DE TRASPASO
 Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados: 1 Gestión de Clientes
 0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c, 4a Núm. Celular en registro
-bdb4e83). Migraciones 001–008 aplicadas (007 = ON DELETE CASCADE; 008 = handle_new_user copia phone);
-backfill de invoices ejecutado; E2E validado. UI con lenguaje neutro ('cliente').
-Pendiente Fase 6: conectar Resend (API key + dominio), deploy a Vercel (+ CRON_SECRET),
-Stripe live + precios reales, auditoría de seguridad. Usar el flujo brainstorm → plan → ejecución (superpowers).
+bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894). Migraciones 001–009 aplicadas
+(007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad); backfill de invoices
+ejecutado; E2E validado. UI con lenguaje neutro ('cliente'). 195/195 tests.
+Pendiente Fase 6: ⚠ BUG G4 (pago no se registra), logout en UI, conectar Resend (+ SMTP confirmación +
+dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, /portal/settings.
+Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
