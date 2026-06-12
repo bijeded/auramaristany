@@ -418,7 +418,7 @@ CREATE TABLE invoices (
 );
 ```
 
-**Seguridad:** Row Level Security (RLS) en Supabase en todas las tablas. Clientes solo ven sus propios datos. Admins ven todo. La seguridad vive en la base de datos, no solo en la aplicación.
+**Seguridad:** Row Level Security (RLS) en Supabase en todas las tablas. Clientes solo ven sus propios datos. Admins ven todo (`is_admin()`). La seguridad vive en la base de datos, no solo en la aplicación. **Defensa en profundidad (auditoría Fase 6, merge `bb05894`):** además del middleware y RLS, las server-actions, las queries que usan service-role y las páginas admin verifican rol con `requireAdmin()`/`requireAdminPage()` (`lib/admin/auth.ts`). Input de contenido validado server-side (zod) y HTML de Tiptap sanitizado al guardar (`sanitize-html`). **Migración 009** endureció: `with check` explícito en políticas `for all` de datos de cliente, `search_path` fijo en `is_admin()`, y normalización de phone en el trigger `handle_new_user`. El acceso al portal lo concede `subscriptionGrantsAccess` (`lib/content/subscription-access.ts`): estados **`active`/`trialing`/`past_due`** (past_due muestra banner de pago pendiente; el corte lo define Stripe Smart Retries).
 
 ---
 

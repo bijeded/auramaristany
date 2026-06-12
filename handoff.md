@@ -1,12 +1,15 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
-Fecha: 4 de junio de 2026 · Actualizado: 10 de junio de 2026
-Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 4 sub-bloques mergeados:
+Fecha: 4 de junio de 2026 · Actualizado: 11 de junio de 2026
+Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 5 sub-bloques mergeados:
         1 Gestión de Clientes (0d23c5e), 3 Página de Pagos + lenguaje neutro (d52f224),
-        4b Constructor de Onboarding (9477a8c), 4a Núm. Celular en registro (bdb4e83).
-        Migr. 001-008 aplicadas (007 = ON DELETE CASCADE; 008 = handle_new_user copia phone);
-        backfill de invoices ejecutado; E2E validado. Pendiente Fase 6: conectar Resend,
-        deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría seguridad.
+        4b Constructor de Onboarding (9477a8c), 4a Núm. Celular en registro (bdb4e83),
+        A Auditoría de seguridad + ciclo de corrección (bb05894).
+        Migr. 001-009 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
+        seguridad: with check RLS + search_path is_admin + phone normalizado en trigger).
+        backfill de invoices ejecutado; E2E validado. Pendiente Fase 6: ⚠ BUG G4 (pago no se
+        registra pese a stripe listen activo), logout en UI, conectar Resend (+ SMTP confirmación),
+        deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, /portal/settings.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -369,6 +372,12 @@ Middleware (orden):
 /lib/auth/phone.ts                  — normalizePhone/validatePhone (registro, TDD)
 /components/auth/RegisterForm.tsx (+) — campo Núm. Celular obligatorio (con lada) → signUp metadata
 /supabase/migrations/008_handle_new_user_phone.sql — handle_new_user copia phone a profiles.phone. APLICADA.
+/lib/admin/auth.ts                  — requireAdmin/requireAdminPage (+ decideAdminAccess puro). Guard de rol admin (DEF-1)
+/lib/content/subscription-access.ts — ACCESS_STATES (active/trialing/past_due) + subscriptionGrantsAccess (SUB-1)
+/lib/admin/content-validation.ts    — validateDayInput/validateBlock/validatePillarInput (zod, INP-2)
+/lib/admin/sanitize-html.ts         — sanitizeRichText (whitelist Tiptap, INP-2)
+/components/portal/PaymentPendingBanner.tsx — banner past_due con CTA WhatsApp (SUB-1)
+/supabase/migrations/009_security_hardening.sql — with check RLS + search_path is_admin + phone normalizado en trigger. APLICADA y verificada.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -636,14 +645,24 @@ COMPLETADO:
     ✓ Sub-bloque 4a: Núm. Celular en /auth/register (merge bdb4e83) — campo obligatorio con lada
       (lib/auth/phone, TDD) → migración 008 (handle_new_user copia phone a profiles.phone, aplicada).
       Activa el botón WhatsApp admin→cliente. 159 tests.
+    ✓ Sub-bloque A: Auditoría de seguridad + ciclo de corrección (merge bb05894) — reporte read-only
+      (0 críticos, docs/superpowers/audits/) → corregidos 5 medios + bonus: DEF-1 (requireAdmin/
+      requireAdminPage uniforme), SUB-1 (acceso = active/trialing/past_due + banner WhatsApp; pilares
+      respeta ACCESS_STATES), INP-2 (validación zod + sanitize-html), INP-3 (msg genérico + phone
+      normalizado), RLS-1/2+HYG-1 (migración 009). + G3 (redirect /auth con sesión). 195 tests.
     Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder /
-    telefono-registro).
+    telefono-registro / auditoria-seguridad / fixes-seguridad).
 
 PENDIENTE (Fase 6):
-  ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — prerequisito de lanzamiento.
+  ⚠ BUG G4 (PRIORIDAD): pago en Stripe sandbox (con stripe listen activo) crea sub 'active' pero NO
+    registra el invoice (no aparece en /admin/payments ni dashboard). Bug de handleInvoicePaid/
+    recordInvoice en lib/webhooks/stripe-handlers.ts. Diagnosticar con systematic-debugging.
+  ○ Logout en UI (admin y portal) — hoy no hay "Cerrar sesión". Sub-bloque corto.
+  ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — también activa el SMTP de
+    confirmación de correo (hoy el registro con correo nuevo no envía confirmación).
   ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
   ○ Stripe live + precios reales (P1): crear los 10 Prices en live y actualizar program_variants.
-  ○ Auditoría de seguridad + edge cases (pasada de RLS, middleware).
+  ○ /portal/settings (pantalla de ajustes del cliente) — scope mayor, posterior.
   ○ Follow-ups menores (no bloquean): regenerar lib/supabase/types.ts (quitar `as any`/`as unknown as`,
     incluye clients-queries); try/catch en stripe.subscriptions.retrieve; unificar formatDate
     duplicado; alinear types.ts (general_notes) con la columna real 'notes'; saveBlocks/
