@@ -132,8 +132,11 @@ function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
 }
 
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  // First invoice (subscription_create): la suscripción ya existe (creada por
-  // checkout.session.completed). Buscamos su id para registrar el primer pago.
+  // First invoice (subscription_create): RED DE SEGURIDAD. Stripe normalmente emite
+  // invoice.paid ANTES que checkout.session.completed, así que la fila de la sub aún
+  // no existe y el registro primario del primer invoice lo hace handleCheckoutCompleted
+  // (que tiene la metadata). Aquí solo registramos si la sub YA existe (orden inverso),
+  // de forma idempotente. No encontrarla en este punto es esperado, no un error.
   if (invoice.billing_reason === "subscription_create") {
     const subscriptionId = getSubscriptionIdFromInvoice(invoice);
     if (!subscriptionId) {
@@ -147,7 +150,8 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
       .eq("stripe_subscription_id", subscriptionId)
       .single();
     if (sub) await recordInvoice(invoice, sub.id);
-    else console.error("[webhook] invoice.paid (create): subscription not found", subscriptionId);
+    // else: la sub aún no existe; checkout.session.completed registrará el primer
+    // invoice. No se loguea como error para no generar falsas alarmas en cada alta.
     return;
   }
 
