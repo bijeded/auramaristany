@@ -1,10 +1,10 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
 Fecha: 4 de junio de 2026 · Actualizado: 11 de junio de 2026
-Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 5 sub-bloques mergeados:
+Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 5 sub-bloques + 2 fixes mergeados:
         1 Gestión de Clientes (0d23c5e), 3 Página de Pagos + lenguaje neutro (d52f224),
         4b Constructor de Onboarding (9477a8c), 4a Núm. Celular en registro (bdb4e83),
-        A Auditoría de seguridad + ciclo de corrección (bb05894).
+        A Auditoría de seguridad + ciclo de corrección (bb05894); + fixes A1/G4 (1e838d7) y B1 (0dde433).
         Migr. 001-009 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
         seguridad: with check RLS + search_path is_admin + phone normalizado en trigger).
         backfill de invoices ejecutado; E2E validado. ✓ BUG G4 RESUELTO (1e838d7: primer invoice
