@@ -8,7 +8,7 @@ function mockSub(slug: string) {
   return {
     from: (table: string) => {
       if (table === "subscriptions") {
-        return { select: () => ({ eq: () => ({ eq: () => ({ single: () =>
+        return { select: () => ({ eq: () => ({ in: () => ({ single: () =>
           Promise.resolve({ data: {
             months_elapsed: 1, program_variant_id: "v1",
             program_variants: { program_id: "pr1", programs: { slug } },
