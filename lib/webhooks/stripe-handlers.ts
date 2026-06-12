@@ -82,25 +82,41 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   }
 
   // Stripe API 2026+ exposes the billing period on subscription items, not the
-  // Subscription object — retrieve the subscription to source the period.
-  const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  // Subscription object — retrieve la suscripción para la fecha de periodo y
+  // expandir latest_invoice (el primer invoice ya pagado en el checkout).
+  const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+    expand: ["latest_invoice"],
+  });
   const { current_period_start, current_period_end } = readPeriod(subscription);
 
-  const { error } = await supabase.from("subscriptions").insert({
-    profile_id: supabase_user_id,
-    program_variant_id: variant_id,
-    stripe_subscription_id: stripeSubscriptionId,
-    stripe_customer_id: stripeCustomerId,
-    status: "active",
-    months_elapsed: 1,
-    enrollment_date: new Date().toISOString().split("T")[0],
-    current_period_start,
-    current_period_end,
-  });
+  const { data: inserted, error } = await supabase
+    .from("subscriptions")
+    .insert({
+      profile_id: supabase_user_id,
+      program_variant_id: variant_id,
+      stripe_subscription_id: stripeSubscriptionId,
+      stripe_customer_id: stripeCustomerId,
+      status: "active",
+      months_elapsed: 1,
+      enrollment_date: new Date().toISOString().split("T")[0],
+      current_period_start,
+      current_period_end,
+    })
+    .select("id")
+    .single();
 
   if (error) console.error("[webhook] subscription insert error:", error);
 
-  if (!error) {
+  if (!error && inserted) {
+    // G4: registrar el primer invoice AQUÍ (el evento que tiene la metadata y crea
+    // la sub), no en invoice.paid. Stripe emite invoice.paid ~1s ANTES que
+    // checkout.session.completed, así que el handler de invoice.paid no encuentra
+    // la fila todavía. recordInvoice es idempotente (upsert), de modo que el
+    // invoice.paid que llega en paralelo no duplica.
+    const latest = subscription.latest_invoice;
+    if (latest && typeof latest === "object" && latest.status === "paid") {
+      await recordInvoice(latest as Stripe.Invoice, inserted.id);
+    }
     const contact = await getProfileContact(supabase, supabase_user_id);
     if (contact) await sendWelcomeEmail({ to: contact.email, name: contact.name });
   }
@@ -116,8 +132,11 @@ function getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
 }
 
 export async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  // First invoice (subscription_create): la suscripción ya existe (creada por
-  // checkout.session.completed). Buscamos su id para registrar el primer pago.
+  // First invoice (subscription_create): RED DE SEGURIDAD. Stripe normalmente emite
+  // invoice.paid ANTES que checkout.session.completed, así que la fila de la sub aún
+  // no existe y el registro primario del primer invoice lo hace handleCheckoutCompleted
+  // (que tiene la metadata). Aquí solo registramos si la sub YA existe (orden inverso),
+  // de forma idempotente. No encontrarla en este punto es esperado, no un error.
   if (invoice.billing_reason === "subscription_create") {
     const subscriptionId = getSubscriptionIdFromInvoice(invoice);
     if (!subscriptionId) {
@@ -131,7 +150,8 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
       .eq("stripe_subscription_id", subscriptionId)
       .single();
     if (sub) await recordInvoice(invoice, sub.id);
-    else console.error("[webhook] invoice.paid (create): subscription not found", subscriptionId);
+    // else: la sub aún no existe; checkout.session.completed registrará el primer
+    // invoice. No se loguea como error para no generar falsas alarmas en cada alta.
     return;
   }
 
@@ -177,14 +197,20 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
 async function recordInvoice(invoice: Stripe.Invoice, subscriptionDbId?: string) {
   if (!subscriptionDbId) return;
   const supabase: AnyClient = createServiceClient();
-  await supabase.from("invoices").insert({
-    subscription_id: subscriptionDbId,
-    stripe_invoice_id: invoice.id,
-    amount_paid: invoice.amount_paid / 100,
-    currency: invoice.currency,
-    status: invoice.status ?? "paid",
-    invoice_date: new Date(invoice.created * 1000).toISOString().split("T")[0],
-  });
+  // Idempotente: checkout.session.completed e invoice.paid pueden intentar registrar
+  // el mismo primer invoice; la constraint UNIQUE stripe_invoice_id + ignoreDuplicates
+  // evita duplicados y errores en la carrera de eventos (G4).
+  await supabase.from("invoices").upsert(
+    {
+      subscription_id: subscriptionDbId,
+      stripe_invoice_id: invoice.id,
+      amount_paid: invoice.amount_paid / 100,
+      currency: invoice.currency,
+      status: invoice.status ?? "paid",
+      invoice_date: new Date(invoice.created * 1000).toISOString().split("T")[0],
+    },
+    { onConflict: "stripe_invoice_id", ignoreDuplicates: true }
+  );
 }
 
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
