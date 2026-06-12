@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // --- Mocks ---
-const insertMock = vi.fn((_payload: Record<string, unknown>) => ({ error: null }));
+// insert ahora soporta el encadenado .select("id").single() (handleCheckoutCompleted
+// necesita el id de la sub recién creada para registrar su primer invoice).
+const insertSingleMock = vi.fn(() => ({ data: { id: "db-sub-new" }, error: null }));
+const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
+  select: () => ({ single: insertSingleMock }),
+}));
+const upsertMock = vi.fn((_payload: Record<string, unknown>, _opts?: Record<string, unknown>) => ({ error: null }));
 const updateEqMock = vi.fn((_col: string, _val: string) => ({ error: null }));
 const updateMock = vi.fn((_payload: Record<string, unknown>) => ({ eq: updateEqMock }));
 const selectEqSingleMock = vi.fn(() => ({ data: null }));
 const selectEqMock = vi.fn(() => ({ single: selectEqSingleMock }));
 const selectMock = vi.fn(() => ({ eq: selectEqMock, single: selectEqSingleMock }));
-const fromMock = vi.fn((_table: string) => ({ insert: insertMock, update: updateMock, select: selectMock }));
+const fromMock = vi.fn((_table: string) => ({ insert: insertMock, upsert: upsertMock, update: updateMock, select: selectMock }));
 
 vi.mock("@/lib/email/send", () => ({
   sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
@@ -64,7 +70,6 @@ describe("computeMonthsUpdate", () => {
 describe("handleCheckoutCompleted", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    insertMock.mockReturnValue({ error: null });
     retrieveMock.mockResolvedValue({
       items: {
         data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }],
@@ -82,7 +87,7 @@ describe("handleCheckoutCompleted", () => {
 
     await handleCheckoutCompleted(session);
 
-    expect(retrieveMock).toHaveBeenCalledWith("sub_123");
+    expect(retrieveMock).toHaveBeenCalledWith("sub_123", { expand: ["latest_invoice"] });
     expect(insertMock).toHaveBeenCalledTimes(1);
     const payload = insertMock.mock.calls[0][0];
     expect(payload.current_period_start).toBe(
@@ -92,17 +97,68 @@ describe("handleCheckoutCompleted", () => {
       new Date(1751932800 * 1000).toISOString()
     );
   });
+
+  it("registra el primer invoice desde latest_invoice (no depende de invoice.paid) — G4", async () => {
+    retrieveMock.mockResolvedValue({
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+      latest_invoice: {
+        id: "in_first_xyz",
+        amount_paid: 99900,
+        currency: "mxn",
+        status: "paid",
+        created: 1749340800,
+      },
+    });
+    const session = {
+      id: "cs_test_456",
+      metadata: { supabase_user_id: "user-2", variant_id: "variant-2" },
+      subscription: "sub_456",
+      customer: "cus_456",
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(session);
+
+    // La sub se inserta y SU primer invoice se registra en el mismo evento.
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(upsertMock).toHaveBeenCalledTimes(1);
+    const inv = upsertMock.mock.calls[0][0];
+    expect(inv.subscription_id).toBe("db-sub-new");
+    expect(inv.stripe_invoice_id).toBe("in_first_xyz");
+    expect(inv.amount_paid).toBe(999);
+    // Idempotente: no duplica si invoice.paid también lo intenta.
+    expect(upsertMock.mock.calls[0][1]).toEqual({
+      onConflict: "stripe_invoice_id",
+      ignoreDuplicates: true,
+    });
+  });
+
+  it("no registra invoice si latest_invoice no está pagado", async () => {
+    retrieveMock.mockResolvedValue({
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+      latest_invoice: { id: "in_open", amount_paid: 0, currency: "mxn", status: "open", created: 1749340800 },
+    });
+    const session = {
+      id: "cs_test_789",
+      metadata: { supabase_user_id: "user-3", variant_id: "variant-3" },
+      subscription: "sub_789",
+      customer: "cus_789",
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(session);
+
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    expect(upsertMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("handleInvoicePaid - subscription_create", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    insertMock.mockReturnValue({ error: null });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectEqSingleMock.mockReturnValue({ data: { id: "db-sub-1" }, error: null } as any);
   });
 
-  it("registra el primer invoice con el subscription_id de la BD", async () => {
+  it("registra (upsert idempotente) el primer invoice con el subscription_id de la BD — red de seguridad", async () => {
     const invoice = {
       id: "in_first_123",
       billing_reason: "subscription_create",
@@ -118,11 +174,15 @@ describe("handleInvoicePaid - subscription_create", () => {
 
     await handleInvoicePaid(invoice);
 
-    expect(insertMock).toHaveBeenCalledTimes(1);
-    const payload = insertMock.mock.calls[0][0];
+    expect(upsertMock).toHaveBeenCalledTimes(1);
+    const payload = upsertMock.mock.calls[0][0];
     expect(payload.subscription_id).toBe("db-sub-1");
     expect(payload.stripe_invoice_id).toBe("in_first_123");
     expect(payload.amount_paid).toBe(990);
+    expect(upsertMock.mock.calls[0][1]).toEqual({
+      onConflict: "stripe_invoice_id",
+      ignoreDuplicates: true,
+    });
   });
 });
 
