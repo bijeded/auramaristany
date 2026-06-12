@@ -56,7 +56,9 @@ export function RegisterForm() {
     });
 
     if (error) {
-      setError(error.message);
+      // No exponer error.message crudo: evita enumeración de cuentas
+      // (distinguir "email ya registrado" de otros fallos). INP-3.
+      setError("No se pudo completar el registro. Verifica tus datos o intenta más tarde.");
       setLoading(false);
       return;
     }

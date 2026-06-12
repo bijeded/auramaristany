@@ -1,4 +1,5 @@
 import "server-only";
+import { requireAdmin } from "./auth";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -21,6 +22,8 @@ interface RawSubRow {
 }
 
 export async function getClientsList(): Promise<ClientListRow[]> {
+  const auth = await requireAdmin();
+  if (!auth.ok) throw new Error(auth.error);
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
@@ -92,6 +95,8 @@ export interface ClientDetail {
 }
 
 export async function getClientDetail(clientId: string): Promise<ClientDetail | null> {
+  const auth = await requireAdmin();
+  if (!auth.ok) throw new Error(auth.error);
   const supabase = await createClient();
 
   const { data: rawProfile } = await supabase

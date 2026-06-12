@@ -9,6 +9,7 @@ import {
   type LogForPerf,
   type PerfExercise,
 } from "./history-helpers";
+import { ACCESS_STATES } from "./subscription-access";
 import type { DayBlock } from "./queries";
 
 export interface HistoryListItem {
@@ -124,7 +125,7 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
     .from("subscriptions")
     .select("id, months_elapsed, current_period_start")
     .eq("profile_id", userId)
-    .eq("status", "active")
+    .in("status", ACCESS_STATES as readonly string[])
     .single();
 
   const sub = rawSub as unknown as SubRow | null;

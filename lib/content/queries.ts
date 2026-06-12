@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentDayKey, getCurrentSeriesNumber } from "./access";
+import { ACCESS_STATES } from "./subscription-access";
 import type { DayKey } from "./access";
 
 export interface Exercise {
@@ -109,7 +110,7 @@ export async function getTodayContent(
        )`
     )
     .eq("profile_id", userId)
-    .eq("status", "active")
+    .in("status", ACCESS_STATES as readonly string[])
     .single();
 
   const sub = rawSub as unknown as SubRow | null;

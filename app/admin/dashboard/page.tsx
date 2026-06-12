@@ -16,6 +16,7 @@ import { RevenueBarChart } from "@/components/admin/RevenueBarChart";
 import { ProgramRevenueDonut } from "@/components/admin/ProgramRevenueDonut";
 import Link from "next/link";
 import { STATUS_LABEL } from "@/lib/admin/payment-status";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
@@ -40,6 +41,7 @@ function Kpi({ label, value, sub, danger, href }: { label: string; value: React.
 }
 
 export default async function AdminDashboardPage() {
+  await requireAdminPage();
   const now = new Date();
   const [activeSubs, invoices, pastDue, recent] = await Promise.all([
     getActiveSubscriptions(),

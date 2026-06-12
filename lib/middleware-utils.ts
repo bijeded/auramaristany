@@ -28,6 +28,12 @@ export function getRedirectPath(params: RedirectParams): string | null {
     return "/auth/login";
   }
 
+  // Ya autenticado: no permitir re-login desde /auth/login|register; mandar a su home.
+  // /auth/callback (confirmación de correo) y /auth/reset-password quedan fuera a propósito.
+  if (hasSession && role && (pathname === "/auth/login" || pathname === "/auth/register")) {
+    return role === "admin" ? "/admin/dashboard" : "/portal/today";
+  }
+
   if (role === "admin" && pathname.startsWith("/portal")) {
     return "/admin/dashboard";
   }

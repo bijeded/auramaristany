@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { ACCESS_STATES } from "./subscription-access";
 
 export interface PillarWithBlocks {
   id: string;
@@ -11,8 +12,9 @@ export interface PillarWithBlocks {
 const ALLOWED = new Set(["cuarenta-mas", "cuarenta-mas-extra"]);
 
 /**
- * True when the user has an active CuarentaMás/Extra subscription (the only
- * programs that expose the monthly pillars section in the portal).
+ * True when the user has a CuarentaMás/Extra subscription in an access-granting
+ * state (ACCESS_STATES: active/trialing/past_due) — the only programs that
+ * expose the monthly pillars section in the portal.
  */
 export async function hasPillarsAccess(userId: string): Promise<boolean> {
   const supabase = await createClient();
@@ -21,7 +23,7 @@ export async function hasPillarsAccess(userId: string): Promise<boolean> {
     .from("subscriptions")
     .select("program_variants!inner ( programs!inner ( slug ) )")
     .eq("profile_id", userId)
-    .eq("status", "active")
+    .in("status", ACCESS_STATES as readonly string[])
     .single();
 
   const sub = rawSub as unknown as { program_variants: { programs: { slug: string } } } | null;
@@ -36,7 +38,7 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
     .select(`months_elapsed, program_variant_id,
       program_variants!inner ( program_id, programs!inner ( slug ) )`)
     .eq("profile_id", userId)
-    .eq("status", "active")
+    .in("status", ACCESS_STATES as readonly string[])
     .single();
 
   const sub = rawSub as unknown as {

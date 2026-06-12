@@ -1,8 +1,8 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { validateQuestion, type QuestionInput } from "./onboarding-helpers";
+import { requireAdmin } from "./auth";
 
 function revalidate() {
   revalidatePath("/admin/onboarding-settings");
@@ -10,10 +10,12 @@ function revalidate() {
 }
 
 export async function saveQuestion(input: QuestionInput): Promise<{ id: string; error?: string }> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return { id: input.id ?? "", error: auth.error };
   const v = validateQuestion(input);
   if (!v.ok) return { id: input.id ?? "", error: v.error };
 
-  const supabase = await createClient();
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
@@ -51,7 +53,9 @@ export async function saveQuestion(input: QuestionInput): Promise<{ id: string; 
 }
 
 export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   for (let i = 0; i < orderedIds.length; i++) {
@@ -66,7 +70,9 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
 }
 
 export async function setQuestionActive(id: string, active: boolean): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error } = await client.from("onboarding_questions").update({ is_active: active }).eq("id", id);

@@ -1,10 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getActiveSubscriberRows } from "./queries";
 import { expandRecipients, type RecipientSelection } from "./message-helpers";
 import { sendNewMessageEmailBatch } from "@/lib/email/send";
+import { requireAdmin } from "./auth";
 
 export interface SendMessageInput {
   subject: string;
@@ -30,19 +30,6 @@ export interface SentMessageDetail {
   createdAt: string;
   isBroadcast: boolean;
   recipients: SentRecipient[];
-}
-
-// Verifica sesión + rol admin. Devuelve el cliente y el user, o un error legible.
-// (Los `as any` en los writes son por los tipos de Supabase desactualizados — convención del repo.)
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false as const, error: "No autenticado" };
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if ((prof as { role?: string } | null)?.role !== "admin") return { ok: false as const, error: "No autorizado" };
-  return { ok: true as const, supabase, user };
 }
 
 export async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {

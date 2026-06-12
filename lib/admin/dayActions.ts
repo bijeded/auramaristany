@@ -1,7 +1,9 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "./auth";
+import { validateDayInput, validateBlock } from "./content-validation";
+import { sanitizeRichText } from "./sanitize-html";
 
 export interface SaveDayInput {
   id?: string;
@@ -16,7 +18,14 @@ export interface SaveDayInput {
 }
 
 export async function saveDay(data: SaveDayInput): Promise<{ dayId: string; error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { dayId: data.id ?? "", error: auth.error };
+  const supabase = auth.supabase;
+  const valid = validateDayInput({
+    title: data.title, weekNumber: data.weekNumber, dayType: data.dayType,
+    durationMinutes: data.durationMinutes, workoutFocus: data.workoutFocus,
+  });
+  if (!valid.ok) return { dayId: data.id ?? "", error: valid.error };
   const row = {
     series_id: data.seriesId,
     week_number: data.weekNumber,
@@ -49,9 +58,16 @@ export interface SaveBlockInput {
 }
 
 export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
+
+  for (const b of blocks) {
+    const v = validateBlock(b);
+    if (!v.ok) return { error: v.error };
+  }
 
   const { error: delError } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
   if (delError) return { error: delError.message };
@@ -61,7 +77,10 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
       day_id: dayId,
       block_type: b.block_type,
       sort_order: i,
-      content: b.content,
+      content:
+        b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
+          ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
+          : b.content,
     }));
     const { error: insError } = await client.from("program_day_blocks").insert(rows);
     if (insError) return { error: insError.message };
@@ -72,7 +91,9 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
 }
 
 export async function deleteDay(dayId: string): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error: blockErr } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
@@ -88,7 +109,9 @@ export async function cloneDay(
   target: { seriesId: string; weekNumber: number; dayOfWeek: string },
   overwrite: boolean
 ): Promise<{ dayId?: string; error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
 
@@ -138,7 +161,9 @@ export async function cloneDay(
 export async function cloneWeek(
   seriesId: string, sourceWeek: number, targetWeek: number, overwrite: boolean
 ): Promise<{ error?: string }> {
-  const supabase = await createClient();
+  const auth = await requireAdmin();
+  if (!auth.ok) return { error: auth.error };
+  const supabase = auth.supabase;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: days } = await (supabase as any).from("program_days")
     .select("id, day_of_week").eq("series_id", seriesId).eq("week_number", sourceWeek);

@@ -82,6 +82,46 @@ describe("getRedirectPath", () => {
     })).toBeNull();
   });
 
+  it("redirects logged-in admin away from /auth/login to dashboard", () => {
+    expect(getRedirectPath({
+      pathname: "/auth/login",
+      hasSession: true,
+      role: "admin",
+      onboardingCompleted: true,
+      hasActiveSubscription: false,
+    })).toBe("/admin/dashboard");
+  });
+
+  it("redirects logged-in client away from /auth/register to portal", () => {
+    expect(getRedirectPath({
+      pathname: "/auth/register",
+      hasSession: true,
+      role: "client",
+      onboardingCompleted: true,
+      hasActiveSubscription: true,
+    })).toBe("/portal/today");
+  });
+
+  it("does NOT redirect logged-in user on /auth/callback (email confirmation)", () => {
+    expect(getRedirectPath({
+      pathname: "/auth/callback",
+      hasSession: true,
+      role: "client",
+      onboardingCompleted: true,
+      hasActiveSubscription: true,
+    })).toBeNull();
+  });
+
+  it("does NOT redirect logged-in user on /auth/reset-password", () => {
+    expect(getRedirectPath({
+      pathname: "/auth/reset-password",
+      hasSession: true,
+      role: "client",
+      onboardingCompleted: true,
+      hasActiveSubscription: true,
+    })).toBeNull();
+  });
+
   it("allows access to checkout routes without session", () => {
     expect(getRedirectPath({
       pathname: "/checkout/cuarenta-mas-principiante-poco",
