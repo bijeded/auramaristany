@@ -7,9 +7,9 @@ Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 5 sub-bloques m
         A Auditoría de seguridad + ciclo de corrección (bb05894).
         Migr. 001-009 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
         seguridad: with check RLS + search_path is_admin + phone normalizado en trigger).
-        backfill de invoices ejecutado; E2E validado. Pendiente Fase 6: ⚠ BUG G4 (pago no se
-        registra pese a stripe listen activo), logout en UI, conectar Resend (+ SMTP confirmación),
-        deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, /portal/settings.
+        backfill de invoices ejecutado; E2E validado. ✓ BUG G4 RESUELTO (1e838d7: primer invoice
+        se registra en checkout.session.completed). Pendiente Fase 6: logout en UI, /portal/settings,
+        Resend (+ SMTP confirmación), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -654,10 +654,12 @@ COMPLETADO:
     telefono-registro / auditoria-seguridad / fixes-seguridad).
 
 PENDIENTE (Fase 6):
-  ⚠ BUG G4 (PRIORIDAD): pago en Stripe sandbox (con stripe listen activo) crea sub 'active' pero NO
-    registra el invoice (no aparece en /admin/payments ni dashboard). Bug de handleInvoicePaid/
-    recordInvoice en lib/webhooks/stripe-handlers.ts. Diagnosticar con systematic-debugging.
-  ○ Logout en UI (admin y portal) — hoy no hay "Cerrar sesión". Sub-bloque corto.
+  ✓ BUG G4 RESUELTO (merge 1e838d7): invoice.paid llega ~1s antes que checkout.session.completed
+    (único creador de la fila de sub) → invoice descartado. Fix: registrar el primer invoice en
+    handleCheckoutCompleted (expand latest_invoice) + recordInvoice idempotente (upsert). Backfill
+    de 2 subs huérfanas aplicado. Smoke OK.
+  ○ Logout en UI (admin y portal) — hoy no hay "Cerrar sesión". Sub-bloque corto. (SIGUIENTE)
+  ○ /portal/settings — pantalla de ajustes del cliente, NECESARIA para el MVP.
   ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — también activa el SMTP de
     confirmación de correo (hoy el registro con correo nuevo no envía confirmación).
   ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
@@ -708,8 +710,10 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     en middleware/getTodayContent/getPerformanceData/pillars + banner WhatsApp), INP-2 (validación zod
     + sanitize-html), INP-3 (msg genérico registro + phone normalizado), RLS-1/2+HYG-1 (migración 009).
     + G3 (autenticado no puede re-login en /auth). 195/195 tests, build verde, smoke+re-smoke OK.
-  Pendiente: ⚠ BUG G4 (pago no se registra con stripe listen activo), logout en UI, Resend (+ SMTP
-    confirmación), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, /portal/settings.
+  ✓ A1 (BUG G4) RESUELTO (merge 1e838d7): primer invoice se registra en checkout.session.completed
+    (no en invoice.paid, que llega antes); recordInvoice idempotente; backfill aplicado. 197 tests.
+  Pendiente: logout en UI, /portal/settings (necesario MVP), Resend (+ SMTP confirmación),
+    deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -801,8 +805,9 @@ Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados:
 0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c, 4a Núm. Celular en registro
 bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894). Migraciones 001–009 aplicadas
 (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad); backfill de invoices
-ejecutado; E2E validado. UI con lenguaje neutro ('cliente'). 195/195 tests.
-Pendiente Fase 6: ⚠ BUG G4 (pago no se registra), logout en UI, conectar Resend (+ SMTP confirmación +
-dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, /portal/settings.
+ejecutado; E2E validado. UI con lenguaje neutro ('cliente'). 197/197 tests. ✓ BUG G4 resuelto (1e838d7).
+Pendiente Fase 6 (orden acordado): logout en UI → /portal/settings (necesario MVP) → 8 bajos de
+auditoría + limpieza → en paralelo pedir a Aura precios (P1)/dominio (P5) → bloque ops: Resend
+(+ SMTP confirmación + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
