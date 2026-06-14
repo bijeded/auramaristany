@@ -447,7 +447,7 @@ CREATE TABLE invoices (
     /history/[logId]              ← detalle de un día anterior: contenido + registro guardado (lectura)
     /messages                     ← bandeja read-only Aura→clienta (Fase 4) + WhatsApp a Aura
     /messages/[id]                ← detalle del mensaje (marca read_at) (Fase 4)
-    /settings                     ← (pendiente)
+    /settings                     ← "Mi cuenta": edición nombre/teléfono + contraseña + avatar + ficha de suscripción + historial de pagos  [Fase 6 ✓]
 
   /admin                          ← guard: role='admin'
     /dashboard

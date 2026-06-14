@@ -240,7 +240,7 @@ exercise_list block JSONB estructura:
   /history/[logId]               — día pasado en modo lectura
   /messages                      — bandeja read-only (Aura→clienta) + WhatsApp a Aura  [Fase 4 ✓]
   /messages/[id]                 — detalle del mensaje (marca read_at)  [Fase 4 ✓]
-  /settings                      — perfil + Stripe Customer Portal  [pendiente]
+  /settings                      — "Mi cuenta": edición nombre/teléfono + contraseña + avatar + ficha de suscripción ("Mes X de Y") + historial de pagos paginado  [Fase 6 ✓]
   /activando · /sin-suscripcion  — polling post-pago / acceso denegado
 
 /admin                           — guard: role='admin'
@@ -384,6 +384,18 @@ Middleware (orden):
 /lib/admin/sanitize-html.ts         — sanitizeRichText (whitelist Tiptap, INP-2)
 /components/portal/PaymentPendingBanner.tsx — banner past_due con CTA WhatsApp (SUB-1)
 /supabase/migrations/009_security_hardening.sql — with check RLS + search_path is_admin + phone normalizado en trigger. APLICADA y verificada.
+-- Sub-bloque B2 — /portal/settings completo (merge 4271c85):
+/lib/portal/settingsActions.ts      — updateAccount + updatePassword (server actions; identidad de getUser,
+                                       contraseña actual re-verificada con cliente stateless sin cookies)
+/lib/portal/account-queries.ts      — getAccountData (perfil+suscripción+invoices, RLS dueño) + mapSubscription/
+                                       mapInvoices/progressLabel (puras, TDD)
+/lib/portal/avatar-validation.ts    — validateAvatarUpload + avatarExtFor (puro, TDD)
+/lib/portal/photo-compress.ts (+)   — compressImage ahora acepta maxDimension (avatar pasa 800; default 1280)
+/app/api/portal/avatar/route.ts     — POST subir avatar (bucket público 'avatars', service-role, upsert, URL cache-busted)
+/components/portal/settings/*       — ProfileHeader · AvatarUpload · AccountForm · PasswordForm · SecuritySection
+                                       · SubscriptionCard ("Mes X de Y") · PaymentHistory (paginación 10/página)
+/app/portal/settings/page.tsx (+)   — Server Component: header + 6 secciones (Next 14 searchParams plano)
+/supabase/migrations/010_avatars_bucket.sql — bucket público 'avatars' + policy avatars_public_read. APLICADA y verificada.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -656,8 +668,13 @@ COMPLETADO:
       requireAdminPage uniforme), SUB-1 (acceso = active/trialing/past_due + banner WhatsApp; pilares
       respeta ACCESS_STATES), INP-2 (validación zod + sanitize-html), INP-3 (msg genérico + phone
       normalizado), RLS-1/2+HYG-1 (migración 009). + G3 (redirect /auth con sesión). 195 tests.
+    ✓ Sub-bloque B2: /portal/settings completo (merge 4271c85) — pantalla "Mi cuenta": edición nombre/
+      teléfono + contraseña (server actions, identidad de getUser INP-4, contraseña actual re-verificada
+      sin tocar sesión, email solo-lectura), foto de perfil (bucket público 'avatars', comprimida a ≤800px,
+      iniciales de respaldo), ficha de suscripción con barra "Mes X de Y", historial de pagos paginado
+      10/página (lectura vía RLS de dueño). Migración 010 (bucket avatars) aplicada. 216 tests.
     Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder /
-    telefono-registro / auditoria-seguridad / fixes-seguridad).
+    telefono-registro / auditoria-seguridad / fixes-seguridad / 2026-06-13-b2-portal-settings).
 
 PENDIENTE (Fase 6):
   ✓ BUG G4 RESUELTO (merge 1e838d7): invoice.paid llega ~1s antes que checkout.session.completed
@@ -667,13 +684,15 @@ PENDIENTE (Fase 6):
   ✓ B1 Logout en UI MERGEADO (0dde433): LogoutButton en sidebar admin (quitado link roto
     "Ver portal de cliente") + /portal/settings MÍNIMO (datos de cuenta solo-lectura + logout,
     arregla la pestaña Configuración que era 404). Reusa components/auth/LogoutButton.tsx.
-  ○ B2 /portal/settings con EDICIÓN (nombre/teléfono/contraseña, etc.) — NECESARIA para el MVP
-    (el esqueleto ya existe). (SIGUIENTE)
+  ✓ B2 /portal/settings COMPLETO MERGEADO (4271c85): "Mi cuenta" con edición nombre/teléfono +
+    contraseña + foto de perfil (bucket público 'avatars', ≤800px) + ficha de suscripción ("Mes X de Y")
+    + historial de pagos paginado. Migración 010 aplicada. 216 tests, smoke+re-smoke OK.
+  ○ C — 8 hallazgos bajos de la auditoría (INP-1, EDGE-5, EDGE-3, MW-3, SVC-2, STG-2, INP-4, INP-5). (SIGUIENTE)
+  ○ D — Limpieza arrastrada (ver follow-ups menores abajo).
   ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — también activa el SMTP de
     confirmación de correo (hoy el registro con correo nuevo no envía confirmación).
   ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
   ○ Stripe live + precios reales (P1): crear los 10 Prices en live y actualizar program_variants.
-  ○ /portal/settings (pantalla de ajustes del cliente) — scope mayor, posterior.
   ○ Follow-ups menores (no bloquean): regenerar lib/supabase/types.ts (quitar `as any`/`as unknown as`,
     incluye clients-queries); try/catch en stripe.subscriptions.retrieve; unificar formatDate
     duplicado; alinear types.ts (general_notes) con la columna real 'notes'; saveBlocks/
@@ -722,7 +741,10 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
   ✓ A1 (BUG G4) RESUELTO (merge 1e838d7): primer invoice se registra en checkout.session.completed
     (no en invoice.paid, que llega antes); recordInvoice idempotente; backfill aplicado. 197 tests.
   ✓ B1 Logout en UI MERGEADO (merge 0dde433): logout en sidebar admin + /portal/settings mínimo.
-  Pendiente: B2 /portal/settings con edición (necesario MVP), Resend (+ SMTP confirmación),
+  ✓ B2 /portal/settings COMPLETO MERGEADO (merge 4271c85): "Mi cuenta" — edición nombre/teléfono +
+    contraseña + avatar (bucket público, ≤800px) + ficha de suscripción ("Mes X de Y") + historial de
+    pagos paginado. Migración 010 (bucket avatars) aplicada y verificada. 216/216 tests.
+  Pendiente: C (8 bajos de auditoría) + D (limpieza), Resend (+ SMTP confirmación),
     deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -813,12 +835,13 @@ Diseño UI (prototipos JSX listos para implementar):
 FIN DEL DOCUMENTO DE TRASPASO
 Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados: 1 Gestión de Clientes
 0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c, 4a Núm. Celular en registro
-bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894). Migraciones 001–009 aplicadas
-(007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad); backfill de invoices
-ejecutado; E2E validado. UI con lenguaje neutro ('cliente'). 197/197 tests. ✓ BUG G4 resuelto (1e838d7).
-✓ B1 logout en UI mergeado (0dde433).
-Pendiente Fase 6 (orden acordado): B2 /portal/settings con edición (necesario MVP) → 8 bajos de
-auditoría + limpieza → en paralelo pedir a Aura precios (P1)/dominio (P5) → bloque ops: Resend
-(+ SMTP confirmación + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894, B2 /portal/settings completo 4271c85).
+Migraciones 001–010 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad;
+010 = bucket público avatars); backfill de invoices ejecutado; E2E validado. UI con lenguaje neutro
+('cliente'). 216/216 tests. ✓ BUG G4 resuelto (1e838d7). ✓ B1 logout en UI mergeado (0dde433).
+✓ B2 /portal/settings completo mergeado (4271c85).
+Pendiente Fase 6 (orden acordado): C (8 bajos de auditoría) + D (limpieza) → en paralelo pedir a Aura
+precios (P1)/dominio (P5) → bloque ops: Resend (+ SMTP confirmación + dominio), deploy a Vercel
+(+ CRON_SECRET), Stripe live + precios reales.
 Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
