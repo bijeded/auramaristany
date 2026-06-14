@@ -24,7 +24,7 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({ auth: { signInWithPassword: statelessSignIn } })),
 }));
 
-import { updateAccount } from "@/lib/portal/settingsActions";
+import { updateAccount, updatePassword } from "@/lib/portal/settingsActions";
 
 beforeEach(() => { calls.length = 0; userId = "user-1"; statelessSignIn.mockReset(); statelessSignIn.mockResolvedValue({ error: null }); });
 
@@ -53,5 +53,37 @@ describe("updateAccount", () => {
     userId = null;
     const r = await updateAccount({ fullName: "Ana", phone: "+52 55 1234 5678" });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("updatePassword", () => {
+  it("rechaza nueva menor a 8", async () => {
+    const r = await updatePassword({ currentPassword: "oldpass12", newPassword: "short", confirmPassword: "short" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rechaza si no coinciden", async () => {
+    const r = await updatePassword({ currentPassword: "oldpass12", newPassword: "newpass12", confirmPassword: "otra1234" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rechaza si la nueva es igual a la actual", async () => {
+    const r = await updatePassword({ currentPassword: "samepass1", newPassword: "samepass1", confirmPassword: "samepass1" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("rechaza si la contraseña actual es incorrecta", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    statelessSignIn.mockResolvedValueOnce({ error: { message: "invalid" } } as any);
+    const r = await updatePassword({ currentPassword: "wrongpass", newPassword: "newpass12", confirmPassword: "newpass12" });
+    expect(r).toEqual({ ok: false, error: "La contraseña actual es incorrecta." });
+    expect(calls.find((c) => c.op === "updateUser")).toBeUndefined();
+  });
+
+  it("cambia la contraseña tras verificar la actual", async () => {
+    const r = await updatePassword({ currentPassword: "oldpass12", newPassword: "newpass12", confirmPassword: "newpass12" });
+    expect(r).toEqual({ ok: true });
+    expect(statelessSignIn).toHaveBeenCalledWith({ email: "c@x.com", password: "oldpass12" });
+    expect(calls.find((c) => c.op === "updateUser")?.payload).toMatchObject({ password: "newpass12" });
   });
 });
