@@ -3,6 +3,10 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
+import { compressImage } from "@/lib/portal/photo-compress";
+
+// Lado mayor máximo del avatar (px). Garantiza ancho ≤ 800 y comprime a JPEG.
+const AVATAR_MAX_DIMENSION = 800;
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -21,8 +25,9 @@ export function AvatarUpload({ name, avatarUrl }: { name: string; avatarUrl: str
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null); setLoading(true);
+    const compressed = await compressImage(file, AVATAR_MAX_DIMENSION);
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", compressed);
     const res = await fetch("/api/portal/avatar", { method: "POST", body: fd });
     setLoading(false);
     if (!res.ok) {

@@ -46,7 +46,7 @@ export default async function PortalSettingsPage({
           avatarUrl={data.profile.avatar_url}
         />
 
-        <SectionTitle>Mi programa</SectionTitle>
+        <SectionTitle>Mi suscripción</SectionTitle>
         <SubscriptionCard subscription={data.subscription} />
 
         <SectionTitle>Seguridad</SectionTitle>

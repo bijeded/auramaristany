@@ -2,16 +2,20 @@
 import { computeResizedDimensions, MAX_PHOTO_DIMENSION } from "./photo-validation";
 
 /**
- * Reduce la imagen a MAX_PHOTO_DIMENSION (lado mayor) y recomprime a JPEG.
+ * Reduce la imagen a `maxDimension` (lado mayor) y recomprime a JPEG.
+ * Por defecto usa MAX_PHOTO_DIMENSION; el avatar pasa un máximo menor (p. ej. 800).
  * Devuelve un File listo para subir. Si algo falla, devuelve el original.
  */
-export async function compressImage(file: File): Promise<File> {
+export async function compressImage(
+  file: File,
+  maxDimension: number = MAX_PHOTO_DIMENSION
+): Promise<File> {
   try {
     const bitmap = await createImageBitmap(file);
     const { width, height } = computeResizedDimensions(
       bitmap.width,
       bitmap.height,
-      MAX_PHOTO_DIMENSION
+      maxDimension
     );
     const canvas = document.createElement("canvas");
     canvas.width = width;

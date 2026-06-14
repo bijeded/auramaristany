@@ -45,9 +45,14 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
   return (
     <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
       <Row label="Programa">
-        <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium"
-          style={{ background: "var(--lavanda-tint)", color: "var(--lavanda-dark)" }}>
-          {subscription.program_name} · {subscription.variant_name}
+        <span className="flex flex-col items-end gap-1">
+          <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium"
+            style={{ background: "var(--lavanda-tint)", color: "var(--lavanda-dark)", whiteSpace: "nowrap" }}>
+            {subscription.program_name}
+          </span>
+          <span className="font-body text-xs" style={{ color: "var(--gris-suave)" }}>
+            {subscription.variant_name}
+          </span>
         </span>
       </Row>
       <Row label="Estado">
