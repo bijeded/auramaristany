@@ -32,7 +32,8 @@ export function AccountForm({
     if (!res.ok) { setError(res.error); return; }
     setSuccess(true);
     router.refresh();
-    onDone?.();
+    // Muestra la confirmación un momento antes de colapsar el formulario.
+    setTimeout(() => onDone?.(), 1200);
   }
 
   return (

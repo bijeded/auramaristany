@@ -23,7 +23,8 @@ export function PasswordForm({ onDone }: { onDone?: () => void }) {
     if (!res.ok) { setError(res.error); return; }
     setSuccess(true);
     setCurrent(""); setNew(""); setConfirm("");
-    onDone?.();
+    // Muestra la confirmación un momento antes de colapsar el formulario.
+    setTimeout(() => onDone?.(), 1200);
   }
 
   return (
