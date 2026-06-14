@@ -1,16 +1,21 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
-Fecha: 4 de junio de 2026 · Actualizado: 11 de junio de 2026
-Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 5 sub-bloques + 2 fixes mergeados:
+Fecha: 4 de junio de 2026 · Actualizado: 14 de junio de 2026
+Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 6 sub-bloques + 2 fixes mergeados:
         1 Gestión de Clientes (0d23c5e), 3 Página de Pagos + lenguaje neutro (d52f224),
         4b Constructor de Onboarding (9477a8c), 4a Núm. Celular en registro (bdb4e83),
-        A Auditoría de seguridad + ciclo de corrección (bb05894); + fixes A1/G4 (1e838d7) y B1 (0dde433).
-        Migr. 001-009 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
-        seguridad: with check RLS + search_path is_admin + phone normalizado en trigger).
+        A Auditoría de seguridad + ciclo de corrección (bb05894), B2 /portal/settings completo (4271c85);
+        + fixes A1/G4 (1e838d7) y B1 (0dde433).
+        Migr. 001-010 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
+        seguridad: with check RLS + search_path is_admin + phone normalizado en trigger;
+        010 = bucket público avatars + policy de lectura).
         backfill de invoices ejecutado; E2E validado. ✓ BUG G4 RESUELTO (1e838d7: primer invoice
-        se registra en checkout.session.completed). ✓ B1 logout MERGEADO (0dde433). Pendiente Fase 6:
-        B2 /portal/settings con edición, Resend (+ SMTP confirmación), deploy a Vercel (+ CRON_SECRET),
-        Stripe live + precios reales.
+        se registra en checkout.session.completed). ✓ B1 logout MERGEADO (0dde433).
+        ✓ B2 /portal/settings COMPLETO MERGEADO (4271c85: edición nombre/teléfono + contraseña,
+        foto de perfil comprimida a 800px en bucket público, ficha de suscripción con "Mes X de Y",
+        historial de pagos paginado; 216 tests). Pendiente Fase 6:
+        C 8 hallazgos bajos auditoría + D limpieza, Resend (+ SMTP confirmación),
+        deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
 ════════════════════════════════════════════════════════════════
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
