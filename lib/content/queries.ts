@@ -181,6 +181,28 @@ export async function getTodayContent(
   };
 }
 
+/** Decisión pura (testeable): extrae el id de la fila de sub que concede acceso. */
+export function pickAccessSubscriptionId(
+  row: { id: string } | null
+): string | null {
+  return row?.id ?? null;
+}
+
+/**
+ * Deriva la suscripción que concede acceso (ACCESS_STATES) del usuario.
+ * Server-side: NO se confía en ningún subscriptionId del cliente (EDGE-5).
+ */
+export async function getAccessSubscriptionId(userId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("profile_id", userId)
+    .in("status", ACCESS_STATES as readonly string[])
+    .maybeSingle();
+  return pickAccessSubscriptionId(data as { id: string } | null);
+}
+
 /**
  * Upserts a progress log for the current day.
  * Called from the auto-save API route.
