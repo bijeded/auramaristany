@@ -27,7 +27,8 @@ const DAY_ORDER: Record<DayOfWeek, number> = {
   domingo: 7,
 };
 
-// JS getDay() → DayOfWeek (0=domingo, 1=lunes, …)
+// JS getUTCDay() → DayOfWeek (0=domingo, 1=lunes, …). UTC para alinearse con
+// getCurrentDayKey, que computa la semana con Date.UTC (EDGE-3).
 const JS_DAY_TO_DOW: DayOfWeek[] = [
   "domingo",
   "lunes",
@@ -39,7 +40,7 @@ const JS_DAY_TO_DOW: DayOfWeek[] = [
 ];
 
 export function toDayOfWeek(date: Date): DayOfWeek {
-  return JS_DAY_TO_DOW[date.getDay()];
+  return JS_DAY_TO_DOW[date.getUTCDay()];
 }
 
 /**
