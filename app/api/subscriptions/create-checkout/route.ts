@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { stripe } from "@/lib/stripe";
 import { checkPrerequisites } from "@/lib/subscriptions/prerequisites";
 import type { PrerequisiteRow, ClientSubscription } from "@/lib/subscriptions/prerequisites";
@@ -32,9 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "variantSlug requerido" }, { status: 400 });
   }
 
-  const service = createServiceClient();
-
-  const { data: variantRaw } = await service
+  const { data: variantRaw } = await supabase
     .from("program_variants")
     .select("id, name, stripe_price_id")
     .eq("slug", variantSlug)
@@ -47,13 +44,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Variante no encontrada" }, { status: 404 });
   }
 
-  const { data: prereqRows } = await service
+  const { data: prereqRows } = await supabase
     .from("program_variant_prerequisites")
     .select("prerequisite_group, required_program_slug, required_variant_levels, required_status")
     .eq("program_variant_id", variant.id);
 
   if (prereqRows && prereqRows.length > 0) {
-    const { data: clientSubs } = await service
+    const { data: clientSubs } = await supabase
       .from("subscriptions")
       .select("status, program_variants(level, programs(slug))")
       .eq("profile_id", user.id)
@@ -79,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: profileRaw } = await service
+  const { data: profileRaw } = await supabase
     .from("profiles")
     .select("stripe_customer_id, full_name, email")
     .eq("id", user.id)
@@ -96,13 +93,9 @@ export async function POST(request: NextRequest) {
       metadata: { supabase_user_id: user.id },
     });
     customerId = customer.id;
-    await (
-      service.from("profiles") as unknown as {
-        update: (values: { stripe_customer_id: string }) => {
-          eq: (column: string, value: string) => Promise<unknown>;
-        };
-      }
-    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
+      .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
   }
