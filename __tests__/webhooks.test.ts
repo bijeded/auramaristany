@@ -150,7 +150,7 @@ describe("handleCheckoutCompleted", () => {
     expect(upsertMock).not.toHaveBeenCalled();
   });
 
-  it("no explota ni inserta nada si stripe.subscriptions.retrieve falla (D2)", async () => {
+  it("lanza el error si stripe.subscriptions.retrieve falla para que Stripe reintente (D2)", async () => {
     retrieveMock.mockRejectedValue(new Error("Network error"));
     const session = {
       id: "cs_test_err",
@@ -159,7 +159,7 @@ describe("handleCheckoutCompleted", () => {
       customer: "cus_err",
     } as unknown as Stripe.Checkout.Session;
 
-    await expect(handleCheckoutCompleted(session)).resolves.toBeUndefined();
+    await expect(handleCheckoutCompleted(session)).rejects.toThrow("Network error");
     expect(insertMock).not.toHaveBeenCalled();
   });
 });

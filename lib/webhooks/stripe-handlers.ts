@@ -91,7 +91,7 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     });
   } catch (err) {
     console.error("[stripe-handlers] subscriptions.retrieve failed", err);
-    return;
+    throw err;
   }
   const { current_period_start, current_period_end } = readPeriod(subscription);
 
