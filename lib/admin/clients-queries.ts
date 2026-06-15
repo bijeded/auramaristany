@@ -2,6 +2,7 @@ import "server-only";
 import { requireAdmin } from "./auth";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { SIGNED_URL_TTL_SECONDS } from "@/lib/storage/signed-url";
 import {
   pickPrimarySubscription,
   canDeleteClient,
@@ -180,7 +181,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   const service = createServiceClient();
   const photos: ClientPhoto[] = [];
   for (const p of (rawPhotos ?? []) as unknown as RawPhoto[]) {
-    const { data: signed } = await service.storage.from("progress").createSignedUrl(p.storage_path, 3600);
+    const { data: signed } = await service.storage.from("progress").createSignedUrl(p.storage_path, SIGNED_URL_TTL_SECONDS);
     if (signed?.signedUrl) {
       photos.push({ id: p.id, url: signed.signedUrl, photoDate: p.taken_at, caption: p.caption });
     }

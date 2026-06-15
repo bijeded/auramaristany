@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getHistoryList, getPerformanceData } from "@/lib/content/history";
 import { ProgressView } from "@/components/portal/ProgressView";
 import type { PhotoItem } from "@/components/portal/PhotosTab";
+import { SIGNED_URL_TTL_SECONDS } from "@/lib/storage/signed-url";
 
 interface PhotoRow {
   id: string;
@@ -35,7 +36,7 @@ export default async function HistoryPage() {
   for (const p of photoRows) {
     const { data: signed } = await supabase.storage
       .from("progress")
-      .createSignedUrl(p.storage_path, 3600);
+      .createSignedUrl(p.storage_path, SIGNED_URL_TTL_SECONDS);
     if (signed?.signedUrl) {
       photos.push({
         id: p.id,
