@@ -88,8 +88,13 @@ export async function middleware(request: NextRequest) {
   return supabaseResponse;
 }
 
+// Exportado para test de cobertura (MW-3). Excluye api/webhooks y api/cron:
+// son endpoints máquina-a-máquina (Stripe / Vercel Cron) que no deben pagar
+// getUser()+query a profiles ni arriesgar un redirect.
+export const MIDDLEWARE_MATCHER = [
+  "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+];
+
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: MIDDLEWARE_MATCHER,
 };
