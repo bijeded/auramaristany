@@ -1,12 +1,7 @@
 import Link from "next/link";
 import type { AccountInvoice } from "@/lib/portal/account-queries";
 import { STATUS_LABEL } from "@/lib/admin/payment-status";
-
-function formatDate(iso: string): string {
-  return new Date(`${iso.split("T")[0]}T12:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric", month: "short", year: "numeric",
-  });
-}
+import { dayLabel } from "@/lib/admin/date-helpers";
 
 function formatMoney(mxn: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(mxn);
@@ -33,7 +28,7 @@ export function PaymentHistory({
               style={{ borderTop: i === 0 ? "none" : "1px solid var(--gris-linea)" }}>
               <div className="min-w-0">
                 <p className="font-body text-sm font-medium truncate" style={{ color: "var(--negro)" }}>{inv.program_name}</p>
-                <p className="font-body text-xs" style={{ color: "var(--gris-suave)" }}>{formatDate(inv.invoice_date)}</p>
+                <p className="font-body text-xs" style={{ color: "var(--gris-suave)" }}>{dayLabel(inv.invoice_date)}</p>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <span className="font-body text-sm font-medium" style={{ color: "var(--negro)" }}>{formatMoney(inv.amount_paid)}</span>

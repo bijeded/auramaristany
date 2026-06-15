@@ -1,5 +1,6 @@
 import type { AccountSubscription } from "@/lib/portal/account-queries";
 import { progressLabel } from "@/lib/portal/account-queries";
+import { longDateLabel } from "@/lib/admin/date-helpers";
 
 const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> = {
   active: { text: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
@@ -8,12 +9,6 @@ const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> 
   canceled: { text: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
   unpaid: { text: "Sin pagar", bg: "var(--error-tint)", color: "var(--error)" },
 };
-
-function formatDate(iso: string): string {
-  return new Date(`${iso.split("T")[0]}T12:00:00`).toLocaleDateString("es-MX", {
-    day: "numeric", month: "long", year: "numeric",
-  });
-}
 
 function formatMoney(mxn: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(mxn);
@@ -61,10 +56,10 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
           {badge.text}
         </span>
       </Row>
-      <Row label="Fecha de inicio">{formatDate(subscription.enrollment_date)}</Row>
+      <Row label="Fecha de inicio">{longDateLabel(subscription.enrollment_date)}</Row>
       {subscription.current_period_end && (
         <Row label="Próximo cobro">
-          {formatDate(subscription.current_period_end)} · {formatMoney(subscription.price_mxn)}
+          {longDateLabel(subscription.current_period_end)} · {formatMoney(subscription.price_mxn)}
         </Row>
       )}
       {progress && (

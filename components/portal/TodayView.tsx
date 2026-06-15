@@ -2,6 +2,7 @@
 
 import { Clock, Dumbbell, Moon, CheckCircle2, Loader2 } from "lucide-react";
 import type { TodayContent, DayBlock } from "@/lib/content/queries";
+import { weekdayLabel } from "@/lib/admin/date-helpers";
 import { TextBlock } from "./blocks/TextBlock";
 import { YoutubeBlock } from "./blocks/YoutubeBlock";
 import { PdfBlock } from "./blocks/PdfBlock";
@@ -28,15 +29,6 @@ const DAY_LABELS: Record<string, string> = {
   domingo: "Domingo",
 };
 
-function formatDate(isoDate?: string): string {
-  const date = isoDate ? new Date(`${isoDate}T12:00:00`) : new Date();
-  const str = date.toLocaleDateString("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
 
 function ProgramBanner({
   monthsElapsed,
@@ -334,7 +326,7 @@ export function TodayView({ content }: { content: TodayContent | null }) {
   return (
     <div style={{ background: "var(--blanco)" }}>
       {/* Sticky top bar — always visible */}
-      <PortalHeader dateLabel={formatDate(content?.effectiveDate)} />
+      <PortalHeader dateLabel={weekdayLabel(content?.effectiveDate)} />
 
       {/* Scrollable content */}
       <div className="px-4 pt-4 pb-8">
