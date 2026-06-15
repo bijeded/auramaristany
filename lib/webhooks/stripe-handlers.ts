@@ -84,9 +84,15 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   // Stripe API 2026+ exposes the billing period on subscription items, not the
   // Subscription object — retrieve la suscripción para la fecha de periodo y
   // expandir latest_invoice (el primer invoice ya pagado en el checkout).
-  const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
-    expand: ["latest_invoice"],
-  });
+  let subscription: Stripe.Subscription;
+  try {
+    subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId, {
+      expand: ["latest_invoice"],
+    });
+  } catch (err) {
+    console.error("[stripe-handlers] subscriptions.retrieve failed", err);
+    return;
+  }
   const { current_period_start, current_period_end } = readPeriod(subscription);
 
   const { data: inserted, error } = await supabase

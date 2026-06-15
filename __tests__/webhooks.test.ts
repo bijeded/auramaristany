@@ -149,6 +149,19 @@ describe("handleCheckoutCompleted", () => {
     expect(insertMock).toHaveBeenCalledTimes(1);
     expect(upsertMock).not.toHaveBeenCalled();
   });
+
+  it("no explota ni inserta nada si stripe.subscriptions.retrieve falla (D2)", async () => {
+    retrieveMock.mockRejectedValue(new Error("Network error"));
+    const session = {
+      id: "cs_test_err",
+      metadata: { supabase_user_id: "user-err", variant_id: "variant-err" },
+      subscription: "sub_err",
+      customer: "cus_err",
+    } as unknown as Stripe.Checkout.Session;
+
+    await expect(handleCheckoutCompleted(session)).resolves.toBeUndefined();
+    expect(insertMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("handleInvoicePaid - subscription_create", () => {
