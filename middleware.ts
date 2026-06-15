@@ -88,13 +88,13 @@ export async function middleware(request: NextRequest) {
   return supabaseResponse;
 }
 
-// Exportado para test de cobertura (MW-3). Excluye api/webhooks y api/cron:
-// son endpoints máquina-a-máquina (Stripe / Vercel Cron) que no deben pagar
-// getUser()+query a profiles ni arriesgar un redirect.
-export const MIDDLEWARE_MATCHER = [
-  "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-];
-
+// Excluye api/webhooks y api/cron (MW-3): son endpoints máquina-a-máquina
+// (Stripe / Vercel Cron) que no deben pagar getUser()+query a profiles ni
+// arriesgar un redirect. NOTA: Next.js exige que `config.matcher` sea un
+// literal inline analizable estáticamente — no puede referenciar una constante,
+// o el matcher se ignora. El test lee `config.matcher[0]` como fuente única.
 export const config = {
-  matcher: MIDDLEWARE_MATCHER,
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

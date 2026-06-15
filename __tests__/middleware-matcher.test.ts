@@ -1,10 +1,10 @@
 // __tests__/middleware-matcher.test.ts
 import { describe, it, expect } from "vitest";
-import { MIDDLEWARE_MATCHER } from "@/middleware";
+import { config } from "@/middleware";
 
 // Construye el RegExp a partir del patrón del matcher para probar cobertura.
 function matches(pathname: string): boolean {
-  const pattern = MIDDLEWARE_MATCHER[0]
+  const pattern = config.matcher[0]
     .replace(/^\//, "^/")        // ancla inicio
     .concat("$");                // ancla fin (el matcher de Next es full-path)
   return new RegExp(pattern).test(pathname);
