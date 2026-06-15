@@ -5,6 +5,7 @@ import { getActiveSubscriberRows } from "./queries";
 import { expandRecipients, validateMessageContent, type RecipientSelection } from "./message-helpers";
 import { sendNewMessageEmailBatch } from "@/lib/email/send";
 import { requireAdmin } from "./auth";
+import { logAndGeneric } from "./errors";
 
 export interface SendMessageInput {
   subject: string;
@@ -55,12 +56,12 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
     .insert({ sender_id: user.id, subject: input.subject.trim(), body: input.body.trim(), is_broadcast: isBroadcast })
     .select("id")
     .single();
-  if (msgErr) return { ok: false, error: msgErr.message };
+  if (msgErr) return { ok: false, error: logAndGeneric("sendMessage.insert", msgErr) };
 
   const recipRows = recipientIds.map((rid) => ({ message_id: msg.id, recipient_id: rid }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: rErr } = await (supabase as any).from("message_recipients").insert(recipRows);
-  if (rErr) return { ok: false, error: rErr.message };
+  if (rErr) return { ok: false, error: logAndGeneric("sendMessage.recipients", rErr) };
 
   // Emails best-effort — un fallo no revierte el mensaje in-app.
   const idSet = new Set(recipientIds);
@@ -114,11 +115,11 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean; e
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: rErr } = await (supabase as any).from("message_recipients").delete().eq("message_id", messageId);
-  if (rErr) return { ok: false, error: rErr.message };
+  if (rErr) return { ok: false, error: logAndGeneric("deleteMessage.recipients", rErr) };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: mErr } = await (supabase as any).from("messages").delete().eq("id", messageId);
-  if (mErr) return { ok: false, error: mErr.message };
+  if (mErr) return { ok: false, error: logAndGeneric("deleteMessage", mErr) };
 
   revalidatePath("/admin/messages");
   return { ok: true };

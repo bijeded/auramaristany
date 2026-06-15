@@ -4,6 +4,7 @@ import type { SaveBlockInput } from "./dayActions";
 import { requireAdmin } from "./auth";
 import { validateBlock, validatePillarInput } from "./content-validation";
 import { sanitizeRichText } from "./sanitize-html";
+import { logAndGeneric } from "./errors";
 
 export async function savePillar(data: {
   seriesId: string; pillarKey: string; title: string; published: boolean;
@@ -21,7 +22,7 @@ export async function savePillar(data: {
       { onConflict: "series_id,pillar_key" }
     )
     .select("id").single();
-  if (error) return { pillarId: "", error: error.message };
+  if (error) return { pillarId: "", error: logAndGeneric("savePillar", error) };
   return { pillarId: row.id };
 }
 
@@ -36,7 +37,7 @@ export async function savePillarBlocks(pillarId: string, blocks: SaveBlockInput[
     if (!v.ok) return { error: v.error };
   }
   const { error: delErr } = await client.from("program_pillar_blocks").delete().eq("pillar_id", pillarId);
-  if (delErr) return { error: delErr.message };
+  if (delErr) return { error: logAndGeneric("savePillarBlocks.delete", delErr) };
   if (blocks.length > 0) {
     const { error } = await client.from("program_pillar_blocks").insert(
       blocks.map((b, i) => ({
@@ -49,7 +50,7 @@ export async function savePillarBlocks(pillarId: string, blocks: SaveBlockInput[
             : b.content,
       }))
     );
-    if (error) return { error: error.message };
+    if (error) return { error: logAndGeneric("savePillarBlocks.insert", error) };
   }
   revalidatePath("/portal/pilares");
   return {};

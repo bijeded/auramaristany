@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "./auth";
 import { validateDayInput, validateBlock } from "./content-validation";
 import { sanitizeRichText } from "./sanitize-html";
+import { logAndGeneric } from "./errors";
 
 export interface SaveDayInput {
   id?: string;
@@ -41,14 +42,14 @@ export async function saveDay(data: SaveDayInput): Promise<{ dayId: string; erro
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: updated, error } = await (supabase as any)
       .from("program_days").update(row).eq("id", data.id).select("id").single();
-    if (error) return { dayId: data.id, error: error.message };
+    if (error) return { dayId: data.id, error: logAndGeneric("saveDay.update", error) };
     return { dayId: updated.id };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: inserted, error } = await (supabase as any)
     .from("program_days").insert(row).select("id").single();
-  if (error) return { dayId: "", error: error.message };
+  if (error) return { dayId: "", error: logAndGeneric("saveDay.insert", error) };
   return { dayId: inserted.id };
 }
 
@@ -70,7 +71,7 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
   }
 
   const { error: delError } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
-  if (delError) return { error: delError.message };
+  if (delError) return { error: logAndGeneric("saveBlocks.delete", delError) };
 
   if (blocks.length > 0) {
     const rows = blocks.map((b, i) => ({
@@ -83,7 +84,7 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
           : b.content,
     }));
     const { error: insError } = await client.from("program_day_blocks").insert(rows);
-    if (insError) return { error: insError.message };
+    if (insError) return { error: logAndGeneric("saveBlocks.insert", insError) };
   }
 
   revalidatePath("/portal/today");
@@ -97,9 +98,9 @@ export async function deleteDay(dayId: string): Promise<{ error?: string }> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error: blockErr } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
-  if (blockErr) return { error: blockErr.message };
+  if (blockErr) return { error: logAndGeneric("deleteDay.blocks", blockErr) };
   const { error } = await client.from("program_days").delete().eq("id", dayId);
-  if (error) return { error: error.message };
+  if (error) return { error: logAndGeneric("deleteDay", error) };
   revalidatePath("/admin/content");
   return {};
 }
@@ -144,7 +145,7 @@ export async function cloneDay(
     duration_minutes: src.duration_minutes,
     published: src.published,
   }).select("id").single();
-  if (error) return { error: error.message };
+  if (error) return { error: logAndGeneric("cloneDay", error) };
 
   // 4. Clonar bloques
   if (srcBlocks && srcBlocks.length > 0) {

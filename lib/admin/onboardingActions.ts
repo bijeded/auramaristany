@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { validateQuestion, type QuestionInput } from "./onboarding-helpers";
 import { requireAdmin } from "./auth";
+import { logAndGeneric } from "./errors";
 
 function revalidate() {
   revalidatePath("/admin/onboarding-settings");
@@ -28,7 +29,7 @@ export async function saveQuestion(input: QuestionInput): Promise<{ id: string; 
 
   if (input.id) {
     const { error } = await client.from("onboarding_questions").update(row).eq("id", input.id);
-    if (error) return { id: input.id, error: error.message };
+    if (error) return { id: input.id, error: logAndGeneric("saveQuestion.update", error) };
     revalidate();
     return { id: input.id };
   }
@@ -47,7 +48,7 @@ export async function saveQuestion(input: QuestionInput): Promise<{ id: string; 
     .insert({ ...row, sort_order: nextOrder, is_active: true })
     .select("id")
     .single();
-  if (error) return { id: "", error: error.message };
+  if (error) return { id: "", error: logAndGeneric("saveQuestion.insert", error) };
   revalidate();
   return { id: inserted.id };
 }
@@ -63,7 +64,7 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
       .from("onboarding_questions")
       .update({ sort_order: i })
       .eq("id", orderedIds[i]);
-    if (error) return { error: error.message };
+    if (error) return { error: logAndGeneric("reorderQuestions", error) };
   }
   revalidate();
   return {};
@@ -76,7 +77,7 @@ export async function setQuestionActive(id: string, active: boolean): Promise<{ 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error } = await client.from("onboarding_questions").update({ is_active: active }).eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: logAndGeneric("setQuestionActive", error) };
   revalidate();
   return {};
 }

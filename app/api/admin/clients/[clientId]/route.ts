@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { canDeleteClient, type SubStatus } from "@/lib/admin/clients-helpers";
+import { logAndGeneric } from "@/lib/admin/errors";
 
 export async function DELETE(
   _req: Request,
@@ -45,7 +46,7 @@ export async function DELETE(
   // Borrar el auth.user -> cascadea profiles y el resto (migración 007).
   const { error } = await admin.auth.admin.deleteUser(params.clientId);
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: logAndGeneric("deleteClient", error) }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
