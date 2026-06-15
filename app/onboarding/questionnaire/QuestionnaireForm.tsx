@@ -15,11 +15,8 @@ interface Question {
 
 export function QuestionnaireForm({
   questions,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  profileId, // ignorado en runtime: la server action deriva identidad de getUser() (INP-4)
 }: {
   questions: Question[];
-  profileId: string;
 }) {
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
