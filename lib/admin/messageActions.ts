@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getActiveSubscriberRows } from "./queries";
-import { expandRecipients, type RecipientSelection } from "./message-helpers";
+import { expandRecipients, validateMessageContent, type RecipientSelection } from "./message-helpers";
 import { sendNewMessageEmailBatch } from "@/lib/email/send";
 import { requireAdmin } from "./auth";
 
@@ -40,9 +40,8 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
   if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase, user } = auth;
 
-  if (!input.subject.trim() || !input.body.trim()) {
-    return { ok: false, error: "Asunto y mensaje son obligatorios" };
-  }
+  const contentCheck = validateMessageContent(input.subject, input.body);
+  if (!contentCheck.ok) return { ok: false, error: contentCheck.error };
 
   const rows = await getActiveSubscriberRows();
   const recipientIds = expandRecipients(rows, input.selection);

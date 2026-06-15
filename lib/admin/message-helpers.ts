@@ -58,6 +58,25 @@ export function formatReadCount(readCount: number, total: number): string {
   return `${readCount} leído${readCount === 1 ? "" : "s"} de ${total}`;
 }
 
+export const MESSAGE_SUBJECT_MAX = 200;
+export const MESSAGE_BODY_MAX = 5000;
+
+export function validateMessageContent(
+  subject: string,
+  body: string
+): { ok: true } | { ok: false; error: string } {
+  if (!subject.trim() || !body.trim()) {
+    return { ok: false, error: "Asunto y mensaje son obligatorios" };
+  }
+  if (subject.trim().length > MESSAGE_SUBJECT_MAX) {
+    return { ok: false, error: `El asunto no puede exceder ${MESSAGE_SUBJECT_MAX} caracteres` };
+  }
+  if (body.trim().length > MESSAGE_BODY_MAX) {
+    return { ok: false, error: `El mensaje no puede exceder ${MESSAGE_BODY_MAX} caracteres` };
+  }
+  return { ok: true };
+}
+
 export function normalizeWhatsappNumber(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const digits = raw.replace(/\D/g, "");

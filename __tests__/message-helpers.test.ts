@@ -6,6 +6,7 @@ import {
   formatReadCount,
   normalizeWhatsappNumber,
   whatsappUrl,
+  validateMessageContent,
   type ActiveSubRow,
 } from "@/lib/admin/message-helpers";
 
@@ -72,5 +73,21 @@ describe("normalizeWhatsappNumber / whatsappUrl", () => {
   it("construye el url con texto opcional", () => {
     expect(whatsappUrl("5215512345678")).toBe("https://wa.me/5215512345678");
     expect(whatsappUrl("5215512345678", "Hola")).toBe("https://wa.me/5215512345678?text=Hola");
+  });
+});
+
+describe("validateMessageContent", () => {
+  it("rechaza subject/body vacíos", () => {
+    expect(validateMessageContent("", "hola").ok).toBe(false);
+    expect(validateMessageContent("hola", "   ").ok).toBe(false);
+  });
+  it("rechaza subject > 200 chars", () => {
+    expect(validateMessageContent("a".repeat(201), "ok").ok).toBe(false);
+  });
+  it("rechaza body > 5000 chars", () => {
+    expect(validateMessageContent("ok", "a".repeat(5001)).ok).toBe(false);
+  });
+  it("acepta dentro de límites", () => {
+    expect(validateMessageContent("Asunto", "Mensaje").ok).toBe(true);
   });
 });
