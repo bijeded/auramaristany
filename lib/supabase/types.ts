@@ -1,5 +1,5 @@
 export type UserRole = "client" | "admin";
-export type SubscriptionStatus = "active" | "past_due" | "canceled" | "unpaid" | "completed";
+export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
 export type BillingModel = "fixed_term_monthly" | "rolling_monthly";
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
@@ -32,6 +32,7 @@ export type Database = {
           onboarding_completed?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
       };
       onboarding_questions: {
         Row: {
@@ -52,6 +53,7 @@ export type Database = {
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["onboarding_questions"]["Insert"]>;
+        Relationships: [];
       };
       onboarding_responses: {
         Row: {
@@ -66,6 +68,7 @@ export type Database = {
           completed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["onboarding_responses"]["Insert"]>;
+        Relationships: [];
       };
       programs: {
         Row: {
@@ -86,6 +89,7 @@ export type Database = {
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["programs"]["Insert"]>;
+        Relationships: [];
       };
       program_variants: {
         Row: {
@@ -110,6 +114,7 @@ export type Database = {
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["program_variants"]["Insert"]>;
+        Relationships: [];
       };
       program_variant_prerequisites: {
         Row: {
@@ -128,6 +133,7 @@ export type Database = {
           required_status?: string;
         };
         Update: Partial<Database["public"]["Tables"]["program_variant_prerequisites"]["Insert"]>;
+        Relationships: [];
       };
       program_series: {
         Row: {
@@ -148,6 +154,7 @@ export type Database = {
           published?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["program_series"]["Insert"]>;
+        Relationships: [];
       };
       program_days: {
         Row: {
@@ -176,6 +183,7 @@ export type Database = {
           published?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["program_days"]["Insert"]>;
+        Relationships: [];
       };
       program_day_blocks: {
         Row: {
@@ -194,6 +202,7 @@ export type Database = {
           content: Json;
         };
         Update: Partial<Database["public"]["Tables"]["program_day_blocks"]["Insert"]>;
+        Relationships: [];
       };
       program_series_pillars: {
         Row: {
@@ -214,6 +223,7 @@ export type Database = {
           published?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["program_series_pillars"]["Insert"]>;
+        Relationships: [];
       };
       program_pillar_blocks: {
         Row: {
@@ -232,6 +242,7 @@ export type Database = {
           content: Json;
         };
         Update: Partial<Database["public"]["Tables"]["program_pillar_blocks"]["Insert"]>;
+        Relationships: [];
       };
       variant_series_map: {
         Row: {
@@ -243,6 +254,7 @@ export type Database = {
           series_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["variant_series_map"]["Insert"]>;
+        Relationships: [];
       };
       subscriptions: {
         Row: {
@@ -275,6 +287,7 @@ export type Database = {
           completed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>;
+        Relationships: [];
       };
       subscription_events: {
         Row: {
@@ -293,6 +306,7 @@ export type Database = {
           processed_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["subscription_events"]["Insert"]>;
+        Relationships: [];
       };
       progress_logs: {
         Row: {
@@ -318,6 +332,7 @@ export type Database = {
           notes?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["progress_logs"]["Insert"]>;
+        Relationships: [];
       };
       body_metrics: {
         Row: {
@@ -339,6 +354,7 @@ export type Database = {
           notes?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["body_metrics"]["Insert"]>;
+        Relationships: [];
       };
       progress_photos: {
         Row: {
@@ -359,6 +375,7 @@ export type Database = {
           caption?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["progress_photos"]["Insert"]>;
+        Relationships: [];
       };
       messages: {
         Row: {
@@ -376,6 +393,7 @@ export type Database = {
           is_broadcast?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["messages"]["Insert"]>;
+        Relationships: [];
       };
       message_recipients: {
         Row: {
@@ -390,6 +408,7 @@ export type Database = {
           read_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["message_recipients"]["Insert"]>;
+        Relationships: [];
       };
       invoices: {
         Row: {
@@ -411,6 +430,7 @@ export type Database = {
           invoice_date: string;
         };
         Update: Partial<Database["public"]["Tables"]["invoices"]["Insert"]>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
