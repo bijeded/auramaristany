@@ -11,6 +11,7 @@ export default async function AdminOnboardingSettingsPage() {
     .select("id, question_text, question_type, options, is_required, is_active, sort_order")
     .order("sort_order");
 
-  const questions = (data as unknown as OnboardingQuestion[] | null) ?? [];
+  // data typed by the SDK from onboarding_questions Row — aligns with OnboardingQuestion.
+  const questions = (data ?? []) as OnboardingQuestion[];
   return <OnboardingBuilder questions={questions} />;
 }

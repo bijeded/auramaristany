@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { canDeleteClient, type SubStatus } from "@/lib/admin/clients-helpers";
+import { logAndGeneric } from "@/lib/admin/errors";
 
 export async function DELETE(
   _req: Request,
@@ -12,8 +13,7 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((profile as any)?.role !== "admin") {
+  if (profile?.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -26,7 +26,8 @@ export async function DELETE(
     .from("subscriptions")
     .select("status")
     .eq("profile_id", params.clientId);
-  const subs = ((rawSubs ?? []) as unknown as { status: SubStatus }[]);
+  // keep: SubStatus is narrower than SubscriptionStatus (missing "trialing"/"completed"); cast narrows.
+  const subs = (rawSubs ?? []) as { status: SubStatus }[];
   const guard = canDeleteClient(subs);
   if (!guard.ok) {
     return NextResponse.json({ error: guard.reason }, { status: 409 });
@@ -37,7 +38,7 @@ export async function DELETE(
     .from("progress_photos")
     .select("storage_path")
     .eq("profile_id", params.clientId);
-  const paths = ((rawPhotos ?? []) as unknown as { storage_path: string }[]).map((p) => p.storage_path);
+  const paths = (rawPhotos ?? []).map((p) => p.storage_path);
   if (paths.length > 0) {
     await admin.storage.from("progress").remove(paths);
   }
@@ -45,7 +46,7 @@ export async function DELETE(
   // Borrar el auth.user -> cascadea profiles y el resto (migración 007).
   const { error } = await admin.auth.admin.deleteUser(params.clientId);
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: logAndGeneric("deleteClient", error) }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

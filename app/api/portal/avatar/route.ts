@@ -37,8 +37,7 @@ export async function POST(req: Request) {
   // Cache-bust: la ruta es fija (upsert), así el navegador no sirve la versión vieja.
   const url = `${pub.publicUrl}?v=${Date.now()}`;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: dbError } = await (admin as any)
+  const { error: dbError } = await admin
     .from("profiles")
     .update({ avatar_url: url })
     .eq("id", user.id);

@@ -46,7 +46,7 @@ export default async function QuestionnairePage() {
         <p className="text-sm mb-6" style={{ color: "var(--gris-texto)" }}>
           Aura personalizará tu experiencia con tus respuestas.
         </p>
-        <QuestionnaireForm questions={questions} profileId={user.id} />
+        <QuestionnaireForm questions={questions} />
       </div>
     </div>
   );

@@ -23,10 +23,11 @@ export async function hasPillarsAccess(userId: string): Promise<boolean> {
     .from("subscriptions")
     .select("program_variants!inner ( programs!inner ( slug ) )")
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES as readonly string[])
+    .in("status", ACCESS_STATES)
     .single();
 
-  const sub = rawSub as unknown as { program_variants: { programs: { slug: string } } } | null;
+  // keep: subscriptions JOIN program_variants!inner JOIN programs!inner — nested join not inferred.
+  const sub = rawSub as { program_variants: { programs: { slug: string } } } | null;
   return !!sub && ALLOWED.has(sub.program_variants.programs.slug);
 }
 
@@ -38,10 +39,11 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
     .select(`months_elapsed, program_variant_id,
       program_variants!inner ( program_id, programs!inner ( slug ) )`)
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES as readonly string[])
+    .in("status", ACCESS_STATES)
     .single();
 
-  const sub = rawSub as unknown as {
+  // keep: subscriptions JOIN program_variants!inner JOIN programs!inner — nested join not inferred.
+  const sub = rawSub as {
     months_elapsed: number;
     program_variant_id: string;
     program_variants: { program_id: string; programs: { slug: string } };
@@ -53,7 +55,8 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
     .from("variant_series_map")
     .select("series_id, program_series!inner ( series_number )")
     .eq("program_variant_id", sub.program_variant_id);
-  const map = rawMap as unknown as { series_id: string; program_series: { series_number: number } }[] | null;
+  // keep: variant_series_map JOIN program_series!inner — nested join not inferred.
+  const map = rawMap as { series_id: string; program_series: { series_number: number } }[] | null;
   const seriesEntry = map?.find((m) => m.program_series.series_number === sub.months_elapsed);
   if (!seriesEntry) return [];
 
@@ -63,7 +66,8 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
     .eq("series_id", seriesEntry.series_id)
     .eq("published", true)
     .order("sort_order");
-  const pillars = (rawPillars as unknown as { id: string; pillar_key: string; title: string }[]) ?? [];
+  // SDK types the simple select; cast to local interface (no "blocks" field yet).
+  const pillars = (rawPillars as { id: string; pillar_key: string; title: string }[]) ?? [];
   if (pillars.length === 0) return [];
 
   const { data: rawBlocks } = await supabase
@@ -71,14 +75,9 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
     .select("id, pillar_id, block_type, sort_order, content")
     .in("pillar_id", pillars.map((p) => p.id))
     .order("sort_order");
-  const blocks =
-    (rawBlocks as unknown as {
-      id: string;
-      pillar_id: string;
-      block_type: string;
-      sort_order: number;
-      content: Record<string, unknown>;
-    }[]) ?? [];
+  // SDK types the simple select; cast to local interface (content is Json in DB, Record here).
+  type PillarBlock = { id: string; pillar_id: string; block_type: string; sort_order: number; content: Record<string, unknown> };
+  const blocks = (rawBlocks as PillarBlock[]) ?? [];
 
   return pillars.map((p) => ({
     ...p,

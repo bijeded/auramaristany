@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ProgressLog } from "@/lib/content/queries";
 
 export interface ExerciseSeriesEntry {
@@ -79,6 +80,7 @@ export function useProgressForm({
     existingLog?.general_notes ?? ""
   );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const router = useRouter();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef({ exercises, generalNotes });
@@ -104,11 +106,19 @@ export function useProgressForm({
           completed,
         }),
       });
-      setSaveStatus(res.ok ? "saved" : "error");
+      if (res.ok) {
+        setSaveStatus("saved");
+        // Invalida la Router Cache de Next: al volver a /portal/today por
+        // navegación interna, el RSC se re-renderiza con el existingLog recién
+        // guardado (si no, se servía el payload cacheado con el form en blanco).
+        router.refresh();
+      } else {
+        setSaveStatus("error");
+      }
     } catch {
       setSaveStatus("error");
     }
-  }, [dayId, subscriptionId]);
+  }, [dayId, subscriptionId, router]);
 
   const scheduleSave = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

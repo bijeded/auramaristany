@@ -14,11 +14,12 @@ export async function getActiveSubscriptions(): Promise<FinanceSubRow[]> {
     .select("current_period_end, program_variants(name, price_mxn)")
     .eq("status", "active");
 
+  // keep: subscriptions JOIN program_variants — nested join shape not inferred by SDK.
   type Raw = {
     current_period_end: string | null;
     program_variants: { name: string; price_mxn: number } | null;
   };
-  return ((data ?? []) as unknown as Raw[])
+  return ((data ?? []) as Raw[])
     .filter((r) => r.program_variants)
     .map((r) => ({
       current_period_end: r.current_period_end,
@@ -37,12 +38,13 @@ export async function getPaidInvoices(monthsBack = 12): Promise<FinanceInvoiceRo
     .eq("status", "paid")
     .gte("invoice_date", cutoff.toISOString());
 
+  // keep: invoices JOIN subscriptions JOIN program_variants JOIN programs — nested join not inferred.
   type Raw = {
     amount_paid: number;
     invoice_date: string;
     subscriptions: { program_variants: { programs: { name: string } | null } | null } | null;
   };
-  return ((data ?? []) as unknown as Raw[]).map((r) => ({
+  return ((data ?? []) as Raw[]).map((r) => ({
     amount_paid: r.amount_paid,
     invoice_date: r.invoice_date,
     program_name: r.subscriptions?.program_variants?.programs?.name ?? "—",
@@ -66,6 +68,7 @@ export async function getRecentPayments(limit = 10): Promise<RecentPaymentRow[]>
     .order("invoice_date", { ascending: false })
     .limit(limit);
 
+  // keep: invoices JOIN subscriptions JOIN profiles JOIN program_variants JOIN programs — nested join not inferred.
   type Raw = {
     amount_paid: number;
     invoice_date: string;
@@ -75,7 +78,7 @@ export async function getRecentPayments(limit = 10): Promise<RecentPaymentRow[]>
       program_variants: { programs: { name: string } | null } | null;
     } | null;
   };
-  return ((data ?? []) as unknown as Raw[]).map((r) => ({
+  return ((data ?? []) as Raw[]).map((r) => ({
     invoice_date: r.invoice_date,
     client_name: r.subscriptions?.profiles?.full_name ?? "—",
     program_name: r.subscriptions?.program_variants?.programs?.name ?? "—",
@@ -93,6 +96,7 @@ export async function getAllPayments(): Promise<PaymentRow[]> {
     )
     .order("invoice_date", { ascending: false });
 
+  // keep: invoices JOIN subscriptions JOIN profiles JOIN program_variants JOIN programs — nested join not inferred.
   type Raw = {
     amount_paid: number;
     invoice_date: string;
@@ -103,7 +107,7 @@ export async function getAllPayments(): Promise<PaymentRow[]> {
       program_variants: { name: string; programs: { name: string } | null } | null;
     } | null;
   };
-  return ((data ?? []) as unknown as Raw[]).map((r) => ({
+  return ((data ?? []) as Raw[]).map((r) => ({
     invoice_date: r.invoice_date,
     profile_id: r.subscriptions?.profile_id ?? null,
     client_name: r.subscriptions?.profiles?.full_name ?? "—",

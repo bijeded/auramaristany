@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { submitOnboarding } from "@/lib/onboarding/responsesActions";
 
 interface Question {
   id: string;
@@ -15,10 +15,8 @@ interface Question {
 
 export function QuestionnaireForm({
   questions,
-  profileId,
 }: {
   questions: Question[];
-  profileId: string;
 }) {
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -53,32 +51,12 @@ export function QuestionnaireForm({
     }
 
     setLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase = createClient() as any;
-
-    const { error: upsertError } = await supabase.from("onboarding_responses").upsert({
-      profile_id: profileId,
-      responses: answers,
-      completed_at: new Date().toISOString(),
-    });
-
-    if (upsertError) {
-      setError("Error al guardar tus respuestas. Intenta de nuevo.");
+    const result = await submitOnboarding(answers);
+    if (!result.ok) {
+      setError(result.error);
       setLoading(false);
       return;
     }
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ onboarding_completed: true })
-      .eq("id", profileId);
-
-    if (updateError) {
-      setError("Error al actualizar tu perfil. Intenta de nuevo.");
-      setLoading(false);
-      return;
-    }
-
     router.push("/portal/today");
     router.refresh();
   }

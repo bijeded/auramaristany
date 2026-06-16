@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { upsertProgressLog } from "@/lib/content/queries";
+import { upsertProgressLog, getAccessSubscriptionId } from "@/lib/content/queries";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -13,17 +13,21 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { dayId, subscriptionId, exercisesDone, generalNotes, completed } =
-    body as {
-      dayId: string;
-      subscriptionId: string;
-      exercisesDone: Record<string, unknown>;
-      generalNotes: string;
-      completed: boolean;
-    };
+  // subscriptionId del body se IGNORA deliberadamente (EDGE-5): se deriva del server.
+  const { dayId, exercisesDone, generalNotes, completed } = body as {
+    dayId: string;
+    exercisesDone: Record<string, unknown>;
+    generalNotes: string;
+    completed: boolean;
+  };
 
-  if (!dayId || !subscriptionId) {
+  if (!dayId) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  const subscriptionId = await getAccessSubscriptionId(user.id);
+  if (!subscriptionId) {
+    return NextResponse.json({ error: "No active subscription" }, { status: 400 });
   }
 
   const result = await upsertProgressLog({

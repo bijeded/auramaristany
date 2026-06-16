@@ -84,7 +84,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
     .from("subscriptions")
     .select("status, enrollment_date, current_period_end, months_elapsed, program_variants(name, price_mxn, programs(name, duration_months))")
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES as unknown as string[])
+    .in("status", ACCESS_STATES)
     .order("enrollment_date", { ascending: false });
 
   const { data: invoiceRows } = await supabase
@@ -100,7 +100,9 @@ export async function getAccountData(userId: string): Promise<AccountData> {
       phone: p.phone ?? null,
       avatar_url: p.avatar_url ?? null,
     },
-    subscription: mapSubscription(subRows as unknown as RawSub[] | null),
-    invoices: mapInvoices(invoiceRows as unknown as RawInvoice[] | null),
+    // keep: subscriptions JOIN program_variants JOIN programs — nested join shape not inferred.
+    subscription: mapSubscription(subRows as RawSub[] | null),
+    // keep: invoices JOIN subscriptions JOIN program_variants JOIN programs — nested join not inferred.
+    invoices: mapInvoices(invoiceRows as RawInvoice[] | null),
   };
 }

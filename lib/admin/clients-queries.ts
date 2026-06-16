@@ -2,6 +2,7 @@ import "server-only";
 import { requireAdmin } from "./auth";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { SIGNED_URL_TTL_SECONDS } from "@/lib/storage/signed-url";
 import {
   pickPrimarySubscription,
   canDeleteClient,
@@ -31,7 +32,8 @@ export async function getClientsList(): Promise<ClientListRow[]> {
       "profile_id, status, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone), program_variants(name, price_mxn, programs(name))"
     );
 
-  const rows = ((data ?? []) as unknown as RawSubRow[]).filter(
+  // keep: subscriptions JOIN profiles JOIN program_variants JOIN programs — nested join not inferred.
+  const rows = ((data ?? []) as RawSubRow[]).filter(
     (r) => r.profiles && r.program_variants
   );
 
@@ -104,7 +106,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     .select("id, full_name, email, phone, avatar_url")
     .eq("id", clientId)
     .maybeSingle();
-  const profile = rawProfile as unknown as ClientDetail["profile"] | null;
+  // SDK types the simple select; cast to ClientDetail["profile"] for the local interface.
+  const profile = rawProfile as ClientDetail["profile"] | null;
   if (!profile) return null;
 
   // Suscripciones
@@ -120,7 +123,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     id: string; status: SubStatus; enrollment_date: string; current_period_end: string | null; months_elapsed: number;
     program_variants: { name: string; price_mxn: number; programs: { name: string; billing_model: string; duration_months: number | null } | null } | null;
   };
-  const subscriptions: ClientSubscription[] = ((rawSubs ?? []) as unknown as RawSub[])
+  // keep: subscriptions JOIN program_variants JOIN programs — nested join not inferred.
+  const subscriptions: ClientSubscription[] = ((rawSubs ?? []) as RawSub[])
     .filter((s) => s.program_variants)
     .map((s) => ({
       id: s.id,
@@ -148,8 +152,10 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     .maybeSingle();
 
   type Q = { id: string; question_text: string };
-  const responses = ((rawResp as unknown as { responses: Record<string, unknown> } | null)?.responses) ?? {};
-  const onboarding: OnboardingAnswer[] = ((rawQuestions ?? []) as unknown as Q[]).map((q) => {
+  // SDK types responses as Json; cast to Record<string,unknown> for iteration.
+  const responses = ((rawResp as { responses: Record<string, unknown> } | null)?.responses) ?? {};
+  // SDK types the simple select; cast to Q for local clarity.
+  const onboarding: OnboardingAnswer[] = ((rawQuestions ?? []) as Q[]).map((q) => {
     const v = responses[q.id];
     const answer = Array.isArray(v) ? v.join(" · ") : v == null || v === "" ? "—" : String(v);
     return { question: q.question_text, answer };
@@ -162,7 +168,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     .eq("profile_id", clientId)
     .order("log_date", { ascending: false });
   type RawLog = { log_date: string; completed: boolean; exercises_done: ExercisesDone | null; program_days: { title: string; workout_focus: string | null } | null };
-  const progress: ProgressEntry[] = ((rawLogs ?? []) as unknown as RawLog[]).map((l) => ({
+  // keep: progress_logs JOIN program_days — nested join shape not inferred.
+  const progress: ProgressEntry[] = ((rawLogs ?? []) as RawLog[]).map((l) => ({
     date: l.log_date,
     title: l.program_days?.title ?? "Día",
     focus: l.program_days?.workout_focus ?? null,
@@ -179,8 +186,9 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   type RawPhoto = { id: string; storage_path: string; taken_at: string; caption: string | null };
   const service = createServiceClient();
   const photos: ClientPhoto[] = [];
-  for (const p of (rawPhotos ?? []) as unknown as RawPhoto[]) {
-    const { data: signed } = await service.storage.from("progress").createSignedUrl(p.storage_path, 3600);
+  // SDK types the simple select; cast to RawPhoto for local interface clarity.
+  for (const p of (rawPhotos ?? []) as RawPhoto[]) {
+    const { data: signed } = await service.storage.from("progress").createSignedUrl(p.storage_path, SIGNED_URL_TTL_SECONDS);
     if (signed?.signedUrl) {
       photos.push({ id: p.id, url: signed.signedUrl, photoDate: p.taken_at, caption: p.caption });
     }
@@ -193,7 +201,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     .eq("subscriptions.profile_id", clientId)
     .order("invoice_date", { ascending: false });
   type RawInv = { amount_paid: number; invoice_date: string; status: string };
-  const payments: PaymentEntry[] = ((rawInvoices ?? []) as unknown as RawInv[]).map((i) => ({
+  // keep: invoices JOIN subscriptions!inner (profile_id filter) — join shape not inferred.
+  const payments: PaymentEntry[] = ((rawInvoices ?? []) as RawInv[]).map((i) => ({
     date: i.invoice_date,
     amount: i.amount_paid,
     status: i.status,
@@ -205,7 +214,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     .select("read_at, messages(id, subject, created_at)")
     .eq("recipient_id", clientId);
   type RawMsg = { read_at: string | null; messages: { id: string; subject: string; created_at: string } | null };
-  const messages: ClientMessage[] = ((rawMsgs ?? []) as unknown as RawMsg[])
+  // keep: message_recipients JOIN messages — nested join shape not inferred.
+  const messages: ClientMessage[] = ((rawMsgs ?? []) as RawMsg[])
     .filter((m) => m.messages)
     .map((m) => ({ id: m.messages!.id, subject: m.messages!.subject, createdAt: m.messages!.created_at, readAt: m.read_at }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

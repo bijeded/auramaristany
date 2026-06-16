@@ -26,6 +26,17 @@ describe("toDayOfWeek", () => {
     const d = new Date("2026-06-08T12:00:00Z"); // Monday
     expect(toDayOfWeek(d)).toBe("lunes");
   });
+
+  it("usa UTC: 2026-06-08T02:00:00Z (madrugada) sigue siendo lunes", () => {
+    const d = new Date("2026-06-08T02:00:00Z"); // lunes en UTC
+    expect(toDayOfWeek(d)).toBe("lunes");
+  });
+
+  it("usa UTC: instante con offset que cae en lunes UTC", () => {
+    // 2026-06-07T20:00:00-06:00 === 2026-06-08T02:00:00Z (lunes UTC)
+    const d = new Date("2026-06-07T20:00:00-06:00");
+    expect(toDayOfWeek(d)).toBe("lunes");
+  });
 });
 
 describe("getCurrentDayKey", () => {
@@ -66,10 +77,11 @@ describe("getCurrentDayKey", () => {
   });
 
   it("returns the correct day_of_week for today", () => {
-    // PERIOD_START is Monday 2026-06-02; day 2 = Wednesday
+    // PERIOD_START is Tuesday 2026-06-02 (UTC); day +2 = 2026-06-04 = Thursday
+    // Uses getUTCDay() to align with Date.UTC week computation (EDGE-3).
     const today = daysAfter(PERIOD_START, 2);
     const key = getCurrentDayKey(PERIOD_START, today);
-    expect(key.day_of_week).toBe("miercoles");
+    expect(key.day_of_week).toBe("jueves");
   });
 
   it("never returns week_number < 1 when today is before period start", () => {

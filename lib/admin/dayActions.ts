@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "./auth";
 import { validateDayInput, validateBlock } from "./content-validation";
 import { sanitizeRichText } from "./sanitize-html";
+import { logAndGeneric } from "./errors";
+import type { Json } from "@/lib/supabase/types";
 
 export interface SaveDayInput {
   id?: string;
@@ -38,17 +40,15 @@ export async function saveDay(data: SaveDayInput): Promise<{ dayId: string; erro
   };
 
   if (data.id) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: updated, error } = await (supabase as any)
+    const { data: updated, error } = await supabase
       .from("program_days").update(row).eq("id", data.id).select("id").single();
-    if (error) return { dayId: data.id, error: error.message };
-    return { dayId: updated.id };
+    if (error) return { dayId: data.id, error: logAndGeneric("saveDay.update", error) };
+    return { dayId: updated!.id };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: inserted, error } = await (supabase as any)
+  const { data: inserted, error } = await supabase
     .from("program_days").insert(row).select("id").single();
-  if (error) return { dayId: "", error: error.message };
+  if (error) return { dayId: "", error: logAndGeneric("saveDay.insert", error) };
   return { dayId: inserted.id };
 }
 
@@ -61,29 +61,29 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   for (const b of blocks) {
     const v = validateBlock(b);
     if (!v.ok) return { error: v.error };
   }
 
-  const { error: delError } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
-  if (delError) return { error: delError.message };
+  const { error: delError } = await supabase.from("program_day_blocks").delete().eq("day_id", dayId);
+  if (delError) return { error: logAndGeneric("saveBlocks.delete", delError) };
 
   if (blocks.length > 0) {
     const rows = blocks.map((b, i) => ({
       day_id: dayId,
       block_type: b.block_type,
       sort_order: i,
-      content:
+      // content is Record<string,unknown> at the interface boundary; cast to Json for the DB insert.
+      content: (
         b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
           ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
-          : b.content,
+          : b.content
+      ) as Json,
     }));
-    const { error: insError } = await client.from("program_day_blocks").insert(rows);
-    if (insError) return { error: insError.message };
+    const { error: insError } = await supabase.from("program_day_blocks").insert(rows);
+    if (insError) return { error: logAndGeneric("saveBlocks.insert", insError) };
   }
 
   revalidatePath("/portal/today");
@@ -94,12 +94,10 @@ export async function deleteDay(dayId: string): Promise<{ error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
-  const { error: blockErr } = await client.from("program_day_blocks").delete().eq("day_id", dayId);
-  if (blockErr) return { error: blockErr.message };
-  const { error } = await client.from("program_days").delete().eq("id", dayId);
-  if (error) return { error: error.message };
+  const { error: blockErr } = await supabase.from("program_day_blocks").delete().eq("day_id", dayId);
+  if (blockErr) return { error: logAndGeneric("deleteDay.blocks", blockErr) };
+  const { error } = await supabase.from("program_days").delete().eq("id", dayId);
+  if (error) return { error: logAndGeneric("deleteDay", error) };
   revalidatePath("/admin/content");
   return {};
 }
@@ -112,20 +110,18 @@ export async function cloneDay(
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
 
   // 1. Leer el día origen + sus bloques
-  const { data: src } = await client.from("program_days")
+  const { data: src } = await supabase.from("program_days")
     .select("week_number, day_of_week, workout_focus, title, description, day_type, duration_minutes, published")
     .eq("id", sourceDayId).single();
   if (!src) return { error: "Día origen no encontrado" };
 
-  const { data: srcBlocks } = await client.from("program_day_blocks")
+  const { data: srcBlocks } = await supabase.from("program_day_blocks")
     .select("block_type, sort_order, content").eq("day_id", sourceDayId).order("sort_order");
 
   // 2. ¿Existe ya un día en la celda destino?
-  const { data: existing } = await client.from("program_days")
+  const { data: existing } = await supabase.from("program_days")
     .select("id").eq("series_id", target.seriesId)
     .eq("week_number", target.weekNumber).eq("day_of_week", target.dayOfWeek).maybeSingle();
 
@@ -133,7 +129,7 @@ export async function cloneDay(
   if (existing) { await deleteDay(existing.id); }
 
   // 3. Insertar el día clonado
-  const { data: newDay, error } = await client.from("program_days").insert({
+  const { data: newDay, error } = await supabase.from("program_days").insert({
     series_id: target.seriesId,
     week_number: target.weekNumber,
     day_of_week: target.dayOfWeek,
@@ -144,13 +140,13 @@ export async function cloneDay(
     duration_minutes: src.duration_minutes,
     published: src.published,
   }).select("id").single();
-  if (error) return { error: error.message };
+  if (error) return { error: logAndGeneric("cloneDay", error) };
 
   // 4. Clonar bloques
   if (srcBlocks && srcBlocks.length > 0) {
-    await client.from("program_day_blocks").insert(
-      srcBlocks.map((b: { block_type: string; sort_order: number; content: unknown }) => ({
-        day_id: newDay.id, block_type: b.block_type, sort_order: b.sort_order, content: b.content,
+    await supabase.from("program_day_blocks").insert(
+      srcBlocks.map((b) => ({
+        day_id: newDay!.id, block_type: b.block_type, sort_order: b.sort_order, content: b.content,
       }))
     );
   }
@@ -164,12 +160,11 @@ export async function cloneWeek(
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: days } = await (supabase as any).from("program_days")
+  const { data: days } = await supabase.from("program_days")
     .select("id, day_of_week").eq("series_id", seriesId).eq("week_number", sourceWeek);
   if (!days || days.length === 0) return { error: "La semana origen no tiene días" };
 
-  for (const d of days as { id: string; day_of_week: string }[]) {
+  for (const d of days) {
     const res = await cloneDay(d.id, { seriesId, weekNumber: targetWeek, dayOfWeek: d.day_of_week }, overwrite);
     if (res.error) return { error: res.error };
   }

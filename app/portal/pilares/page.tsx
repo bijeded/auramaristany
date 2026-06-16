@@ -2,16 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMonthPillars } from "@/lib/content/pillars";
 import { PillarsView } from "@/components/portal/PillarsView";
-
-function formatDate(isoDate: string): string {
-  // T12:00:00 avoids midnight-UTC → prior-day in negative-offset timezones
-  const str = new Date(`${isoDate}T12:00:00`).toLocaleDateString("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+import { weekdayLabel } from "@/lib/admin/date-helpers";
 
 export default async function PilaresPage() {
   const supabase = await createClient();
@@ -28,5 +19,5 @@ export default async function PilaresPage() {
   )
     .toISOString()
     .split("T")[0];
-  return <PillarsView pillars={pillars} dateLabel={formatDate(isoToday)} />;
+  return <PillarsView pillars={pillars} dateLabel={weekdayLabel(isoToday)} />;
 }

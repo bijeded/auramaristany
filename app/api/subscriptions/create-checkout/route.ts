@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { stripe } from "@/lib/stripe";
 import { checkPrerequisites } from "@/lib/subscriptions/prerequisites";
 import type { PrerequisiteRow, ClientSubscription } from "@/lib/subscriptions/prerequisites";
@@ -32,9 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "variantSlug requerido" }, { status: 400 });
   }
 
-  const service = createServiceClient();
-
-  const { data: variantRaw } = await service
+  const { data: variantRaw } = await supabase
     .from("program_variants")
     .select("id, name, stripe_price_id")
     .eq("slug", variantSlug)
@@ -47,23 +44,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Variante no encontrada" }, { status: 404 });
   }
 
-  const { data: prereqRows } = await service
+  const { data: prereqRows } = await supabase
     .from("program_variant_prerequisites")
     .select("prerequisite_group, required_program_slug, required_variant_levels, required_status")
     .eq("program_variant_id", variant.id);
 
   if (prereqRows && prereqRows.length > 0) {
-    const { data: clientSubs } = await service
+    const { data: clientSubs } = await supabase
       .from("subscriptions")
       .select("status, program_variants(level, programs(slug))")
       .eq("profile_id", user.id)
       .in("status", ["active", "completed"]);
 
-    const clientSubsTyped =
-      (clientSubs as unknown as {
-        status: string;
-        program_variants?: { level: string | null; programs?: { slug: string } | null } | null;
-      }[]) ?? [];
+    // keep: subscriptions JOIN program_variants+programs — Supabase SDK with bespoke DB type
+    // (no Relationships) can't infer nested join shape; local interface cast is necessary.
+    type ClientSubRaw = {
+      status: string;
+      program_variants?: { level: string | null; programs?: { slug: string } | null } | null;
+    };
+    const clientSubsTyped = (clientSubs as ClientSubRaw[]) ?? [];
     const mapped: ClientSubscription[] = clientSubsTyped.map((s) => ({
       program_slug: s.program_variants?.programs?.slug ?? "",
       variant_level: s.program_variants?.level ?? null,
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: profileRaw } = await service
+  const { data: profileRaw } = await supabase
     .from("profiles")
     .select("stripe_customer_id, full_name, email")
     .eq("id", user.id)
@@ -96,13 +95,8 @@ export async function POST(request: NextRequest) {
       metadata: { supabase_user_id: user.id },
     });
     customerId = customer.id;
-    await (
-      service.from("profiles") as unknown as {
-        update: (values: { stripe_customer_id: string }) => {
-          eq: (column: string, value: string) => Promise<unknown>;
-        };
-      }
-    )
+    await supabase
+      .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
   }

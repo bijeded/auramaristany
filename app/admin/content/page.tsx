@@ -4,7 +4,7 @@ import { getAdminPrograms } from "@/lib/admin/queries";
 
 const BILLING_LABELS: Record<string, string> = {
   fixed_term_monthly: "Plazo fijo mensual",
-  ongoing_monthly: "Mensual recurrente",
+  rolling_monthly: "Mensual recurrente",
 };
 
 export default async function AdminContentPage() {

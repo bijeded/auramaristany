@@ -47,7 +47,8 @@ export default function ActivandoPage() {
           .eq("id", user.id)
           .single();
 
-        const profile = rawProfile as unknown as { onboarding_completed: boolean } | null;
+        // rawProfile typed by client's DB type; profile.onboarding_completed is boolean.
+        const profile = rawProfile;
 
         router.replace(
           profile?.onboarding_completed ? "/portal/today" : "/onboarding/questionnaire"
