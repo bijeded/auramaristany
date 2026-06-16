@@ -14,7 +14,7 @@ export default async function AdminProgramPage({
 
   if (!result) notFound();
 
-  const { program, series } = result;
+  const { program, series, variants } = result;
 
   return (
     <div className="p-8 max-w-4xl">
@@ -79,6 +79,7 @@ export default async function AdminProgramPage({
               programId={programId}
               programSlug={program.slug}
               defaultOpen={i === series.length - 1}
+              variants={variants}
             />
           ))}
         </div>
