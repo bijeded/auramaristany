@@ -40,3 +40,6 @@ next-env.d.ts
 
 # supabase CLI local state (project ref, pooler url — no commitear)
 supabase/.temp/
+
+# playwright MCP artifacts
+.playwright-mcp/
