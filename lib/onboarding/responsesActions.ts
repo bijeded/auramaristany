@@ -26,11 +26,9 @@ export async function submitOnboarding(
   if (!check.ok) return check;
 
   // profileId SIEMPRE = user.id (se ignora cualquier valor del cliente).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
-  const { error: upsertError } = await client.from("onboarding_responses").upsert({
+  const { error: upsertError } = await supabase.from("onboarding_responses").upsert({
     profile_id: user.id,
-    responses,
+    responses: responses as import("@/lib/supabase/types").Json,
     completed_at: new Date().toISOString(),
   });
   if (upsertError) {
@@ -38,7 +36,7 @@ export async function submitOnboarding(
     return { ok: false, error: GENERIC_ERROR };
   }
 
-  const { error: updateError } = await client
+  const { error: updateError } = await supabase
     .from("profiles")
     .update({ onboarding_completed: true })
     .eq("id", user.id);

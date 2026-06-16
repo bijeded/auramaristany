@@ -21,8 +21,7 @@ export async function updateAccount(input: { fullName: string; phone: string }):
   const phoneCheck = validatePhone(input.phone);
   if (!phoneCheck.ok) return { ok: false, error: phoneCheck.error! };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from("profiles")
     .update({ full_name: fullName, phone: phoneCheck.normalized })
     .eq("id", user.id);

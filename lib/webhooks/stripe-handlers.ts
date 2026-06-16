@@ -12,7 +12,9 @@ import {
 type ItemPeriod = { current_period_start?: number; current_period_end?: number };
 
 function readPeriod(subscription: Stripe.Subscription) {
-  const item = subscription.items.data[0] as unknown as ItemPeriod | undefined;
+  // keep: Stripe SDK SubscriptionItem type doesn't expose current_period_* in TypeScript
+  // definitions (moved to item level in 2026+ API); reading defensively via local interface.
+  const item = subscription.items.data[0] as ItemPeriod | undefined;
   return {
     current_period_start: item?.current_period_start
       ? new Date(item.current_period_start * 1000).toISOString()
@@ -37,28 +39,29 @@ export function computeMonthsUpdate(
   return { newMonthsElapsed, shouldComplete };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyClient = any;
+type ServiceClient = ReturnType<typeof createServiceClient>;
 
-async function getProfileContact(supabase: AnyClient, profileId: string): Promise<{ email: string; name: string } | null> {
+async function getProfileContact(supabase: ServiceClient, profileId: string): Promise<{ email: string; name: string } | null> {
   const { data } = await supabase.from("profiles").select("email, full_name").eq("id", profileId).single();
   if (!data?.email) return null;
   return { email: data.email, name: data.full_name ?? "" };
 }
 
-async function getContactBySubscription(supabase: AnyClient, stripeSubscriptionId: string): Promise<{ email: string; name: string } | null> {
+async function getContactBySubscription(supabase: ServiceClient, stripeSubscriptionId: string): Promise<{ email: string; name: string } | null> {
   const { data } = await supabase
     .from("subscriptions")
     .select("profiles(email, full_name)")
     .eq("stripe_subscription_id", stripeSubscriptionId)
     .single();
-  const p = data?.profiles as { email: string; full_name: string | null } | null;
+  // keep: subscriptions JOIN profiles — nested join shape not inferred by SDK without Relationships.
+  type SubProfile = { profiles: { email: string; full_name: string | null } | null };
+  const p = (data as SubProfile | null)?.profiles;
   if (!p?.email) return null;
   return { email: p.email, name: p.full_name ?? "" };
 }
 
 export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const supabase: AnyClient = createServiceClient();
+  const supabase = createServiceClient();
   const { supabase_user_id, variant_id } = session.metadata ?? {};
 
   if (!supabase_user_id || !variant_id) {
@@ -149,7 +152,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
       console.error("[webhook] invoice.paid (create): no subscription id", invoice.id);
       return;
     }
-    const supabase: AnyClient = createServiceClient();
+    const supabase = createServiceClient();
     const { data: sub } = await supabase
       .from("subscriptions")
       .select("id")
@@ -167,18 +170,26 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return;
   }
 
-  const supabase: AnyClient = createServiceClient();
+  const supabase = createServiceClient();
 
-  const { data: sub, error } = await supabase
+  const { data: rawSub, error } = await supabase
     .from("subscriptions")
     .select("id, months_elapsed, program_variants(programs(billing_model, duration_months))")
     .eq("stripe_subscription_id", subscriptionId)
     .single();
 
-  if (error || !sub) {
+  if (error || !rawSub) {
     console.error("[webhook] invoice.paid: subscription not found", subscriptionId);
     return;
   }
+
+  // keep: subscriptions JOIN program_variants JOIN programs — nested join shape not inferred by SDK.
+  type SubWithVariant = {
+    id: string;
+    months_elapsed: number;
+    program_variants: { programs: { billing_model: string; duration_months: number | null } | null } | null;
+  };
+  const sub = rawSub as SubWithVariant;
 
   await recordInvoice(invoice, sub.id);
 
@@ -189,8 +200,9 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
     program?.duration_months ?? null
   );
 
-  const updatePayload: Record<string, unknown> = { months_elapsed: newMonthsElapsed };
-  if (shouldComplete) updatePayload.completed_at = new Date().toISOString();
+  const updatePayload = shouldComplete
+    ? { months_elapsed: newMonthsElapsed, completed_at: new Date().toISOString() }
+    : { months_elapsed: newMonthsElapsed };
 
   const { error: updateError } = await supabase
     .from("subscriptions")
@@ -202,7 +214,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
 async function recordInvoice(invoice: Stripe.Invoice, subscriptionDbId?: string) {
   if (!subscriptionDbId) return;
-  const supabase: AnyClient = createServiceClient();
+  const supabase = createServiceClient();
   // Idempotente: checkout.session.completed e invoice.paid pueden intentar registrar
   // el mismo primer invoice; la constraint UNIQUE stripe_invoice_id + ignoreDuplicates
   // evita duplicados y errores en la carrera de eventos (G4).
@@ -220,13 +232,15 @@ async function recordInvoice(invoice: Stripe.Invoice, subscriptionDbId?: string)
 }
 
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  const supabase: AnyClient = createServiceClient();
+  const supabase = createServiceClient();
   // Re-source the billing period from subscription items (Stripe API 2026+) so renewals stay fresh.
   const { current_period_start, current_period_end } = readPeriod(subscription);
   const { error } = await supabase
     .from("subscriptions")
     .update({
-      status: subscription.status,
+      // keep: Stripe Subscription.Status includes statuses ("incomplete", "incomplete_expired")
+      // not in our SubscriptionStatus union; mapping via cast as the DB stores them as-is.
+      status: subscription.status as import("@/lib/supabase/types").SubscriptionStatus,
       cancel_at_period_end: subscription.cancel_at_period_end,
       current_period_start,
       current_period_end,
@@ -237,7 +251,7 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
 }
 
 export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const supabase: AnyClient = createServiceClient();
+  const supabase = createServiceClient();
   const { error } = await supabase
     .from("subscriptions")
     .update({ status: "canceled" })
@@ -256,7 +270,7 @@ export async function handlePaymentFailed(invoice: Stripe.Invoice) {
     return;
   }
 
-  const supabase: AnyClient = createServiceClient();
+  const supabase = createServiceClient();
   const { error } = await supabase
     .from("subscriptions")
     .update({ status: "past_due" })
