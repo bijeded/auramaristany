@@ -11,7 +11,7 @@ import { paginate } from "@/lib/admin/pagination";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Con pago fallido"];
+const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas"];
 const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
@@ -61,7 +61,7 @@ export function ClientsTable({ rows }: { rows: ClientListRow[] }) {
 
   return (
     <div style={{ padding: "28px 32px 40px", maxWidth: 1040 }}>
-      <div className="flex items-end justify-between" style={{ marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
+      <div className="flex items-center justify-between" style={{ marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
         <h1 className="font-head" style={{ fontSize: 28, fontWeight: 700 }}>
           Clientes <span style={{ fontSize: 17, color: "var(--gris-texto)", fontWeight: 400 }}>({activas} activas)</span>
         </h1>

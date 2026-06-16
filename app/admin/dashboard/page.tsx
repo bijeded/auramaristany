@@ -56,13 +56,13 @@ export default async function AdminDashboardPage() {
   const clientsByVariant = groupClientsByVariant(activeSubs);
   const revenueByProgram = groupRevenueByProgram(invoices);
   const maxClients = Math.max(1, ...clientsByVariant.map((p) => p.count));
-  const rawMonth = now.toLocaleDateString("es-MX", { month: "long", year: "numeric" }); // "junio de 2026"
-  const monthLabel = rawMonth.charAt(0).toUpperCase() + rawMonth.slice(1); // "Junio de 2026"
+  const dayMonth = now.toLocaleDateString("es-MX", { day: "numeric", month: "long" }); // "16 de junio"
+  const dateLabel = `${dayMonth}, ${now.getFullYear()}`; // "16 de junio, 2026"
 
   return (
     <div style={{ padding: "28px 32px 40px", maxWidth: 1000 }}>
       <h1 className="font-head" style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Dashboard</h1>
-      <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13, marginBottom: 20 }}>{monthLabel}</p>
+      <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13, marginBottom: 20 }}>{dateLabel}</p>
 
       {/* KPIs */}
       <div className="flex" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>

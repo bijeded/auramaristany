@@ -41,9 +41,9 @@ describe("filterClients", () => {
     const r = filterClients(rows, { query: "", program: "Todas", status: "Vencidas" });
     expect(r.map((x) => x.profile_id)).toEqual(["p2"]);
   });
-  it("filtra 'Con pago fallido' por past_due", () => {
-    const r = filterClients(rows, { query: "", program: "Todas", status: "Con pago fallido" });
-    expect(r.map((x) => x.profile_id)).toEqual(["p2"]);
+  it("filtra 'Canceladas' por canceled", () => {
+    const r = filterClients(rows, { query: "", program: "Todas", status: "Canceladas" });
+    expect(r.map((x) => x.profile_id)).toEqual(["p3"]);
   });
 });
 

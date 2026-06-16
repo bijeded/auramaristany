@@ -1,6 +1,6 @@
 export type SubStatus = "active" | "past_due" | "canceled" | "unpaid";
 
-export type StatusFilter = "Activas" | "Vencidas" | "Con pago fallido" | null;
+export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | null;
 
 export interface ClientListRow {
   profile_id: string;
@@ -25,7 +25,7 @@ export function filterClients(
     if (opts.program !== "Todas" && r.program_name !== opts.program) return false;
     if (opts.status === "Activas" && r.status !== "active") return false;
     if (opts.status === "Vencidas" && r.status !== "past_due" && r.status !== "unpaid") return false;
-    if (opts.status === "Con pago fallido" && r.status !== "past_due") return false;
+    if (opts.status === "Canceladas" && r.status !== "canceled") return false;
     return true;
   });
 }

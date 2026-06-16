@@ -42,7 +42,7 @@ export default function AdminLayout({
       >
         {/* Logo */}
         <div
-          className="flex items-baseline gap-2 px-6"
+          className="flex items-center gap-2 px-6"
           style={{ height: 60, borderBottom: "1px solid var(--gris-linea)" }}
         >
           <span

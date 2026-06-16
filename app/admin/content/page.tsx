@@ -48,8 +48,15 @@ export default async function AdminContentPage() {
                   {program.name}
                 </p>
                 <p className="font-body mt-0.5" style={{ fontSize: 12, color: "var(--gris-texto)" }}>
-                  {BILLING_LABELS[program.billing_model] ?? program.billing_model}
-                  {program.duration_months ? ` · ${program.duration_months} meses` : ""}
+                  {/* CuarentaMás Extra pasará a cobro mensual recurrente (cancelable);
+                      por ahora solo cambia la etiqueta. El cambio de billing_model +
+                      lógica de cobro queda pendiente. */}
+                  {program.slug === "cuarenta-mas-extra"
+                    ? "Mensual recurrente"
+                    : BILLING_LABELS[program.billing_model] ?? program.billing_model}
+                  {program.slug !== "cuarenta-mas-extra" && program.duration_months
+                    ? ` · ${program.duration_months} meses`
+                    : ""}
                   {" · "}
                   <span style={{ fontWeight: 600 }}>{program.series_count}</span>{" "}
                   {program.series_count === 1 ? "serie" : "series"}

@@ -12,7 +12,8 @@ import { PaymentHistory } from "@/components/portal/settings/PaymentHistory";
 // Etiqueta de fecha para el PortalHeader (respeta DEV_DATE en dev, como /pilares).
 function todayLabel(): string {
   const base = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
-  return base.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  const s = base.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  return s.charAt(0).toUpperCase() + s.slice(1); // "Martes, 16 de junio" (capitalizado como el resto)
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
