@@ -12,8 +12,7 @@ export async function POST(req: Request) {
 
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user.id).single();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((profile as any)?.role !== "admin") {
+  if (profile?.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

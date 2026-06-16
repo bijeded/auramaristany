@@ -56,11 +56,13 @@ export async function POST(request: NextRequest) {
       .eq("profile_id", user.id)
       .in("status", ["active", "completed"]);
 
-    const clientSubsTyped =
-      (clientSubs as unknown as {
-        status: string;
-        program_variants?: { level: string | null; programs?: { slug: string } | null } | null;
-      }[]) ?? [];
+    // keep: subscriptions JOIN program_variants+programs — Supabase SDK with bespoke DB type
+    // (no Relationships) can't infer nested join shape; local interface cast is necessary.
+    type ClientSubRaw = {
+      status: string;
+      program_variants?: { level: string | null; programs?: { slug: string } | null } | null;
+    };
+    const clientSubsTyped = (clientSubs as ClientSubRaw[]) ?? [];
     const mapped: ClientSubscription[] = clientSubsTyped.map((s) => ({
       program_slug: s.program_variants?.programs?.slug ?? "",
       variant_level: s.program_variants?.level ?? null,
@@ -93,8 +95,7 @@ export async function POST(request: NextRequest) {
       metadata: { supabase_user_id: user.id },
     });
     customerId = customer.id;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
       .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);

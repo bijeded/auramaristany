@@ -17,8 +17,7 @@ export async function GET(request: Request) {
   }
 
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase: any = createServiceClient();
+  const supabase = createServiceClient();
 
   const { data: oldMsgs, error: selErr } = await supabase
     .from("messages")

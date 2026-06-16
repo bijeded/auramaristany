@@ -44,9 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = admin as any;
-  const { data, error: insertError } = await client
+  const { data, error: insertError } = await admin
     .from("progress_photos")
     .insert({
       profile_id: user.id,

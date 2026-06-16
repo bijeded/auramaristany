@@ -20,13 +20,13 @@ export async function DELETE(
     .eq("profile_id", user.id)
     .maybeSingle();
 
-  const photo = rawPhoto as unknown as { storage_path: string } | null;
+  // rawPhoto is typed by the SDK from the progress_photos Row.
+  const photo = rawPhoto;
   if (!photo) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
   const admin = createServiceClient();
   await admin.storage.from("progress").remove([photo.storage_path]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (admin as any).from("progress_photos").delete().eq("id", params.id);
+  await admin.from("progress_photos").delete().eq("id", params.id);
 
   return NextResponse.json({ ok: true });
 }

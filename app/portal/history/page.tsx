@@ -5,13 +5,6 @@ import { ProgressView } from "@/components/portal/ProgressView";
 import type { PhotoItem } from "@/components/portal/PhotosTab";
 import { SIGNED_URL_TTL_SECONDS } from "@/lib/storage/signed-url";
 
-interface PhotoRow {
-  id: string;
-  storage_path: string;
-  taken_at: string;
-  caption: string | null;
-}
-
 export default async function HistoryPage() {
   const supabase = await createClient();
   const {
@@ -31,7 +24,8 @@ export default async function HistoryPage() {
     .eq("profile_id", user.id)
     .order("taken_at", { ascending: false });
 
-  const photoRows = (rawPhotos ?? []) as unknown as PhotoRow[];
+  // rawPhotos typed by the SDK from progress_photos Row — no cast needed.
+  const photoRows = rawPhotos ?? [];
   const photos: PhotoItem[] = [];
   for (const p of photoRows) {
     const { data: signed } = await supabase.storage
