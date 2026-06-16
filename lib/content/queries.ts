@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentDayKey, getCurrentSeriesNumber } from "./access";
 import { ACCESS_STATES } from "./subscription-access";
 import type { DayKey } from "./access";
+import type { Json } from "@/lib/supabase/types";
 
 export interface Exercise {
   id: string;
@@ -110,10 +111,12 @@ export async function getTodayContent(
        )`
     )
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES as readonly string[])
+    .in("status", ACCESS_STATES)
     .single();
 
-  const sub = rawSub as unknown as SubRow | null;
+  // keep: subscriptions JOIN program_variants!inner JOIN programs!inner — Supabase SDK
+  // returns `never` for nested join shape without Relationships in Database type.
+  const sub = rawSub as SubRow | null;
   if (!sub || !sub.current_period_start) return null;
 
   const programSlug = sub.program_variants.programs.slug;
@@ -126,7 +129,8 @@ export async function getTodayContent(
     .select("series_id, program_series!inner ( series_number )")
     .eq("program_variant_id", sub.program_variant_id);
 
-  const variantSeries = rawVariantSeries as unknown as VariantSeriesRow[] | null;
+  // keep: variant_series_map JOIN program_series!inner — join shape not inferred.
+  const variantSeries = rawVariantSeries as VariantSeriesRow[] | null;
   const seriesEntry = variantSeries?.find(
     (m) => m.program_series.series_number === seriesNumber
   );
@@ -145,7 +149,8 @@ export async function getTodayContent(
     .eq("published", true)
     .single();
 
-  const day = rawDay as unknown as DayRow | null;
+  // SDK types the simple select; cast to DayRow to align with the local interface.
+  const day = rawDay as DayRow | null;
   if (!day) return null; // rest day or content not yet published
 
   // 4. Fetch blocks ordered by sort_order
@@ -155,7 +160,8 @@ export async function getTodayContent(
     .eq("day_id", day.id)
     .order("sort_order");
 
-  const blocks = rawBlocks as unknown as BlockRow[] | null;
+  // SDK types the simple select; cast to BlockRow[] to align with the local interface.
+  const blocks = rawBlocks as BlockRow[] | null;
 
   // 5. Load any existing progress log for today
   const todayDate = today.toISOString().split("T")[0];
@@ -167,7 +173,8 @@ export async function getTodayContent(
     .eq("log_date", todayDate)
     .maybeSingle();
 
-  const existingLog = rawLog as unknown as LogRow | null;
+  // SDK types the aliased select (general_notes:notes); cast to LogRow to align.
+  const existingLog = rawLog as LogRow | null;
 
   return {
     day,
@@ -198,7 +205,7 @@ export async function getAccessSubscriptionId(userId: string): Promise<string | 
     .from("subscriptions")
     .select("id")
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES as readonly string[])
+    .in("status", ACCESS_STATES)
     .maybeSingle();
   return pickAccessSubscriptionId(data as { id: string } | null);
 }
@@ -223,9 +230,7 @@ export async function upsertProgressLog(params: {
     : new Date();
   const logDate = today.toISOString().split("T")[0];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client = supabase as any;
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from("progress_logs")
     .upsert(
       {
@@ -233,7 +238,7 @@ export async function upsertProgressLog(params: {
         subscription_id: params.subscriptionId,
         program_day_id: params.programDayId,
         log_date: logDate,
-        exercises_done: params.exercisesDone,
+        exercises_done: params.exercisesDone as Json,
         notes: params.generalNotes,
         completed: params.completed,
       },

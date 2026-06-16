@@ -67,7 +67,8 @@ export async function getHistoryList(userId: string): Promise<HistoryListItem[]>
     .eq("profile_id", userId)
     .order("log_date", { ascending: false });
 
-  const logs = (rawLogs ?? []) as unknown as ListRow[];
+  // keep: progress_logs JOIN program_days!inner — nested join shape not inferred.
+  const logs = (rawLogs ?? []) as ListRow[];
   if (logs.length === 0) return [];
 
   // Conteo total de ejercicios por día (de los bloques exercise_list).
@@ -77,7 +78,8 @@ export async function getHistoryList(userId: string): Promise<HistoryListItem[]>
     .select("day_id, block_type, sort_order, content")
     .in("day_id", dayIds);
 
-  const blocks = (rawBlocks ?? []) as unknown as BlockRow[];
+  // SDK types the simple select; cast to BlockRow[] to align with local interface (content: Json→Record).
+  const blocks = (rawBlocks ?? []) as BlockRow[];
   const totalByDay = new Map<string, number>();
   for (const id of dayIds) {
     totalByDay.set(
@@ -125,10 +127,11 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
     .from("subscriptions")
     .select("id, months_elapsed, current_period_start")
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES as readonly string[])
+    .in("status", ACCESS_STATES)
     .single();
 
-  const sub = rawSub as unknown as SubRow | null;
+  // SDK types the simple select; cast to SubRow for the local interface.
+  const sub = rawSub as SubRow | null;
   if (!sub || !sub.current_period_start) return [];
 
   const periodStart = sub.current_period_start.split("T")[0];
@@ -140,7 +143,8 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
     .gte("log_date", periodStart)
     .order("log_date", { ascending: true });
 
-  const logs = (rawLogs ?? []) as unknown as PerfLogRow[];
+  // SDK types the simple select; cast to PerfLogRow[] for the local interface.
+  const logs = (rawLogs ?? []) as PerfLogRow[];
   if (logs.length === 0) return [];
 
   const dayIds = Array.from(new Set(logs.map((l) => l.program_day_id)));
@@ -150,7 +154,8 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
     .in("day_id", dayIds)
     .eq("block_type", "exercise_list");
 
-  const blocks = (rawBlocks ?? []) as unknown as ExBlockRow[];
+  // SDK types the simple select; cast to ExBlockRow[] for the local interface (content structure).
+  const blocks = (rawBlocks ?? []) as ExBlockRow[];
 
   // Mapa exercise-uuid → { name, metrics } desde los bloques del mes.
   const meta = new Map<string, ExerciseMeta>();
@@ -203,7 +208,8 @@ export async function getHistoryLog(
     .eq("profile_id", userId)
     .maybeSingle();
 
-  const log = rawLog as unknown as DetailLogRow | null;
+  // SDK types the aliased select (general_notes:notes); cast to DetailLogRow.
+  const log = rawLog as DetailLogRow | null;
   if (!log) return null;
 
   const { data: rawDay } = await supabase
@@ -212,7 +218,8 @@ export async function getHistoryLog(
     .eq("id", log.program_day_id)
     .single();
 
-  const day = rawDay as unknown as DetailDayRow | null;
+  // SDK types the simple select; cast to DetailDayRow for the local interface.
+  const day = rawDay as DetailDayRow | null;
   if (!day) return null;
 
   const { data: rawBlocks } = await supabase

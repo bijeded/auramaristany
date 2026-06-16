@@ -23,8 +23,9 @@ export async function getInboxMessages(userId: string): Promise<InboxItem[]> {
     .select("read_at, messages(id, subject, body, created_at)")
     .eq("recipient_id", userId);
 
+  // keep: message_recipients JOIN messages — nested join shape not inferred by SDK.
   type Raw = { read_at: string | null; messages: { id: string; subject: string; body: string; created_at: string } | null };
-  return ((data ?? []) as unknown as Raw[])
+  return ((data ?? []) as Raw[])
     .filter((r) => r.messages)
     .map((r) => ({
       id: r.messages!.id,
@@ -55,8 +56,9 @@ export async function getMessageDetail(userId: string, messageId: string): Promi
     .eq("message_id", messageId)
     .maybeSingle();
 
+  // keep: message_recipients JOIN messages — nested join shape not inferred by SDK.
   type Raw = { messages: { id: string; subject: string; body: string; created_at: string } | null } | null;
-  const row = data as unknown as Raw;
+  const row = data as Raw;
   if (!row?.messages) return null;
   return {
     id: row.messages.id,
