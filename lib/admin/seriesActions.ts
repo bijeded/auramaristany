@@ -78,7 +78,6 @@ export async function updateSeries(
       title: data.title,
       description: data.description ?? null,
       published: data.published,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", seriesId);
 
