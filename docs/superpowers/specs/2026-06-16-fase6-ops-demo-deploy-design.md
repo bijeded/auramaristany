@@ -14,9 +14,9 @@ Publicar un **demo en línea funcional** de Aura Maristany en `app.auramaristany
 | Tema | Decisión |
 |------|----------|
 | Modo Stripe | **Test mode** ahora (checkout funciona con tarjetas de prueba, sin cobros). Flip a live cuando Aura defina precios. |
-| Proyecto Supabase prod | **Mismo proyecto** `bgvxaagfnzvzamtxqbkg` (ya tiene migraciones 001–010 y contenido). |
+| Proyecto Supabase prod | **Mismo proyecto** `bgvxaagfnzvzamtxqbkg` (ya tiene migraciones 001–010 y contenido). **Antes de salir a producción real** habrá que eliminar **toda la información de clientes** (perfiles, suscripciones, invoices, fotos, etc.), conservando la cuenta admin y los programas/series creados durante el demo. |
 | Email (A2) | **Completo**: dominio verificado en Resend + SMTP en Supabase + **confirmación de email activada** + emails de ciclo de vida. |
-| Datos demo | **Se conservan** (no se limpian). Aura debe ver 20 clientes simulados + contenido real de programas. |
+| Datos demo | **Se conservan hasta que estemos listos para lanzar.** Durante el demo Aura ve 20 clientes simulados + contenido real de programas. Al llegar a la etapa de lanzamiento, se eliminan los datos de clientes (ver fila "Proyecto Supabase prod"); admin y programas/series se mantienen. |
 | Workflow Vercel | `main` → Production (lo que ve Aura). Ramas de feature → Preview URLs para desarrollo continuo sin romper el demo. |
 | Precios | Pendientes de Aura. Quedan en placeholder ($999 test). A4-live es trabajo futuro. |
 
@@ -31,17 +31,20 @@ Mayormente **configuración en dashboards externos** (ejecutada por Francisco co
 ### 1. Correcciones de código (previas al deploy)
 
 **1.1 — Foco 1: Secreto filtrado en `scripts/seed-demo.ts`**
-- Problema: `MGMT_TOKEN` hardcodeado en texto plano (línea 17). El archivo está untracked (aún no commiteado).
-- Fix:
-  - Leer el token desde `process.env.SUPABASE_MGMT_TOKEN` (o equivalente), con guard si falta.
-  - **Rotar** el token actual en Supabase (acción manual de Francisco), ya que estuvo en disco.
-  - Documentar la variable en `.env.local` (solo local; nunca a producción).
+- Problema: `MGMT_TOKEN` (Access Token de Supabase Management API) hardcodeado en texto plano (línea 17). El archivo está untracked (aún no commiteado).
+- Nota: ese Access Token **caduca en ~6 días** (quedará inservible), así que rotarlo es poco útil por sí solo y, peor, dejaría el seed roto en una semana.
+- Fix recomendado: **eliminar la dependencia del Management API**. El seed solo usa ese token para correr `DELETE` por SQL; como ya usa el `service_role` (que ignora RLS) para los `INSERT`, podemos hacer los borrados con `supabase.from(table).delete()` en lugar de `sql(...)`. Esto:
+  - Quita el secreto del archivo por completo (no más `MGMT_TOKEN` ni `PROJECT_REF` hardcodeados).
+  - Resuelve también el problema de caducidad del token.
+  - Deja el seed dependiendo solo de `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (ya requeridos).
+- El token actual hardcodeado igual debe considerarse comprometido; como caduca en días, basta con no volver a usarlo (no se commitea).
 
 **1.2 — Foco 2: Seed aditivo (opción a)**
 - Problema: `seed-demo.ts` hace `DELETE` de las tablas de catálogo (`program_series`, `program_days`, `program_*_blocks`, `variant_series_map`, `programs`, `program_variants`, `onboarding_questions`, …) y solo re-inserta programas + variantes + 1 pregunta. Esto borraría el contenido real (incluida la serie creada hoy) y dejaría el portal sin contenido.
 - Fix: el seed **NO toca las tablas de catálogo**. Solo:
   - Elimina usuarios de auth.
   - Limpia las tablas de datos de usuario (`profiles`, `subscriptions`, `invoices`, `progress_*`, `onboarding_responses`, `messages`, etc.).
+  - **Borra los archivos que suban los clientes durante la prueba** (fotos de perfil en el bucket `avatars` y fotos de avance en el bucket `progress`), para que el seed deje el storage limpio de datos de usuario.
   - Re-crea admin + 20 clientes + suscripciones + invoices + respuestas de onboarding.
   - Para las respuestas de onboarding: **busca una pregunta activa existente** en `onboarding_questions` en lugar de crear/borrar la pregunta. Si no hay ninguna activa, omite las respuestas (o crea una sin borrar las demás).
   - No re-inserta `programs` / `program_variants` / `program_variant_prerequisites` (ya existen en el proyecto).
@@ -115,8 +118,8 @@ Pasos:
 ## Fuera de alcance (trabajo futuro)
 
 - **A4-live:** crear Products/Prices en Stripe live con precios reales de Aura → actualizar `program_variants` → flip keys test→live → re-registrar webhook live.
-- **UI de admin para gestión de planes/precios** (hoy se hace por script + SQL).
-- Limpieza de datos demo (explícitamente NO se hace; se conservan).
+- **UI de admin para gestión de planes/precios** (hoy se hace por script + SQL). A futuro habrá que **definir si se mantiene así o se construye una UI**, según las necesidades que exprese Aura.
+- **Limpieza de datos de clientes previa al lanzamiento**: NO se hace durante el demo (se conservan). Se ejecutará al llegar a la etapa de lanzamiento, conservando admin y programas/series (ver "Decisiones tomadas").
 
 ## Migraciones
 
