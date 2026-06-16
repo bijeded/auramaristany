@@ -50,17 +50,15 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
 
   const isBroadcast = input.selection.mode !== "individual";
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: msg, error: msgErr } = await (supabase as any)
+  const { data: msg, error: msgErr } = await supabase
     .from("messages")
     .insert({ sender_id: user.id, subject: input.subject.trim(), body: input.body.trim(), is_broadcast: isBroadcast })
     .select("id")
     .single();
   if (msgErr) return { ok: false, error: logAndGeneric("sendMessage.insert", msgErr) };
 
-  const recipRows = recipientIds.map((rid) => ({ message_id: msg.id, recipient_id: rid }));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: rErr } = await (supabase as any).from("message_recipients").insert(recipRows);
+  const recipRows = recipientIds.map((rid) => ({ message_id: msg!.id, recipient_id: rid }));
+  const { error: rErr } = await supabase.from("message_recipients").insert(recipRows);
   if (rErr) return { ok: false, error: logAndGeneric("sendMessage.recipients", rErr) };
 
   // Emails best-effort — un fallo no revierte el mensaje in-app.
@@ -84,15 +82,17 @@ export async function getSentMessageDetail(messageId: string): Promise<SentMessa
     .eq("id", messageId)
     .maybeSingle();
   if (!msg) return null;
-  const m = msg as unknown as { id: string; subject: string; body: string; is_broadcast: boolean; created_at: string };
+  // msg is typed by the SDK; alias to m for cleaner access.
+  const m = msg;
 
   const { data: recips } = await supabase
     .from("message_recipients")
     .select("read_at, profiles(full_name, email)")
     .eq("message_id", messageId);
 
+  // keep: message_recipients JOIN profiles — nested join shape not inferred by SDK.
   type RecRow = { read_at: string | null; profiles: { full_name: string | null; email: string | null } | null };
-  const recipients: SentRecipient[] = ((recips ?? []) as unknown as RecRow[])
+  const recipients: SentRecipient[] = ((recips ?? []) as RecRow[])
     .map((r) => ({ name: r.profiles?.full_name ?? r.profiles?.email ?? "—", read: r.read_at != null }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -113,12 +113,10 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean; e
   if (!auth.ok) return { ok: false, error: auth.error };
   const { supabase } = auth;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: rErr } = await (supabase as any).from("message_recipients").delete().eq("message_id", messageId);
+  const { error: rErr } = await supabase.from("message_recipients").delete().eq("message_id", messageId);
   if (rErr) return { ok: false, error: logAndGeneric("deleteMessage.recipients", rErr) };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: mErr } = await (supabase as any).from("messages").delete().eq("id", messageId);
+  const { error: mErr } = await supabase.from("messages").delete().eq("id", messageId);
   if (mErr) return { ok: false, error: logAndGeneric("deleteMessage", mErr) };
 
   revalidatePath("/admin/messages");
