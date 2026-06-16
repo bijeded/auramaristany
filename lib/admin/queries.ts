@@ -51,11 +51,11 @@ export async function getAdminPrograms(): Promise<AdminProgram[]> {
 
   const countMap: Record<string, number> = {};
   for (const row of counts ?? []) {
-    const r = row as unknown as { program_id: string };
-    countMap[r.program_id] = (countMap[r.program_id] ?? 0) + 1;
+    if (row.program_id) countMap[row.program_id] = (countMap[row.program_id] ?? 0) + 1;
   }
 
-  return (data as unknown as Omit<AdminProgram, "series_count">[]).map((p) => ({
+  // SDK types the select; cast to align with local AdminProgram (is_active/billing_model fields).
+  return ((data ?? []) as Omit<AdminProgram, "series_count">[]).map((p) => ({
     ...p,
     series_count: countMap[p.id] ?? 0,
   }));
@@ -84,7 +84,8 @@ export async function getAdminProgram(programId: string) {
     program_days: AdminDay[];
   };
 
-  const series: AdminSeries[] = ((rawSeries ?? []) as unknown as RawSeries[]).map((s) => ({
+  // keep: program_series JOIN program_days (nested collection) — join shape not inferred.
+  const series: AdminSeries[] = ((rawSeries ?? []) as RawSeries[]).map((s) => ({
     id: s.id,
     series_number: s.series_number,
     title: s.title,
@@ -93,7 +94,8 @@ export async function getAdminProgram(programId: string) {
     days: s.program_days ?? [],
   }));
 
-  return { program: program as unknown as Omit<AdminProgram, "series_count">, series };
+  // SDK types the simple select; cast to align with local AdminProgram interface.
+  return { program: program as Omit<AdminProgram, "series_count">, series };
 }
 
 export interface BlockData {
@@ -128,7 +130,8 @@ export async function getDayWithBlocks(dayId: string): Promise<DayWithBlocks | n
     .eq("id", dayId)
     .single();
 
-  const day = rawDay as unknown as Omit<DayWithBlocks, "blocks"> | null;
+  // SDK types the simple select; cast to DayWithBlocks base (no "blocks" yet).
+  const day = rawDay as Omit<DayWithBlocks, "blocks"> | null;
   if (!day) return null;
 
   const { data: rawBlocks } = await supabase
@@ -137,7 +140,8 @@ export async function getDayWithBlocks(dayId: string): Promise<DayWithBlocks | n
     .eq("day_id", dayId)
     .order("sort_order");
 
-  return { ...day, blocks: (rawBlocks as unknown as BlockData[]) ?? [] };
+  // SDK types the simple select; cast to BlockData[] (content: Json→Record difference).
+  return { ...day, blocks: (rawBlocks as BlockData[]) ?? [] };
 }
 
 export const PILLARS = [
@@ -161,7 +165,8 @@ export async function getSeriesPillars(seriesId: string): Promise<PillarRow[]> {
     .from("program_series_pillars")
     .select("id, pillar_key, title, published")
     .eq("series_id", seriesId);
-  const existing = (data as unknown as { id: string; pillar_key: string; title: string; published: boolean }[]) ?? [];
+  // SDK types the simple select; cast to local interface shape.
+  const existing = (data as { id: string; pillar_key: string; title: string; published: boolean }[]) ?? [];
   return PILLARS.map((p) => {
     const row = existing.find((e) => e.pillar_key === p.key);
     return { pillar_key: p.key, name: p.name, id: row?.id ?? null, title: row?.title ?? null, published: row?.published ?? false };
@@ -177,7 +182,8 @@ export async function getPillarWithBlocks(seriesId: string, pillarKey: string): 
     .select("id, pillar_key, title, published")
     .eq("series_id", seriesId).eq("pillar_key", pillarKey).maybeSingle();
 
-  const pillar = rawPillar as unknown as { id: string; pillar_key: string; title: string; published: boolean } | null;
+  // SDK types the simple select; cast to local interface shape.
+  const pillar = rawPillar as { id: string; pillar_key: string; title: string; published: boolean } | null;
   const name = PILLARS.find((p) => p.key === pillarKey)?.name ?? pillarKey;
   if (!pillar) return { id: null, pillar_key: pillarKey, title: name, published: false, blocks: [] };
 
@@ -186,7 +192,8 @@ export async function getPillarWithBlocks(seriesId: string, pillarKey: string): 
     .select("id, block_type, sort_order, content")
     .eq("pillar_id", pillar.id).order("sort_order");
 
-  return { ...pillar, blocks: (rawBlocks as unknown as BlockData[]) ?? [] };
+  // SDK types the simple select; cast to BlockData[] (content: Json→Record difference).
+  return { ...pillar, blocks: (rawBlocks as BlockData[]) ?? [] };
 }
 
 export interface SentMessage {
@@ -216,7 +223,8 @@ export async function getActiveSubscriberRows(): Promise<ActiveSubRow[]> {
     program_variants: { name: string; program_id: string; programs: { name: string } | null } | null;
   };
 
-  return ((data ?? []) as unknown as Raw[])
+  // keep: subscriptions JOIN profiles JOIN program_variants JOIN programs — nested join shape not inferred.
+  return ((data ?? []) as Raw[])
     .filter((r) => r.profiles && r.program_variants)
     .map((r) => ({
       profile_id: r.profile_id,
@@ -243,7 +251,8 @@ export async function getSentMessages(): Promise<SentMessage[]> {
 
   type RecRow = { message_id: string; read_at: string | null; profiles: { full_name: string | null } | null };
   const byMessage = new Map<string, { total: number; read: number; singleName: string | null }>();
-  for (const r of ((recips ?? []) as unknown as RecRow[])) {
+  // keep: message_recipients JOIN profiles — nested join shape not inferred.
+  for (const r of ((recips ?? []) as RecRow[])) {
     let e = byMessage.get(r.message_id);
     if (!e) {
       e = { total: 0, read: 0, singleName: null };
@@ -255,7 +264,8 @@ export async function getSentMessages(): Promise<SentMessage[]> {
   }
 
   type MsgRow = { id: string; subject: string; is_broadcast: boolean; created_at: string };
-  return ((msgs ?? []) as unknown as MsgRow[]).map((m) => {
+  // SDK types the simple select; cast to MsgRow for local interface clarity.
+  return ((msgs ?? []) as MsgRow[]).map((m) => {
     const agg = byMessage.get(m.id) ?? { total: 0, read: 0, singleName: null };
     return {
       id: m.id,
