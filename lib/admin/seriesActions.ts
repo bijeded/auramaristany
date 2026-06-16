@@ -67,6 +67,9 @@ export async function updateSeries(
 ): Promise<{ error?: string }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
+  if (data.variantIds.length === 0) {
+    return { error: "La serie debe tener al menos una variante." };
+  }
   const supabase = auth.supabase;
 
   const { error: updateError } = await supabase
