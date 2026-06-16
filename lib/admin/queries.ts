@@ -26,6 +26,11 @@ export interface AdminDay {
   published: boolean;
 }
 
+export interface AdminVariant {
+  id: string;
+  name: string;
+}
+
 export interface AdminSeries {
   id: string;
   series_number: number;
@@ -33,6 +38,7 @@ export interface AdminSeries {
   description: string | null;
   published: boolean;
   days: AdminDay[];
+  variantIds: string[];
 }
 
 export async function getAdminPrograms(): Promise<AdminProgram[]> {
@@ -80,11 +86,30 @@ export async function getAdminProgram(programId: string) {
     .eq("program_id", programId)
     .order("series_number");
 
-  type RawSeries = Omit<AdminSeries, "days"> & {
+  const { data: rawVariants } = await supabase
+    .from("program_variants")
+    .select("id, name")
+    .eq("program_id", programId)
+    .order("name");
+
+  const seriesIds = ((rawSeries ?? []) as { id: string }[]).map((s) => s.id);
+  const { data: rawMappings } = seriesIds.length > 0
+    ? await supabase
+        .from("variant_series_map")
+        .select("series_id, program_variant_id")
+        .in("series_id", seriesIds)
+    : { data: [] as { series_id: string; program_variant_id: string }[] };
+
+  const variantMap: Record<string, string[]> = {};
+  for (const m of (rawMappings ?? []) as { series_id: string; program_variant_id: string }[]) {
+    if (!variantMap[m.series_id]) variantMap[m.series_id] = [];
+    variantMap[m.series_id].push(m.program_variant_id);
+  }
+
+  type RawSeries = Omit<AdminSeries, "days" | "variantIds"> & {
     program_days: AdminDay[];
   };
 
-  // keep: program_series JOIN program_days (nested collection) — join shape not inferred.
   const series: AdminSeries[] = ((rawSeries ?? []) as RawSeries[]).map((s) => ({
     id: s.id,
     series_number: s.series_number,
@@ -92,10 +117,12 @@ export async function getAdminProgram(programId: string) {
     description: s.description,
     published: s.published,
     days: s.program_days ?? [],
+    variantIds: variantMap[s.id] ?? [],
   }));
 
-  // SDK types the simple select; cast to align with local AdminProgram interface.
-  return { program: program as Omit<AdminProgram, "series_count">, series };
+  const variants: AdminVariant[] = (rawVariants ?? []) as AdminVariant[];
+
+  return { program: program as Omit<AdminProgram, "series_count">, series, variants };
 }
 
 export interface BlockData {
