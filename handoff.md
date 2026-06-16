@@ -39,6 +39,17 @@ Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 8 sub-bloques +
         (admin hola@auramaristany.com/09876543 + 20 clientes demo /12345678) — seed-demo.ts reescrito
         ADITIVO y SIN secretos (borra solo datos de usuario vía service_role + vacía buckets, no toca
         catálogo). Fix de build roto en main (updateSeries seteaba updated_at a mano → TS2322).
+        ✓ CORRECCIONES PRE-DEMO (commit bf7216a, 252 tests): dashboard fecha con día ("16 de junio,
+        2026") + logo AURA centrado; Clientes header alineado + pills (quita "Con pago fallido",
+        agrega "Canceladas"); Contenido "Mensual recurrente" para CuarentaMás Extra; fecha de
+        /portal/settings capitalizada. ✓ FIX WORKFLOW DE DEPLOY: los auto-deploys de Git los BLOQUEABA
+        Vercel porque el email de los commits (auto-generado por hostname) no matcheaba la cuenta
+        GitHub (bijeded) → git user.email = francisco.venegas.velasco@gmail.com (config GLOBAL); ahora
+        git push main → Production funciona.
+        ⚠ CAMBIO DECIDIDO PENDIENTE (Aura, 16-jun): CuarentaMás Extra pasará a cobro mensual recurrente
+        cancelable (como Strong & Fit); por ahora solo se cambió la etiqueta — falta cambiar
+        programs.billing_model de cuarenta-mas-extra a rolling_monthly + lógica de acceso/completed_at/
+        checkout (stripe-handlers, clients-helpers.subscriptionProgressLabel, prerequisitos).
         Pendiente Fase 6: Task 5 smoke E2E con Aura; luego (antes de lanzar) Stripe LIVE + precios
         reales de Aura, WhatsApp real, limpieza de datos demo, env vars de Preview.
         Registrado para después: transaccionalidad de saveBlocks/savePillarBlocks.
@@ -852,6 +863,13 @@ thumbnail propio antes de cargar el iframe (react-lite-youtube-embed).
 
 TIPTAP: Solo el núcleo open-source (MIT). Las extensiones Pro de Tiptap
 (collaborative editing, AI, etc.) son de pago. No se usan; no son necesarias.
+
+VERCEL — EMAIL DE COMMITS: Vercel BLOQUEA los auto-deploys de Git si el email
+del autor del commit no corresponde a una cuenta de GitHub ("commit email …
+could not be matched to a GitHub account"). El git user.email DEBE ser el de la
+cuenta GitHub (bijeded → francisco.venegas.velasco@gmail.com), ya configurado
+GLOBAL. Síntoma cuando falla: los deploys de Git quedan en estado UNKNOWN, no
+aliasan el dominio, y solo `vercel --prod` (CLI, buildea local) funciona.
 
 STRIPE / MONEDA: Todas las suscripciones en MXN. Los 10 Prices deben
 crearse manualmente en el dashboard de Stripe (no hay automatización de
