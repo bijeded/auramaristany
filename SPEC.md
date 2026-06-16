@@ -551,7 +551,7 @@ La clienta puede ver su desempeño a lo largo del mes, revisar días pasados con
 
 ### Tab "Fotos"
 
-- Galería en **bucket privado de Storage (`progress`)** servida con **signed URLs** (TTL 1h). Grid de 3 columnas con **filtro por mes**.
+- Galería en **bucket privado de Storage (`progress`)** servida con **signed URLs** (TTL **600s / 10 min**, bajado de 1h en STG-2). Grid de 3 columnas con **filtro por mes**.
 - Subir foto: archivo/cámara + **comentario opcional** (no editable); fecha = hoy. **Compresión en cliente** a 1280px (lado mayor) + JPEG antes de subir. Límites: **5MB/archivo**, **máx 250 fotos** por clienta (badge `[N/250]`).
 - Visor (lightbox) con navegación y **borrar** (solo la dueña; admin puede por RLS, sin UI aún).
 

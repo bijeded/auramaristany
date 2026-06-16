@@ -327,7 +327,7 @@ Middleware (orden):
 /lib/portal/photo-compress.ts       — compressImage (canvas, cliente): reescala 1280px + JPEG 0.82
 /app/api/portal/photos/route.ts     — POST upload (bucket privado 'progress', prefijo {userId}/)
 /app/api/portal/photos/[id]/route.ts — DELETE (valida dueña + borra Storage y fila)
-/app/portal/history/page.tsx        — server: carga lista+desempeño+fotos (signed URLs 1h), monta ProgressView
+/app/portal/history/page.tsx        — server: carga lista+desempeño+fotos (signed URLs 600s, STG-2), monta ProgressView
 /app/portal/history/[logId]/page.tsx — server: detalle read-only (getHistoryLog, notFound si no es suya)
 /components/portal/ProgressView.tsx  — tabs Desempeño | Fotos (cliente)
 /components/portal/PerformanceTab.tsx + PerformanceChart.tsx — pills de ejercicio + Recharts + lista "Historial de ejercicios"
@@ -553,7 +553,7 @@ COMPLETADO:
         toggle de métrica dinámico (reps/peso/otras), SIN selector de periodo,
         SIN stat cards. Debajo: lista "Historial de ejercicios" (días con
         progress_log, reciente primero) → /portal/history/[logId].
-      - Fotos: bucket privado 'progress' + signed URLs (1h), grid 3 col,
+      - Fotos: bucket privado 'progress' + signed URLs (600s desde STG-2; era 1h), grid 3 col,
         filtro por mes, subir con comentario opcional + compresión cliente
         (1280px, JPEG), visor con navegación + borrar. SIN métricas corporales.
     ✓ /portal/history/[logId]: detalle read-only (reusa BlockView con prop
@@ -580,11 +580,9 @@ COMPLETADO:
       - upsertProgressLog respeta DEV_DATE en log_date (antes usaba fecha real, lo que
         colapsaba días simulados en la misma fecha). Producción sin cambios.
       - Límite de 5MB: la compresión cliente deja la foto pequeña, comportamiento OK.
-    Follow-ups Fase 3 (no bloquean): regenerar lib/supabase/types.ts para incluir
-    progress_photos/body_metrics y quitar los `as any` de los endpoints de fotos;
-    tope de 250 fotos no es race-safe (aceptable single-user); UI de admin para
-    eliminar fotos de clientas (RLS ya lo permite, falta UI — futura ficha de cliente);
-    notas de admin sobre el registro del día (diferido, evaluar en Fase 4).
+    Follow-ups Fase 3: ✓ types.ts completado + `as any` quitados (C+D, b32f0c5); ✓ UI admin para
+    eliminar fotos de clientas (sub-bloque 1, ficha de cliente). Pendientes: tope de 250 fotos no es
+    race-safe (aceptable single-user); notas de admin sobre el registro del día (diferido, evaluar luego).
 
   ✓ FASE 4 — MENSAJERÍA (COMPLETA y MERGEADA A MAIN, merge dbdb432; migr. 006 aplicada; 2 smokes OK)
     Spec: docs/superpowers/specs/2026-06-09-fase-4-mensajeria-design.md
@@ -679,8 +677,16 @@ COMPLETADO:
       sin tocar sesión, email solo-lectura), foto de perfil (bucket público 'avatars', comprimida a ≤800px,
       iniciales de respaldo), ficha de suscripción con barra "Mes X de Y", historial de pagos paginado
       10/página (lectura vía RLS de dueño). Migración 010 (bucket avatars) aplicada. 216 tests.
+    ✓ Sub-bloque C+D: pulido auditoría + limpieza de tipos (merge b32f0c5, SIN migración) — 8 bajos
+      cerrados (STG-2 signed URLs 600s; INP-5 tope 200/5000 sendMessage; EDGE-3 getUTCDay; MW-3 matcher
+      excluye webhooks/cron con literal inline; EDGE-5 progress deriva subscriptionId del server; INP-1
+      logAndGeneric; SVC-2 checkout RLS-aware; INP-4 onboarding server action) + limpieza (types.ts a mano,
+      0 casts injustificados, Relationships:[] + "trialing"; try/catch retrieve re-lanza; formatDate
+      unificado; tests cloneDay/cloneWeek) + bonus (fix BILLING_LABELS, dayLabel timestamptz, fix
+      pre-existente router.refresh() tras guardar progreso en /portal/today). 247 tests.
     Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder /
-    telefono-registro / auditoria-seguridad / fixes-seguridad / 2026-06-13-b2-portal-settings).
+    telefono-registro / auditoria-seguridad / fixes-seguridad / 2026-06-13-b2-portal-settings /
+    2026-06-15-fase6-cd-pulido-limpieza).
 
 PENDIENTE (Fase 6):
   ✓ BUG G4 RESUELTO (merge 1e838d7): invoice.paid llega ~1s antes que checkout.session.completed
@@ -693,16 +699,16 @@ PENDIENTE (Fase 6):
   ✓ B2 /portal/settings COMPLETO MERGEADO (4271c85): "Mi cuenta" con edición nombre/teléfono +
     contraseña + foto de perfil (bucket público 'avatars', ≤800px) + ficha de suscripción ("Mes X de Y")
     + historial de pagos paginado. Migración 010 aplicada. 216 tests, smoke+re-smoke OK.
-  ○ C — 8 hallazgos bajos de la auditoría (INP-1, EDGE-5, EDGE-3, MW-3, SVC-2, STG-2, INP-4, INP-5). (SIGUIENTE)
-  ○ D — Limpieza arrastrada (ver follow-ups menores abajo).
+  ✓ C+D MERGEADO (b32f0c5): 8 bajos de auditoría (INP-1, EDGE-5, EDGE-3, MW-3, SVC-2, STG-2, INP-4, INP-5)
+    + limpieza de tipos (types.ts a mano, 0 casts injustificados; try/catch retrieve re-lanza; formatDate
+    unificado; tests cloneDay/cloneWeek). 247 tests.
+  ○ Decisiones de Aura: P1 precios reales MXN (bloquea Stripe live) + P5 dominio app.auramaristany.com
+    (bloquea Resend y Vercel). (SIGUIENTE)
   ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — también activa el SMTP de
     confirmación de correo (hoy el registro con correo nuevo no envía confirmación).
   ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
   ○ Stripe live + precios reales (P1): crear los 10 Prices en live y actualizar program_variants.
-  ○ Follow-ups menores (no bloquean): regenerar lib/supabase/types.ts (quitar `as any`/`as unknown as`,
-    incluye clients-queries); try/catch en stripe.subscriptions.retrieve; unificar formatDate
-    duplicado; alinear types.ts (general_notes) con la columna real 'notes'; saveBlocks/
-    savePillarBlocks no transaccionales; tests de cloneDay/cloneWeek.
+  ○ Registrado para después (fuera de scope C+D): saveBlocks/savePillarBlocks no transaccionales.
   ○ Setup local: correr `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
     para probar checkout (ver sección 12).
 
@@ -750,8 +756,13 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
   ✓ B2 /portal/settings COMPLETO MERGEADO (merge 4271c85): "Mi cuenta" — edición nombre/teléfono +
     contraseña + avatar (bucket público, ≤800px) + ficha de suscripción ("Mes X de Y") + historial de
     pagos paginado. Migración 010 (bucket avatars) aplicada y verificada. 216/216 tests.
-  Pendiente: C (8 bajos de auditoría) + D (limpieza), Resend (+ SMTP confirmación),
+  ✓ C+D pulido auditoría + limpieza tipos MERGEADO (merge b32f0c5, SIN migración): 8 bajos cerrados
+    (STG-2/INP-5/EDGE-3/MW-3/EDGE-5/INP-1/SVC-2/INP-4) + types.ts a mano (0 casts injustificados) +
+    try/catch retrieve (re-lanza) + formatDate unificado + tests cloneDay/cloneWeek + bonus
+    (BILLING_LABELS, dayLabel timestamptz, fix pre-existente router.refresh() en /portal/today). 247/247 tests.
+  Pendiente: decisiones de Aura (P1 precios MXN, P5 dominio), Resend (+ SMTP confirmación),
     deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+    Registrado para después: transaccionalidad de saveBlocks/savePillarBlocks.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 12. LIMITACIONES Y RESTRICCIONES CONOCIDAS
@@ -844,10 +855,10 @@ Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados:
 bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894, B2 /portal/settings completo 4271c85).
 Migraciones 001–010 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad;
 010 = bucket público avatars); backfill de invoices ejecutado; E2E validado. UI con lenguaje neutro
-('cliente'). 216/216 tests. ✓ BUG G4 resuelto (1e838d7). ✓ B1 logout en UI mergeado (0dde433).
-✓ B2 /portal/settings completo mergeado (4271c85).
-Pendiente Fase 6 (orden acordado): C (8 bajos de auditoría) + D (limpieza) → en paralelo pedir a Aura
-precios (P1)/dominio (P5) → bloque ops: Resend (+ SMTP confirmación + dominio), deploy a Vercel
-(+ CRON_SECRET), Stripe live + precios reales.
+('cliente'). 247/247 tests. ✓ BUG G4 resuelto (1e838d7). ✓ B1 logout en UI mergeado (0dde433).
+✓ B2 /portal/settings completo mergeado (4271c85). ✓ C+D pulido auditoría + limpieza tipos mergeado (b32f0c5).
+Pendiente Fase 6 (orden acordado): pedir a Aura precios (P1)/dominio (P5) → bloque ops: Resend
+(+ SMTP confirmación + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+Registrado para después: transaccionalidad de saveBlocks/savePillarBlocks.
 Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
