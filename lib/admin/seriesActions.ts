@@ -114,6 +114,13 @@ export async function deleteSeries(
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
 
+  const { error: mapError } = await supabase
+    .from("variant_series_map")
+    .delete()
+    .eq("series_id", seriesId);
+
+  if (mapError) return { error: logAndGeneric("deleteSeries.deleteMap", mapError) };
+
   const { error } = await supabase
     .from("program_series")
     .delete()
