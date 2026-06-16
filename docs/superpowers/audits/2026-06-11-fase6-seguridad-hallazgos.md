@@ -38,16 +38,17 @@ Ordenada por severidad y, dentro de cada nivel, por impacto/confianza. Esfuerzo:
 5. **[RLS-1] Políticas `for all` sin `with check` explícito** — esfuerzo **S** (migración idempotente). Mitigado hoy por Postgres, pero conviene cerrarlo.
 
 ### Bajos (higiene / defensa en profundidad)
-6. **[INP-1]** Errores crudos de Postgres/Supabase devueltos al cliente — **S**.
-7. **[EDGE-5]** `/api/portal/progress` confía en `subscriptionId` del body — **S**.
-8. **[EDGE-3]** `getDay()` local vs cómputo en UTC (off-by-one si runtime no-UTC) — **S**.
-9. **[MW-3]** El `matcher` cubre `/api/*` (webhook/cron pagan `getUser()` innecesario) — **S**.
-10. **[RLS-2]** `messages_admin_write` sin `with check` — **S**.
-11. **[SVC-2]** `create-checkout` usa service-role de más — **S**.
-12. **[STG-2]** Signed URLs de fotos con expiración de 1h (considerar bajar a 5–10 min) — **S**.
-13. **[INP-4]** Guardado de onboarding client-side, validación solo client — **M**.
-14. **[INP-5]** `sendMessage` sin tope de longitud en subject/body — **S**.
-15. **[HYG-1]** `is_admin()` no fija `search_path` explícito — **S**.
+> **Estado:** los 8 bajos de C+D **RESUELTOS** en el merge `b32f0c5` (15 jun 2026, changelog SPEC 2.0). RLS-2 y HYG-1 ya se habían resuelto en el sub-bloque A (migración 009).
+6. **[INP-1]** Errores crudos de Postgres/Supabase devueltos al cliente — **S**. ✅ RESUELTO (`b32f0c5`, `logAndGeneric` en `lib/admin/errors.ts`).
+7. **[EDGE-5]** `/api/portal/progress` confía en `subscriptionId` del body — **S**. ✅ RESUELTO (`b32f0c5`, `getAccessSubscriptionId` server-side, body ignorado).
+8. **[EDGE-3]** `getDay()` local vs cómputo en UTC (off-by-one si runtime no-UTC) — **S**. ✅ RESUELTO (`b32f0c5`, `toDayOfWeek` usa `getUTCDay()`).
+9. **[MW-3]** El `matcher` cubre `/api/*` (webhook/cron pagan `getUser()` innecesario) — **S**. ✅ RESUELTO (`b32f0c5`, `matcher` excluye `api/webhooks`/`api/cron`, literal inline).
+10. **[RLS-2]** `messages_admin_write` sin `with check` — **S**. ✅ RESUELTO en sub-bloque A (migración 009).
+11. **[SVC-2]** `create-checkout` usa service-role de más — **S**. ✅ RESUELTO (`b32f0c5`, todo RLS-aware).
+12. **[STG-2]** Signed URLs de fotos con expiración de 1h (considerar bajar a 5–10 min) — **S**. ✅ RESUELTO (`b32f0c5`, 600s vía `lib/storage/signed-url.ts`).
+13. **[INP-4]** Guardado de onboarding client-side, validación solo client — **M**. ✅ RESUELTO (`b32f0c5`, server action `lib/onboarding/responsesActions.ts` con validación server-side).
+14. **[INP-5]** `sendMessage` sin tope de longitud en subject/body — **S**. ✅ RESUELTO (`b32f0c5`, `validateMessageContent` 200/5000).
+15. **[HYG-1]** `is_admin()` no fija `search_path` explícito — **S**. ✅ RESUELTO en sub-bloque A (migración 009).
 
 ---
 
