@@ -1,14 +1,15 @@
 ════════════════════════════════════════════════════════════════
 DOCUMENTO DE TRASPASO — PLATAFORMA WEB AURA MARISTANY
-Fecha: 4 de junio de 2026 · Actualizado: 15 de junio de 2026
-Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 7 sub-bloques + 2 fixes mergeados:
+Fecha: 4 de junio de 2026 · Actualizado: 16 de junio de 2026
+Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 8 sub-bloques + 2 fixes mergeados:
         1 Gestión de Clientes (0d23c5e), 3 Página de Pagos + lenguaje neutro (d52f224),
         4b Constructor de Onboarding (9477a8c), 4a Núm. Celular en registro (bdb4e83),
         A Auditoría de seguridad + ciclo de corrección (bb05894), B2 /portal/settings completo (4271c85),
-        C+D pulido auditoría + limpieza de tipos (b32f0c5); + fixes A1/G4 (1e838d7) y B1 (0dde433).
+        C+D pulido auditoría + limpieza de tipos (b32f0c5), CRUD de Series en admin (d2b3d70);
+        + fixes A1/G4 (1e838d7) y B1 (0dde433).
         Migr. 001-010 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento
         seguridad: with check RLS + search_path is_admin + phone normalizado en trigger;
-        010 = bucket público avatars + policy de lectura). C+D SIN migración nueva.
+        010 = bucket público avatars + policy de lectura). C+D y CRUD de Series SIN migración nueva.
         backfill de invoices ejecutado; E2E validado. ✓ BUG G4 RESUELTO (1e838d7: primer invoice
         se registra en checkout.session.completed). ✓ B1 logout MERGEADO (0dde433).
         ✓ B2 /portal/settings COMPLETO MERGEADO (4271c85: edición nombre/teléfono + contraseña,
@@ -18,9 +19,28 @@ Estado: Fases 0-5 en main; Fase 6 (Pulido + Launch) EN CURSO con 7 sub-bloques +
         INP-1/SVC-2/INP-4) + limpieza de tipos (types.ts completado a mano, 0 casts injustificados,
         Relationships:[] + "trialing"; try/catch en stripe.retrieve que re-lanza; formatDate unificado;
         tests cloneDay/cloneWeek) + bonus (fix BILLING_LABELS, dayLabel timestamptz, y fix pre-existente
-        router.refresh() tras guardar progreso en /portal/today). 247 tests.
-        Pendiente Fase 6: decisiones de Aura P1 precios/P5 dominio; Resend (+ SMTP confirmación),
-        deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+        router.refresh() tras guardar progreso en /portal/today).
+        ✓ CRUD de Series COMPLETO (HEAD d2b3d70, 10 commits): crear/editar/eliminar series en
+        /admin/content/[programId]; server actions createSeries/updateSeries/deleteSeries; menú ⋯
+        en SeriesAccordion; SeriesFormModal (variantes por checkbox) + SeriesDeleteDialog (cascade
+        warning); getAdminProgram devuelve variants[] + variantIds[]. SIN migración nueva. 252 tests.
+        ✓ DEMO EN LÍNEA DESPLEGADO (16-jun): app pública en https://app.auramaristany.com (Vercel
+        Production), modo DEMO para feedback de Aura (NO lanzamiento productivo). Decisiones: Stripe
+        TEST mode (flip a live cuando Aura dé precios — quiere ver el demo funcionando antes); mismo
+        proyecto Supabase como prod; A2 completo (Resend dominio verificado + SMTP + Confirm email);
+        datos demo se conservan (se borran solo clientes al lanzar). ✓ A2 (Resend): dominio
+        auramaristany.com verificado (DNS en IONOS, registros en subdominio 'send' + DKIM, sin tocar
+        correo IONOS); SMTP de Supabase Auth → Resend (smtp.resend.com:465, user 'resend'); Confirm
+        email activado; RESEND_FROM_EMAIL=no-reply@auramaristany.com. ✓ A3 (deploy): repo PRIVADO
+        github.com/bijeded/auramaristany; Vercel team "Aura Maristany's projects"/project-a24no
+        conectado a GitHub (main→Production, ramas→Preview); framework nextjs en vercel.json; 11 env
+        vars Production (Stripe TEST); webhook test we_1Tj1aZ… (4 eventos); vercel --prod aliased a
+        app.auramaristany.com; Site URL + Redirect URLs ajustados en Supabase Auth. Seed corrido
+        (admin hola@auramaristany.com/09876543 + 20 clientes demo /12345678) — seed-demo.ts reescrito
+        ADITIVO y SIN secretos (borra solo datos de usuario vía service_role + vacía buckets, no toca
+        catálogo). Fix de build roto en main (updateSeries seteaba updated_at a mano → TS2322).
+        Pendiente Fase 6: Task 5 smoke E2E con Aura; luego (antes de lanzar) Stripe LIVE + precios
+        reales de Aura, WhatsApp real, limpieza de datos demo, env vars de Preview.
         Registrado para después: transaccionalidad de saveBlocks/savePillarBlocks.
 ════════════════════════════════════════════════════════════════
 
@@ -402,6 +422,24 @@ Middleware (orden):
                                        · SubscriptionCard ("Mes X de Y") · PaymentHistory (paginación 10/página)
 /app/portal/settings/page.tsx (+)   — Server Component: header + 6 secciones (Next 14 searchParams plano)
 /supabase/migrations/010_avatars_bucket.sql — bucket público 'avatars' + policy avatars_public_read. APLICADA y verificada.
+-- CRUD de Series — /admin/content/[programId] (HEAD d2b3d70, SIN migración):
+/lib/admin/seriesActions.ts         — "use server" · createSeries (INSERT + variant_series_map; 23505→inline) /
+                                       updateSeries (UPDATE + DELETE/INSERT map; guard variantIds.length>0) /
+                                       deleteSeries (borra variant_series_map PRIMERO, luego program_series;
+                                       FK sin CASCADE); todas requieren requireAdmin + revalidatePath
+/lib/admin/queries.ts (+)           — getAdminProgram ahora retorna { program, series, variants } donde
+                                       cada serie incluye variantIds[]; guard seriesIds.length>0 antes de .in()
+/components/admin/SeriesFormModal.tsx — "use client" · modal crear/editar: Mes#(create-only), Título,
+                                       Descripción, Publicado(edit-only), checkboxes de variantes;
+                                       error 23505 inline bajo Mes# con borde rojo; import type AdminVariant/
+                                       AdminSeries (type-only import para evitar server-only en cliente)
+/components/admin/SeriesDeleteDialog.tsx — "use client" · confirmación cascade: "días, bloques y pilares
+                                       se eliminarán permanentemente"; botones Cancelar/Eliminar(rojo)
+/components/admin/NewSeriesButton.tsx — "use client" · mantiene page.tsx como Server Component; abre
+                                       SeriesFormModal en mode="create"
+/components/admin/SeriesAccordion.tsx (+) — header convertido de <button> a <div> (HTML: no anidar buttons);
+                                       menú ⋯ (useRef+useEffect click-outside, patrón DayCellMenu);
+                                       dropdown "Editar"/"Eliminar"; modales montados en Fragment fuera del card
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 9. VARIABLES DE ENTORNO REQUERIDAS
@@ -413,12 +451,17 @@ SUPABASE_SERVICE_ROLE_KEY          (solo servidor)
 STRIPE_SECRET_KEY
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 STRIPE_WEBHOOK_SECRET
-RESEND_API_KEY
-RESEND_FROM_EMAIL=noreply@auramaristany.com   (dev sin dominio verificado: onboarding@resend.dev)
-NEXT_PUBLIC_AURA_WHATSAPP           (Fase 4: número de Aura, internacional solo dígitos; prueba 525512620404)
-CRON_SECRET                         (Fase 4: secreto del Vercel Cron de retención; setear en Vercel al desplegar)
+RESEND_API_KEY                      (prod: en Vercel; VACÍA en .env.local local → email no-op en dev)
+RESEND_FROM_EMAIL=no-reply@auramaristany.com  (dev sin dominio verificado: onboarding@resend.dev)
+NEXT_PUBLIC_AURA_WHATSAPP           (Fase 4: número de Aura, internacional solo dígitos; demo: 525512620404)
+CRON_SECRET                         (Fase 4: secreto del Vercel Cron de retención; ya seteado en Vercel prod)
 NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
-DEV_DATE=YYYY-MM-DD                 (solo dev, server-only, gitignored; remover en prod)
+DEV_DATE=YYYY-MM-DD                 (solo dev, server-only, gitignored; NO se puso en Vercel)
+
+  Demo en Vercel (Production, 16-jun): las 11 vars están seteadas vía `vercel env add`. Stripe en
+  TEST (sk_test/pk_test) por ser demo; STRIPE_WEBHOOK_SECRET = del endpoint test we_1Tj1aZ…; NO se
+  copió DEV_DATE. Env vars de Preview pendientes (el CLI pide rama interactiva; se harán al crear la
+  1ª rama de dev). Al pasar a LIVE: flip de keys Stripe a sk_live/pk_live + nuevo webhook live + secret.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 10. ESTADO ACTUAL DEL PROYECTO
@@ -684,9 +727,18 @@ COMPLETADO:
       0 casts injustificados, Relationships:[] + "trialing"; try/catch retrieve re-lanza; formatDate
       unificado; tests cloneDay/cloneWeek) + bonus (fix BILLING_LABELS, dayLabel timestamptz, fix
       pre-existente router.refresh() tras guardar progreso en /portal/today). 247 tests.
+    ✓ CRUD de Series en admin (HEAD d2b3d70, SIN migración): botón "Nueva serie" habilitado en
+      /admin/content/[programId]; 3 server actions en lib/admin/seriesActions.ts (createSeries/
+      updateSeries/deleteSeries, con requireAdmin + revalidatePath); SeriesFormModal (crear: Mes#/
+      título/descripción/variantes checkboxes; editar: +published; error 23505 inline); SeriesDeleteDialog
+      (cascade warning modal); NewSeriesButton (client component, mantiene page.tsx Server Component);
+      SeriesAccordion reescrito: header <div> (no anidar <button>), menú ⋯ (click-outside patrón
+      DayCellMenu), modales en Fragment fuera del card. getAdminProgram devuelve variants[] + variantIds[]
+      por serie (guard seriesIds.length>0 antes de .in()). DELETE borra variant_series_map primero (FK
+      sin CASCADE). 252/252 tests, smoke OK (crear/editar/publicar/mes-duplicado/eliminar). 10 commits.
     Specs/planes en docs/superpowers/ (gestion-clientes / admin-payments / onboarding-builder /
     telefono-registro / auditoria-seguridad / fixes-seguridad / 2026-06-13-b2-portal-settings /
-    2026-06-15-fase6-cd-pulido-limpieza).
+    2026-06-15-fase6-cd-pulido-limpieza / 2026-06-16-series-crud-admin).
 
 PENDIENTE (Fase 6):
   ✓ BUG G4 RESUELTO (merge 1e838d7): invoice.paid llega ~1s antes que checkout.session.completed
@@ -702,12 +754,25 @@ PENDIENTE (Fase 6):
   ✓ C+D MERGEADO (b32f0c5): 8 bajos de auditoría (INP-1, EDGE-5, EDGE-3, MW-3, SVC-2, STG-2, INP-4, INP-5)
     + limpieza de tipos (types.ts a mano, 0 casts injustificados; try/catch retrieve re-lanza; formatDate
     unificado; tests cloneDay/cloneWeek). 247 tests.
-  ○ Decisiones de Aura: P1 precios reales MXN (bloquea Stripe live) + P5 dominio app.auramaristany.com
-    (bloquea Resend y Vercel). (SIGUIENTE)
-  ○ Conectar Resend (API key + RESEND_FROM_EMAIL + verificar dominio) — también activa el SMTP de
-    confirmación de correo (hoy el registro con correo nuevo no envía confirmación).
-  ○ Deploy a Vercel + env vars de prod (+ CRON_SECRET, STRIPE_WEBHOOK_SECRET de prod, remover DEV_DATE).
-  ○ Stripe live + precios reales (P1): crear los 10 Prices en live y actualizar program_variants.
+  ✓ CRUD de Series COMPLETO (HEAD d2b3d70, 10 commits, SIN migración): botón "Nueva serie" funcional;
+    createSeries/updateSeries/deleteSeries; SeriesFormModal + SeriesDeleteDialog + NewSeriesButton;
+    SeriesAccordion con menú ⋯; getAdminProgram devuelve variants[] + variantIds[]. 252 tests, smoke OK.
+  ✓ DECISIONES DE AURA: P5 dominio confirmado (auramaristany.com email + app.auramaristany.com app,
+    ya en Vercel). P1 precios: Aura quiere ver el demo funcionando ANTES de definir precios → demo
+    sale en Stripe TEST; precios reales + Stripe live = trabajo futuro antes del lanzamiento.
+  ✓ A2 Resend + confirmación de email CONFIGURADO (dominio verificado, SMTP Supabase, Confirm email).
+  ✓ A3 Deploy a Vercel COMPLETO (demo en vivo en https://app.auramaristany.com, Stripe test, webhook
+    test, GitHub conectado, datos demo cargados). Verificado: /auth/login 200, rutas protegidas
+    redirigen, middleware OK.
+  ○ Task 5 — Smoke E2E en producción CON AURA (SIGUIENTE): login admin demo (hola@auramaristany.com/
+    09876543) + cliente demo (gaby.torres@test.aura.mx/12345678) + registro real → confirmación →
+    onboarding → checkout test (4242 4242 4242 4242) → webhook crea sub.
+  ○ Correcciones menores detectadas por el usuario en la verificación de navegador (pendientes de
+    detallar/implementar).
+  ○ ANTES DE LANZAR (futuro): Stripe LIVE + precios reales de Aura (crear 10 Prices live + actualizar
+    program_variants + flip de keys + webhook live); WhatsApp real de Aura; limpieza de datos de
+    clientes demo (conservando admin y programas/series); env vars de Preview en Vercel; decidir si
+    se construye UI de admin para gestión de planes/precios o se mantiene script+SQL.
   ○ Registrado para después (fuera de scope C+D): saveBlocks/savePillarBlocks no transaccionales.
   ○ Setup local: correr `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
     para probar checkout (ver sección 12).
@@ -760,8 +825,19 @@ Fase 6 — Pulido + Launch   (sem 14-15) Edge cases + auditoría seguridad + pro
     (STG-2/INP-5/EDGE-3/MW-3/EDGE-5/INP-1/SVC-2/INP-4) + types.ts a mano (0 casts injustificados) +
     try/catch retrieve (re-lanza) + formatDate unificado + tests cloneDay/cloneWeek + bonus
     (BILLING_LABELS, dayLabel timestamptz, fix pre-existente router.refresh() en /portal/today). 247/247 tests.
-  Pendiente: decisiones de Aura (P1 precios MXN, P5 dominio), Resend (+ SMTP confirmación),
-    deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+  ✓ CRUD de Series en admin COMPLETO (HEAD d2b3d70, SIN migración, 10 commits en main): Aura puede
+    crear series (Mes#, título, descripción, variantes), editar (+ published) y eliminar (cascade
+    warning) desde /admin/content/[programId]. Server actions lib/admin/seriesActions.ts. Menú ⋯ en
+    SeriesAccordion (patrón DayCellMenu). Error 23505 (mes duplicado) inline. FK sin CASCADE → delete
+    borra variant_series_map antes de program_series. 252/252 tests, smoke OK.
+  ✓ DEMO EN LÍNEA (16-jun): app desplegada en https://app.auramaristany.com (Vercel Production, modo
+    DEMO para feedback de Aura). A2 Resend+SMTP+Confirm email configurado; A3 deploy completo (repo
+    privado bijeded/auramaristany conectado a Vercel project-a24no, 11 env vars Stripe TEST, webhook
+    test we_1Tj1aZ…, seed demo cargado). seed-demo.ts reescrito aditivo+sin-secretos. Stripe en TEST
+    (Aura quiere ver el demo antes de dar precios). Logins demo: admin hola@auramaristany.com/09876543,
+    clientes /12345678.
+  Pendiente: Task 5 smoke E2E con Aura; correcciones menores de la verificación de navegador; ANTES
+    DE LANZAR → Stripe LIVE + precios reales, WhatsApp real, limpieza de datos demo, env Preview.
     Registrado para después: transaccionalidad de saveBlocks/savePillarBlocks.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -803,10 +879,11 @@ tardó más de lo esperado". NO es bug de código. Aplica incluso en test mode.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 P1: ¿Cuáles son los precios exactos en MXN de cada variante?
-    RESUELTO TEMPORALMENTE: Se usarán precios simulados ($999 MXN) en Stripe
-    test mode durante el desarrollo. Antes del lanzamiento se crean los
-    Products/Prices reales en Stripe live mode y se actualizan los
-    stripe_price_id en la tabla program_variants con un query SQL.
+    DECISIÓN DE AURA (16-jun): quiere ver el DEMO funcionando antes de definir precios. El demo sale
+    en Stripe TEST con precios simulados ($999 MXN). Antes del lanzamiento real Aura dará los precios
+    → se crean los Products/Prices en Stripe LIVE y se actualizan stripe_price_id/price_mxn en
+    program_variants (vía scripts/seed-stripe.ts en live + SQL). NO hay UI de admin para planes/precios
+    (decisión futura: mantener script+SQL o construir UI según necesidades de Aura).
 
 P2: ¿Qué pasa en semanas 5 de un mes? (ver Limitaciones arriba)
     Opciones: a) descanso automático  b) repetir contenido semana 4
@@ -822,6 +899,10 @@ P4: ¿Cuáles son las preguntas del onboarding que Aura quiere hacer?
     (migración 002) hasta que Aura defina y cargue su set definitivo desde el admin.
 
 P5: ¿El nombre de dominio ya está comprado? ¿app.auramaristany.com o similar?
+    RESUELTO (16-jun): auramaristany.com comprado (DNS en IONOS). Email desde el dominio (Resend
+    verificado, remitente no-reply@auramaristany.com); app en app.auramaristany.com (conectado a
+    Vercel, sirviendo el demo). El apex auramaristany.com NO está apuntado a Vercel (irrelevante;
+    solo se usa el subdominio app).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 14. ARCHIVOS DE REFERENCIA EN DISCO
@@ -852,13 +933,19 @@ Diseño UI (prototipos JSX listos para implementar):
 FIN DEL DOCUMENTO DE TRASPASO
 Estado: Fases 0–5 COMPLETAS y en main; Fase 6 EN CURSO (sub-bloques mergeados: 1 Gestión de Clientes
 0d23c5e, 3 Página de Pagos d52f224, 4b Constructor de Onboarding 9477a8c, 4a Núm. Celular en registro
-bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894, B2 /portal/settings completo 4271c85).
+bdb4e83, A Auditoría de seguridad + ciclo de corrección bb05894, B2 /portal/settings completo 4271c85,
+C+D pulido auditoría + limpieza de tipos b32f0c5, CRUD de Series en admin HEAD d2b3d70).
 Migraciones 001–010 aplicadas (007 = ON DELETE CASCADE; 008 = phone; 009 = endurecimiento seguridad;
 010 = bucket público avatars); backfill de invoices ejecutado; E2E validado. UI con lenguaje neutro
-('cliente'). 247/247 tests. ✓ BUG G4 resuelto (1e838d7). ✓ B1 logout en UI mergeado (0dde433).
+('cliente'). 252/252 tests. ✓ BUG G4 resuelto (1e838d7). ✓ B1 logout en UI mergeado (0dde433).
 ✓ B2 /portal/settings completo mergeado (4271c85). ✓ C+D pulido auditoría + limpieza tipos mergeado (b32f0c5).
-Pendiente Fase 6 (orden acordado): pedir a Aura precios (P1)/dominio (P5) → bloque ops: Resend
-(+ SMTP confirmación + dominio), deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales.
+✓ CRUD de Series en admin completo (HEAD d2b3d70, SIN migración, 10 commits).
+✓ DEMO EN LÍNEA desplegado (16-jun): https://app.auramaristany.com (Vercel Production, Stripe TEST,
+demo para feedback de Aura). A2 Resend+SMTP+Confirm email ✓. A3 deploy Vercel ✓ (repo privado
+bijeded/auramaristany conectado, 11 env vars, webhook test, datos demo cargados). seed-demo.ts
+reescrito aditivo+sin-secretos. Dominio (P5) y decisión de precios (P1: demo antes de precios) resueltos.
+Pendiente Fase 6: Task 5 smoke E2E con Aura + correcciones menores de la verificación de navegador;
+ANTES DE LANZAR → Stripe LIVE + precios reales, WhatsApp real, limpieza datos demo, env Preview.
 Registrado para después: transaccionalidad de saveBlocks/savePillarBlocks.
 Usar el flujo brainstorm → plan → ejecución (superpowers).
 ════════════════════════════════════════════════════════════════
