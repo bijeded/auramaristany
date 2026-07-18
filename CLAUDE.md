@@ -81,6 +81,17 @@ DEV_DATE=YYYY-MM-DD   # SOLO dev, gitignored, NUNCA en Vercel
 
 ---
 
+## Design
+
+Fuente visual: **`design-handoff-aura/`** — prototipo hi-fi (17 pantallas, React-sin-build) + `README.md` con **design tokens** y **reglas de dominio del cliente**. `prototype/aura/styles.css` = tokens (rosa `#eddbd8`/lavanda `#9982f4`, Oswald/Hind, radios, sombras); `components.jsx` = primitivos; cada `*-*.jsx` = una pantalla; `assets/logo.png` = logo.
+
+- **Recrear** la UI con las librerías del proyecto (shadcn/Tailwind/Recharts/dnd-kit) — **no** copiar el JSX del prototipo (usa Babel-en-navegador, no es código de producción).
+- **Copy:** cálido, 1ª persona ("Mi progreso"), celebra logros, sin tecnicismos; **evitar "bienestar"**.
+- **Reglas de dominio del prototipo (se respetan):** 1 video por ejercicio; captura por serie (reps + peso, N filas = N series); **nunca** métricas corporales (sí fotos de progreso); ejercicios en tarjetas; logo negro sobre fondos claros; botones ≥48px / áreas táctiles ≥44px; skeletons (no spinners).
+- ⚠ **El prototipo es el original; el dominio evolucionó.** Donde prototipo y `SPEC.md`/código difieran en **lógica** (p.ej. "Mes·Semana" no "Día X de 180"; grilla 4×7 no 6×30; Desempeño sin stat cards; sin selector de tipo de día), **manda `SPEC.md` + el código enviado**. El prototipo manda en **look & feel** (tokens, componentes, tono).
+
+---
+
 ## Conventions
 
 - **Idioma UI:** español neutro de México — **'cliente', nunca 'clienta'**. Fechas capitalizadas en JS (`charAt(0).toUpperCase()`), no `text-transform`.
