@@ -38,6 +38,10 @@ next-env.d.ts
 # git worktrees
 .worktrees/
 
+# Claude Code local artifacts (the opsx/* integration IS committed; these are machine-local)
+.claude/worktrees/
+.claude/settings.local.json
+
 # supabase CLI local state (project ref, pooler url — no commitear)
 supabase/.temp/
 

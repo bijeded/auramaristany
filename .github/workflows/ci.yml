@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    # Placeholder env so `next build`/tests don't fail on missing config.
+    # These are NON-secret dummy values (not real keys) — used only to let the
+    # static prerender of client pages construct clients at build time.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
+      STRIPE_SECRET_KEY: build-placeholder
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: build-placeholder
+      STRIPE_WEBHOOK_SECRET: build-placeholder
+      RESEND_API_KEY: ""
+      RESEND_FROM_EMAIL: onboarding@resend.dev
+      NEXT_PUBLIC_AURA_WHATSAPP: "525512620404"
+      CRON_SECRET: build-placeholder
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Secret scan first — fail-fast, needs no dependencies. BLOCKING.
+      # gitleaks-action only requires GITLEAKS_LICENSE on GitHub Organizations,
+      # not personal accounts (bijeded). Add the license if the repo moves to an org.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20 # conservative match for @types/node ^20; bump to match Vercel if needed
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+      # Non-blocking early warning; the launch gate for vulns is production-checklist.
+      - name: Dependency audit
+        run: npm audit --audit-level=high || true
