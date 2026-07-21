@@ -1,176 +1,176 @@
 # Backlog — Aura Maristany
 
-Lista viva de trabajo pendiente. **Cada item tiene un ID estable** para lanzarlo directo al loop de OpenSpec.
+Living list of pending work. **Each item has a stable ID** to launch it directly into the OpenSpec loop.
 
 ```
-/opsx:propose "A2 — descanso en minutos"     # cuando el alcance ya está claro
-/opsx:explore "A6 — sistema de reservas"     # cuando falta definir
+/opsx:propose "A2 — rest in minutes"     # when scope is already clear
+/opsx:explore "A6 — booking system"      # when it still needs defining
 ```
 
-**Al cerrar un item:** `/opsx:archive` → marcar aquí como `✅ Hecho` → re-indexar codebase-memory en modo `fast`.
+**When closing an item:** `/opsx:archive` → mark it here as `✅ Done` → re-index codebase-memory in `fast` mode.
 
-**Fuentes:** feedback de Aura (2026-07-18) + pendientes de `handoff.md`/`SPEC.md`.
-**Tamaño:** `S` ≈ horas · `M` ≈ ~1 día · `L` ≈ varios días.
+**Sources:** Aura's feedback (2026-07-18) + pending items from `handoff.md`/`SPEC.md`.
+**Size:** `S` ≈ hours · `M` ≈ ~1 day · `L` ≈ several days.
 
 ---
 
-## Índice
+## Index
 
-| ID | Item | Tam. | Estado |
+| ID | Item | Size | Status |
 |----|------|:----:|--------|
-| **A2** | Descanso en minutos | S | Pendiente |
-| **A3** | Checkbox de ejercicio más visible | S | Falta decisión visual |
-| **A10** | Barras en "Ingresos por programa" | S | Pendiente |
-| **A11** | 5ª stat card: vencen en 7 días | S | Pendiente |
-| **A1** | Selector kg / lb | M | Pendiente |
-| **A5** | Filtro "Sin actividad" en Clientes | M | Pendiente |
-| **A8** | Color y fondo en el editor de texto | M | Falta decidir paleta |
-| **A9** | Cancelación + encuesta de salida | M | Pendiente |
-| **A12** | Calendario de 7 días en el portal | M | Pendiente |
-| **A6** | Sistema de reservas (WordPress) | L | Pendiente |
-| **A7** | Bloque "Agendar" en el editor | M | Bloqueado por A6 |
-| **A4** | Mensajes automáticos | L | Hacer después de A5 |
-| **L1** | Stripe LIVE + precios reales | M | Bloqueado (precios de Aura) |
-| **L2** | Extra → cobro mensual recurrente | L | Pendiente |
-| **L3** | Set de preguntas de onboarding | S | Bloqueado (Aura las define) |
-| **L4** | Smoke E2E con Aura | S | Pendiente |
-| **L5** | WhatsApp real | S | Bloqueado (número de Aura) |
-| **L6** | Limpieza de datos demo | S | Pendiente |
-| **L7** | Correcciones menores del demo | S | Falta detallar |
-| **L8** | production-checklist | M | Al final |
-| **L9** | ¿UI de admin para planes/precios? | L | Falta decidir |
-| **L10** | Env vars de Preview en Vercel | S | Pendiente |
-| **D1–D7** | Diferidos / deuda técnica | — | Ver abajo |
+| **A2** | Rest in minutes | S | Pending |
+| **A3** | More visible exercise checkbox | S | Visual decision pending |
+| **A10** | Bars in "Ingresos por programa" | S | Pending |
+| **A11** | 5th stat card: expiring in 7 days | S | Pending |
+| **A1** | kg / lb selector | M | Pending |
+| **A5** | "Sin actividad" filter in Clients | M | Pending |
+| **A8** | Color and background in the text editor | M | Palette decision pending |
+| **A9** | Cancellation + exit survey | M | Pending |
+| **A12** | 7-day calendar in the portal | M | Pending |
+| **A6** | Booking system (WordPress) | L | Pending |
+| **A7** | "Agendar" block in the editor | M | Blocked by A6 |
+| **A4** | Automated messages | L | Do after A5 |
+| **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
+| **L2** | Extra → recurring monthly billing | L | Pending |
+| **L3** | Onboarding question set | S | Blocked (Aura defines them) |
+| **L4** | E2E smoke test with Aura | S | Pending |
+| **L5** | Real WhatsApp | S | Blocked (Aura's number) |
+| **L6** | Demo data cleanup | S | Pending |
+| **L7** | Minor demo fixes | S | Needs detailing |
+| **L8** | production-checklist | M | At the end |
+| **L9** | Admin UI for plans/prices? | L | Decision pending |
+| **L10** | Preview env vars in Vercel | S | Pending |
+| **D1–D7** | Deferred / technical debt | — | See below |
 
 ---
 
-## A · Solicitudes de Aura
+## A · Aura's Requests
 
-### A2 · Descanso en minutos — `S`
-Mostrar `1 min` / `1:30 min` en vez de `60 seg`. **Solo la etiqueta**; `rest_seconds` no cambia.
-- **Toca:** helper puro nuevo (+ tests, patrón AAA) · tarjeta de ejercicio en `/portal/today` · `components/portal/blocks/ExerciseListLogged.tsx` (historial read-only) · revisar preview del editor admin.
-- **Ojo:** puramente presentacional — no migrar datos ni tocar el JSON de `exercise_list`.
+### A2 · Rest in minutes — `S`
+Show `1 min` / `1:30 min` instead of `60 seg`. **Label only**; `rest_seconds` doesn't change.
+- **Touches:** new pure helper (+ tests, AAA pattern) · exercise card in `/portal/today` · `components/portal/blocks/ExerciseListLogged.tsx` (read-only history) · review admin editor preview.
+- **Watch out:** purely presentational — don't migrate data or touch the `exercise_list` JSON.
 
-### A3 · Checkbox de ejercicio más visible — `S`
-Hacer más notorio el control de "ejercicio hecho" en `/portal/today`.
-- **Toca:** tarjeta de ejercicio del portal (patrón `CheckRound` del prototipo: borde `rosa-deep` → relleno lavanda + check).
-- **Falta decidir:** tamaño / contraste / si toda la tarjeta se vuelve táctil. Presentar 2–3 opciones antes de implementar.
-- **Ojo:** respetar áreas táctiles ≥44px y los tokens de marca.
+### A3 · More visible exercise checkbox — `S`
+Make the "exercise done" control in `/portal/today` more noticeable.
+- **Touches:** portal exercise card (prototype's `CheckRound` pattern: `rosa-deep` border → lavender fill + check).
+- **Still to decide:** size / contrast / whether the whole card becomes tappable. Present 2–3 options before implementing.
+- **Watch out:** respect ≥44px tap targets and the brand tokens.
 
-### A10 · Barras en "Ingresos por programa" — `S`
-Cambiar la dona por barras en el dashboard.
-- **Toca:** `components/admin/ProgramRevenueDonut.tsx` → barras (reusar patrón de `components/admin/RevenueBarChart.tsx`).
-- **Ojo:** los datos no cambian (`groupRevenueByProgram` en `lib/admin/finance-helpers.ts`). Aplica el skill `dataviz`.
+### A10 · Bars in "Ingresos por programa" — `S`
+Change the donut chart to bars on the dashboard.
+- **Touches:** `components/admin/ProgramRevenueDonut.tsx` → bars (reuse the pattern from `components/admin/RevenueBarChart.tsx`).
+- **Watch out:** the data doesn't change (`groupRevenueByProgram` in `lib/admin/finance-helpers.ts`). Apply the `dataviz` skill.
 
-### A11 · 5ª stat card: vencen en 7 días — `S`
-KPI con suscripciones que expiran en ≤7 días.
-- **Decidido:** se **agrega** una quinta card; NO reemplaza "Renuevan este mes" (≤30d).
-- **Toca:** `lib/admin/finance-helpers.ts` (generalizar `computeRenewalsThisMonth` a N días, puro + TDD) · `app/admin/dashboard/page.tsx`.
-- **Ojo:** revisar el layout responsivo del KPI row al pasar de 4 a 5 cards.
+### A11 · 5th stat card: expiring in 7 days — `S`
+KPI with subscriptions expiring in ≤7 days.
+- **Decided:** a fifth card is **added**; it does NOT replace "Renuevan este mes" (≤30d).
+- **Touches:** `lib/admin/finance-helpers.ts` (generalize `computeRenewalsThisMonth` to N days, pure + TDD) · `app/admin/dashboard/page.tsx`.
+- **Watch out:** review the KPI row's responsive layout when going from 4 to 5 cards.
 
-### A1 · Selector kg / lb — `M`
-La clienta elige unidad de peso; el histórico debe quedar consistente.
-- **Decidido (recomendación):** guardar **siempre canónico en kg**; convertir solo al capturar/mostrar. Nunca guardar unidades mezcladas.
-- **Toca:** captura de ejercicios + `hooks/useProgressForm.ts` · `ExerciseListLogged` · `lib/content/history-helpers.ts` (`aggregateDayValue`/`buildPerformanceSeries` promedian peso) · `components/portal/PerformanceChart.tsx` (etiqueta de eje) · preferencia del usuario en `/portal/settings` (`lib/portal/settingsActions.ts`, `account-queries.ts`).
-- **Ojo:** la clave del JSON es literalmente `weight_kg` y `metrics: ["reps_done","weight_kg"]` — decidir si se conserva el nombre (recomendado) y solo se convierte en la vista. Probable **migración 011** para la preferencia en `profiles`.
+### A1 · kg / lb selector — `M`
+The client chooses the weight unit; history must stay consistent.
+- **Decided (recommendation):** always store **canonical in kg**; convert only when logging/displaying. Never store mixed units.
+- **Touches:** exercise logging + `hooks/useProgressForm.ts` · `ExerciseListLogged` · `lib/content/history-helpers.ts` (`aggregateDayValue`/`buildPerformanceSeries` average weight) · `components/portal/PerformanceChart.tsx` (axis label) · user preference in `/portal/settings` (`lib/portal/settingsActions.ts`, `account-queries.ts`).
+- **Watch out:** the JSON key is literally `weight_kg` and `metrics: ["reps_done","weight_kg"]` — decide whether to keep the name (recommended) and only convert at the view layer. Likely **migration 011** for the preference in `profiles`.
 
-### A5 · Filtro "Sin actividad" en Clientes — `M`
-Pill nueva junto a Activas/Vencidas/Canceladas: sin `progress_logs` en 10 días.
-- **Toca:** `lib/admin/clients-queries.ts` (`getClientsList` → agregar última actividad, máx `progress_logs.log_date`) · `lib/admin/clients-helpers.ts` (`filterClients`, `STATE_FILTERS`, puros + TDD) · `components/admin/ClientsTable.tsx`.
-- **Ojo:** 🔗 **la señal "última actividad" la reusa A4.** Construirla aquí y dejarla reutilizable.
+### A5 · "Sin actividad" filter in Clients — `M`
+New pill next to Activas/Vencidas/Canceladas: no `progress_logs` in 10 days.
+- **Touches:** `lib/admin/clients-queries.ts` (`getClientsList` → add last activity, max `progress_logs.log_date`) · `lib/admin/clients-helpers.ts` (`filterClients`, `STATE_FILTERS`, pure + TDD) · `components/admin/ClientsTable.tsx`.
+- **Watch out:** 🔗 **the "last activity" signal is reused by A4.** Build it here and keep it reusable.
 
-### A8 · Color y fondo en el editor de texto — `M`
-Color de letra y de fondo en el bloque de Texto (Tiptap).
-- **Toca:** deps MIT `@tiptap/extension-text-style` + `@tiptap/extension-color` + `@tiptap/extension-highlight` · editor del bloque de texto en `components/admin/blocks/`.
-- **⚠ Gotcha:** `lib/admin/sanitize-html.ts` **borra los estilos** si no se amplía el whitelist (`allowedStyles` con `color` / `background-color`). Sin esto el color se pierde al guardar y parece "bug".
-- **Falta decidir:** paleta acotada a tokens de marca (recomendado) vs. selector libre.
+### A8 · Color and background in the text editor — `M`
+Text color and background for the Text block (Tiptap).
+- **Touches:** MIT deps `@tiptap/extension-text-style` + `@tiptap/extension-color` + `@tiptap/extension-highlight` · text block editor in `components/admin/blocks/`.
+- **⚠ Gotcha:** `lib/admin/sanitize-html.ts` **strips styles** unless the whitelist is extended (`allowedStyles` with `color` / `background-color`). Without this, the color is lost on save and looks like a "bug".
+- **Still to decide:** palette limited to brand tokens (recommended) vs. free-form picker.
 
-### A9 · Cancelación + encuesta de salida — `M`
-Cancelar desde la cuenta + preguntar motivo (radios).
-- **Decidido:** **fin del periodo ya pagado, sin reembolsos.** Verificado en `scripts/seed-stripe.ts`: los 10 precios son `recurring: { interval: "month" }` → todo es cobro mensual (CuarentaMás = 6 ciclos mensuales, **no** un pago en parcialidades) → **no existe caso de reembolso**.
-- **Toca:** `components/portal/settings/SubscriptionCard.tsx` + `lib/portal/settingsActions.ts` · `lib/webhooks/stripe-handlers.ts` (`customer.subscription.updated`) · almacenamiento del motivo (tabla nueva o JSONB → **migración**).
-- **Ojo:** `subscriptions.cancel_at_period_end` **ya existe** y el webhook ya lo maneja; hoy se cancela vía Customer Portal de Stripe.
+### A9 · Cancellation + exit survey — `M`
+Cancel from the account + ask for a reason (radio buttons).
+- **Decided:** **end of the already-paid period, no refunds.** Verified in `scripts/seed-stripe.ts`: all 10 prices are `recurring: { interval: "month" }` → everything is monthly billing (CuarentaMás = 6 monthly cycles, **not** an installment payment) → **no refund case exists**.
+- **Touches:** `components/portal/settings/SubscriptionCard.tsx` + `lib/portal/settingsActions.ts` · `lib/webhooks/stripe-handlers.ts` (`customer.subscription.updated`) · storing the reason (new table or JSONB → **migration**).
+- **Watch out:** `subscriptions.cancel_at_period_end` **already exists** and the webhook already handles it; today cancellation happens via Stripe's Customer Portal.
 
-### A12 · Calendario de 7 días en el portal — `M`
-Pestaña nueva: títulos de las actividades de los próximos 7 días, **sin poder entrar**.
-- **Decidido:** ventana de 7 días **cortada al periodo actual**. Si cruza al mes siguiente, **no** mostrar esas actividades (aún no están pagadas).
-- **Toca:** `components/portal/PortalNav.tsx` (4 → 5 tabs; revisar layout móvil) · ruta nueva en `app/portal/` · lectura de títulos apoyada en `lib/content/access.ts` / `lib/content/queries.ts`.
-- **⚠ Ojo:** roza la regla "sin acceso a días futuros". Se respeta porque son **solo títulos** y no hay navegación a la actividad. No filtrar contenido no publicado. Definir si la ventana incluye hoy.
+### A12 · 7-day calendar in the portal — `M`
+New tab: titles of the next 7 days' activities, **not enterable**.
+- **Decided:** 7-day window **cut off at the current period**. If it crosses into the next month, **do not** show those activities (not yet paid for).
+- **Touches:** `components/portal/PortalNav.tsx` (4 → 5 tabs; review mobile layout) · new route in `app/portal/` · title reads backed by `lib/content/access.ts` / `lib/content/queries.ts`.
+- **⚠ Watch out:** this brushes against the "sin acceso a días futuros" rule. It's respected because these are **titles only** with no navigation into the activity. Don't filter out unpublished content. Decide whether the window includes today.
 
-### A6 · Sistema de reservas (WordPress) — `L`
-Llamadas quincenales por Zoom/Meet.
-- **Decidido:** vive en **WordPress con TheBooking**; la app manda un **enlace firmado** que prueba suscripción activa. Las reglas (1 llamada / 15 días, ≥1 día de anticipación) las controla WordPress.
-- **Toca:** endpoint que genere el enlace firmado (HMAC + secreto compartido, **env var nueva**) · gate con `subscriptionGrantsAccess` (`lib/content/subscription-access.ts`) · configuración del lado WP (fuera del repo).
-- **Ojo:** el enlace debe caducar y no ser reutilizable por terceros. La identidad sale de `getUser()` en el servidor, nunca del cliente.
+### A6 · Booking system (WordPress) — `L`
+Biweekly calls via Zoom/Meet.
+- **Decided:** lives in **WordPress with TheBooking**; the app sends a **signed link** proving an active subscription. The rules (1 call / 15 days, ≥1 day's notice) are controlled by WordPress.
+- **Touches:** endpoint that generates the signed link (HMAC + shared secret, **new env var**) · gate with `subscriptionGrantsAccess` (`lib/content/subscription-access.ts`) · WP-side configuration (outside the repo).
+- **Watch out:** the link must expire and must not be reusable by third parties. Identity comes from `getUser()` on the server, never from the client.
 
-### A7 · Bloque "Agendar" en el editor — `M` · bloqueado por A6
-Nuevo tipo de bloque que lleva al sistema de reservas.
-- **Toca:** nuevo `block_type` en `program_day_blocks` · paleta y editor en `components/admin/blocks/` · zod en `lib/admin/content-validation.ts` · render en `components/portal/blocks/BlockView.tsx`.
-- **Ojo:** si WP impone las reglas, el bloque es prácticamente un CTA con enlace firmado (`S`); si se movieran a la app, crece.
+### A7 · "Agendar" block in the editor — `M` · blocked by A6
+New block type that links to the booking system.
+- **Touches:** new `block_type` in `program_day_blocks` · palette and editor in `components/admin/blocks/` · zod in `lib/admin/content-validation.ts` · rendering in `components/portal/blocks/BlockView.tsx`.
+- **Watch out:** if WP enforces the rules, the block is basically a CTA with a signed link (`S`); if the rules moved into the app, it grows.
 
-### A4 · Mensajes automáticos — `L` · después de A5
-Disparos automáticos: día 12 → recordar agendar videollamada; 10 días sin progreso → "¿todo bien?".
-- **Decidido:** el **recordatorio de cobro NO** se implementa — lo envía Stripe (decisión de Fase 4).
-- **Toca:** cron(s) nuevos en `app/api/cron/` siguiendo el patrón de `purge-messages/route.ts` (Bearer `CRON_SECRET`) + `crons` en `vercel.json` · envío vía `lib/admin/messageActions.ts` / `message_recipients` + `lib/email/send.ts`.
-- **Ojo:** necesita **dedupe** (no reenviar el mismo aviso) → marca persistente por clienta+regla. Reusa la señal de última actividad de **A5**. El aviso de videollamada depende de **A6**.
+### A4 · Automated messages — `L` · after A5
+Automated triggers: day 12 → reminder to schedule a video call; 10 days with no progress → "¿todo bien?".
+- **Decided:** the **billing reminder is NOT** implemented — Stripe sends it (Phase 4 decision).
+- **Touches:** new cron(s) in `app/api/cron/` following the pattern of `purge-messages/route.ts` (Bearer `CRON_SECRET`) + `crons` in `vercel.json` · sending via `lib/admin/messageActions.ts` / `message_recipients` + `lib/email/send.ts`.
+- **Watch out:** needs **dedupe** (don't resend the same notice) → persistent flag per client+rule. Reuses the last-activity signal from **A5**. The video-call notice depends on **A6**.
 
 ---
 
-## L · Antes de abrir a clientes reales
+## L · Before Opening to Real Clients
 
-### L1 · Stripe LIVE + precios reales — `M` · bloqueado
-Crear 10 Products/Prices en live (`scripts/seed-stripe.ts` en modo live) → actualizar `stripe_price_id`/`price_mxn` en `program_variants` → flip de keys a `sk_live`/`pk_live` en Vercel → registrar **webhook live** + nuevo `STRIPE_WEBHOOK_SECRET`.
-**Bloqueado:** faltan los precios de Aura (P1).
+### L1 · Stripe LIVE + real prices — `M` · blocked
+Create 10 Products/Prices in live mode (`scripts/seed-stripe.ts` in live mode) → update `stripe_price_id`/`price_mxn` in `program_variants` → flip keys to `sk_live`/`pk_live` in Vercel → register **live webhook** + new `STRIPE_WEBHOOK_SECRET`.
+**Blocked:** Aura's prices (P1) are still missing.
 
-### L2 · Extra → cobro mensual recurrente — `L`
-`programs.billing_model` de `cuarenta-mas-extra`: `fixed_term_monthly` → `rolling_monthly` (migración) + ajustar acceso/`completed_at`/checkout.
-- **Toca:** `lib/webhooks/stripe-handlers.ts` · `lib/admin/clients-helpers.ts` (`subscriptionProgressLabel`) · `lib/content/access.ts` · revisar prerequisitos de Extra Avanzado (hoy dependen de "Extra Intermedio completado").
-- **Ojo:** hoy solo se cambió la **etiqueta** en el admin; el fondo sigue pendiente.
+### L2 · Extra → recurring monthly billing — `L`
+`programs.billing_model` for `cuarenta-mas-extra`: `fixed_term_monthly` → `rolling_monthly` (migration) + adjust access/`completed_at`/checkout.
+- **Touches:** `lib/webhooks/stripe-handlers.ts` · `lib/admin/clients-helpers.ts` (`subscriptionProgressLabel`) · `lib/content/access.ts` · review Extra Avanzado prerequisites (today they depend on "Extra Intermedio completado").
+- **Watch out:** today only the **label** was changed in admin; the underlying logic is still pending.
 
-### L3 · Set de preguntas de onboarding — `S` · bloqueado
-Aura carga sus preguntas reales desde `/admin/onboarding-settings`. Hoy quedan 3 seed de prueba (migración 002).
+### L3 · Onboarding question set — `S` · blocked
+Aura loads her real questions from `/admin/onboarding-settings`. Currently there are 3 test seed questions left (migration 002).
 
-### L4 · Smoke E2E con Aura — `S`
-Login admin/cliente demo + registro real → confirmación de email → onboarding → checkout test (`4242 4242 4242 4242`) → webhook crea sub → portal.
+### L4 · E2E smoke test with Aura — `S`
+Admin/demo client login + real registration → email confirmation → onboarding → test checkout (`4242 4242 4242 4242`) → webhook creates sub → portal.
 
-### L5 · WhatsApp real — `S` · bloqueado
-Cambiar `NEXT_PUBLIC_AURA_WHATSAPP` (hoy `525512620404`, de prueba) por el número real.
+### L5 · Real WhatsApp — `S` · blocked
+Replace `NEXT_PUBLIC_AURA_WHATSAPP` (currently `525512620404`, a test number) with the real number.
 
-### L6 · Limpieza de datos demo — `S`
-Borrar solo datos de clientes (perfiles/subs/invoices/fotos) conservando admin y catálogo. Base: `scripts/seed-demo.ts` (ya es aditivo y sin secretos).
+### L6 · Demo data cleanup — `S`
+Delete only client data (profiles/subs/invoices/photos), keeping admin and the catalog. Base: `scripts/seed-demo.ts` (already additive and secret-free).
 
-### L7 · Correcciones menores del demo — `S` · falta detallar
-Ajustes UI detectados en la verificación de navegador; nunca se detallaron. **Primer paso: enumerarlos.**
+### L7 · Minor demo fixes — `S` · needs detailing
+UI tweaks found during browser verification; never itemized. **First step: list them out.**
 
 ### L8 · production-checklist — `M`
-Correr el skill `production-checklist` antes de abrir a clientes reales (incluye el gate de vulnerabilidades de `npm audit`).
+Run the `production-checklist` skill before opening to real clients (includes the `npm audit` vulnerability gate).
 
-### L9 · ¿UI de admin para planes/precios? — `L` · falta decidir
-Decidir si se construye UI para gestionar variantes/precios o se mantiene script + SQL.
+### L9 · Admin UI for plans/prices? — `L` · decision pending
+Decide whether to build a UI to manage variants/prices or keep the script + SQL approach.
 
-### L10 · Env vars de Preview en Vercel — `S`
-Setear las 11 vars para Preview (el CLI pide rama interactiva; hacerlo al crear la 1ª rama de dev).
+### L10 · Preview env vars in Vercel — `S`
+Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this when creating the 1st dev branch).
 
 ---
 
-## D · Diferidos / deuda técnica
+## D · Deferred / Technical Debt
 
-| ID | Item | Tam. | Nota |
+| ID | Item | Size | Note |
 |----|------|:----:|------|
-| **D1** | Notas de admin sobre el registro del día | M | Diferido desde Fase 3. |
-| **D2** | Transaccionalidad `saveBlocks`/`savePillarBlocks` | M | Guardado no atómico → posible estado parcial. Registrado fuera de scope de C+D. |
-| **D3** | Zapier on-subscribe | M | Diferido desde Fase 4. |
-| **D4** | Tope de 250 fotos no race-safe | S | Aceptable single-user. |
-| **D5** | `getSentMessages` carga todos los `message_recipients` | S | Escala; bien por ahora. |
-| **D6** | Typo en `.env.example` | S | `noreply@auramristany.com` → `no-reply@auramaristany.com`. |
-| **D7** | Verificar CI + gitleaks en el 1er PR | S | El gate `ci` nunca se ha ejercido. |
+| **D1** | Admin notes on the day's log | M | Deferred from Phase 3. |
+| **D2** | `saveBlocks`/`savePillarBlocks` transactionality | M | Non-atomic save → possible partial state. Logged as out of scope for C+D. |
+| **D3** | Zapier on-subscribe | M | Deferred from Phase 4. |
+| **D4** | 250-photo cap not race-safe | S | Acceptable for single-user. |
+| **D5** | `getSentMessages` loads all `message_recipients` | S | Scaling concern; fine for now. |
+| **D6** | Typo in `.env.example` | S | `noreply@auramristany.com` → `no-reply@auramaristany.com`. |
+| **D7** | Verify CI + gitleaks on the 1st PR | S | The `ci` gate has never been exercised. |
 
 ---
 
-## Secuencia sugerida
+## Suggested Sequence
 
-1. **Batch rápido:** `A2` · `A3` · `A10` · `A11` — poco riesgo, muy visible, estrena el gate de CI.
-2. **Medianas:** `A1` · `A5` · `A8` · `A9` · `A12` (`A5` antes que `A4`).
-3. **Proyectos:** `A6` → `A7` → `A4`.
-4. **En paralelo (depende de Aura):** `L1` precios · `L5` WhatsApp · `L3` preguntas de onboarding.
-5. **Cierre de lanzamiento:** `L2` · `L4` · `L6` · `L7` · `L10` → `L8` production-checklist.
+1. **Quick batch:** `A2` · `A3` · `A10` · `A11` — low risk, highly visible, first to exercise the CI gate.
+2. **Mediums:** `A1` · `A5` · `A8` · `A9` · `A12` (`A5` before `A4`).
+3. **Projects:** `A6` → `A7` → `A4`.
+4. **In parallel (depends on Aura):** `L1` pricing · `L5` WhatsApp · `L3` onboarding questions.
+5. **Launch close-out:** `L2` · `L4` · `L6` · `L7` · `L10` → `L8` production-checklist.

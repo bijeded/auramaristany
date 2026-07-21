@@ -1,21 +1,21 @@
 schema: spec-driven
 
 context: |
-  Aura Maristany — plataforma de coaching de salud (mujeres 40+). Vende programas como
-  suscripciones mensuales recurrentes.
+  Aura Maristany — health coaching platform (women 40+). Sells programs as recurring
+  monthly subscriptions.
   Stack: Next.js 14 App Router + TypeScript, Supabase (PostgreSQL + RLS + Auth + Storage),
   Stripe (MXN, apiVersion 2026-05-27.dahlia), Tailwind + shadcn/ui, Tiptap, Resend, Recharts,
-  dnd-kit, zod, Vitest. Deploy en Vercel; DB en Supabase Cloud.
-  Convenciones: español neutro de México en UI ('cliente', no 'clienta'); funciones puras
-  (con tests, patrón AAA) separadas de queries server-only; Server Components por defecto,
-  mutaciones vía server actions; RLS es la frontera de seguridad, service-role solo tras
-  requireAdmin(); identidad siempre de getUser(); validar input con zod + sanitize-html;
+  dnd-kit, zod, Vitest. Deploy on Vercel; DB on Supabase Cloud.
+  Conventions: neutral Mexican Spanish in the UI ('cliente', not 'clienta'); pure functions
+  (with tests, AAA pattern) kept separate from server-only queries; Server Components by
+  default, mutations via server actions; RLS is the security boundary, service-role only
+  after requireAdmin(); identity always from getUser(); validate input with zod + sanitize-html;
   Conventional Commits.
-  Migraciones: SQL numerado en supabase/migrations/ (001-010 aplicadas); nunca editar una
-  aplicada, agregar nueva. months_elapsed es el arbitro inmutable del acceso (se incrementa
-  por invoice.paid, no se calcula por fechas).
-  Restriccion de despliegue: main = Produccion del demo en vivo (app.auramaristany.com) que
-  ve Aura; el WIP va en ramas/Preview. Ver CLAUDE.md, SPEC.md y handoff.md para el detalle.
+  Migrations: numbered SQL in supabase/migrations/ (001-010 applied); never edit an applied
+  one, add a new one. months_elapsed is the immutable arbiter of access (incremented by
+  invoice.paid, never computed from dates).
+  Deployment restriction: main = Production for the live demo (app.auramaristany.com) that
+  Aura sees; WIP goes on branches/Preview. See CLAUDE.md, SPEC.md, and handoff.md for details.
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
