@@ -42,6 +42,10 @@ next-env.d.ts
 .claude/worktrees/
 .claude/settings.local.json
 
+# Cursor is not used on this project. `openspec init/update` regenerates .cursor/
+# when cursor is in --tools; ignore it so it never returns to the repo or the code graph.
+.cursor/
+
 # supabase CLI local state (project ref, pooler url — no commitear)
 supabase/.temp/
 
