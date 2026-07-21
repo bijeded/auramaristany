@@ -3,6 +3,7 @@
 Coaching de salud integral para mujeres 40+. Vende, entrega y gestiona programas de entrenamiento/alimentación/bienestar como **suscripciones mensuales recurrentes**. La app vive en un subdominio (`app.auramaristany.com`); el sitio de marketing es un WordPress independiente que NO se toca.
 
 - **Estado:** Fases 0–5 completas en `main`; **Fase 6 (Pulido + Launch) en curso**. Desplegado como **DEMO en línea** (Stripe en **test mode**, sin cobros reales) para feedback de Aura antes del lanzamiento productivo.
+- **Backlog activo:** **`BACKLOG.md`** — trabajo pendiente con **IDs estables** (`A*` feedback de Aura · `L*` lanzamiento · `D*` diferidos) listos para `/opsx:propose "A2 — …"`. Actualizarlo al archivar un cambio.
 - **SPEC técnico:** `SPEC.md` · **Traspaso detallado:** `handoff.md` · **Historia por sub-bloque:** `docs/superpowers/` (specs/plans/audits/context — histórico).
 
 ---
