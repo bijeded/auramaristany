@@ -1,46 +1,46 @@
-# Especificación Técnica — Plataforma Web Aura Maristany
+# Technical Specification — Aura Maristany Web Platform
 
-## Visión General
+## Overview
 
-Plataforma web para Aura Maristany, coach de salud integral especializada en mujeres 40+. Permite vender, entregar y gestionar programas de entrenamiento, alimentación y bienestar mediante suscripciones mensuales recurrentes.
+Web platform for Aura Maristany, a holistic health coach specializing in women 40+. Lets her sell, deliver, and manage training, nutrition, and wellness programs via recurring monthly subscriptions.
 
-- **Sitio de marketing (WordPress):** https://demo.studiosdmm.com.mx/aura/
-- **App web:** subdominio independiente, ej. `app.auramaristany.com`
-- **Idioma:** español (México) · **Moneda:** MXN
+- **Marketing site (WordPress):** https://demo.studiosdmm.com.mx/aura/
+- **Web app:** independent subdomain, e.g. `app.auramaristany.com`
+- **Language:** Spanish (Mexico) · **Currency:** MXN
 
 ---
 
-## Stack Tecnológico
+## Technology Stack
 
-| Capa | Tecnología |
+| Layer | Technology |
 |------|-----------|
 | Framework | Next.js 14 (App Router) |
-| Base de datos + Auth | Supabase (PostgreSQL + RLS + Storage + Real-time) |
-| Pagos | Stripe (suscripciones MXN) |
+| Database + Auth | Supabase (PostgreSQL + RLS + Storage + Real-time) |
+| Payments | Stripe (MXN subscriptions) |
 | UI | shadcn/ui + Tailwind CSS |
-| Editor de contenido | Tiptap (MIT, sin costo) |
-| Email transaccional | Resend + React Email |
+| Content editor | Tiptap (MIT, free) |
+| Transactional email | Resend + React Email |
 | Deploy | Vercel + Supabase Cloud |
-| Gráficas | Recharts |
+| Charts | Recharts |
 | Drag & drop | dnd-kit |
 | Video embed | react-lite-youtube-embed |
 
 ---
 
-## Identidad Visual
+## Visual Identity
 
-| Elemento | Valor |
+| Element | Value |
 |---------|-------|
-| Tipografía encabezados/botones | **Oswald** (Google Fonts) |
-| Tipografía texto | **Hind** (Google Fonts) |
-| Color primario | `#eddbd8` (rosa polvoso cálido) |
-| Color secundario | `#9982f4` (lavanda) |
-| Base | Negro y blanco |
-| Diseño | Mobile-first, UX simple para público 40+ |
+| Heading/button typography | **Oswald** (Google Fonts) |
+| Body text typography | **Hind** (Google Fonts) |
+| Primary color | `#eddbd8` (warm dusty pink) |
+| Secondary color | `#9982f4` (lavender) |
+| Base | Black and white |
+| Design | Mobile-first, simple UX for a 40+ audience |
 
 ---
 
-## Flujo General del Cliente
+## General Client Flow
 
 ```
 Sitio WordPress
@@ -52,15 +52,15 @@ Sitio WordPress
                            └─ /portal/today (Día 1)
 ```
 
-**El cliente nunca elige su variante libremente.** El cuestionario en WordPress determina la variante y redirige al URL de checkout correcto.
+**The client never freely chooses her variant.** The WordPress questionnaire determines the variant and redirects to the correct checkout URL.
 
 ---
 
-## Programas
+## Programs
 
-### 1. CuarentaMás — 6 meses, facturación mensual
+### 1. CuarentaMás — 6 months, monthly billing
 
-| slug | Nivel | Tiempo |
+| slug | Level | Time |
 |-----|-------|--------|
 | `cuarenta-mas-principiante-poco` | Principiante | < 45 min |
 | `cuarenta-mas-principiante-suf` | Principiante | 45–80 min |
@@ -68,76 +68,76 @@ Sitio WordPress
 | `cuarenta-mas-intermedio-suf` | Intermedio | 45–80 min |
 | `cuarenta-mas-avanzado-suf` | Avanzado | 45–80 min |
 
-- **Acceso:** solo hasta el día actual (día N = días desde inscripción + 1). Sin acceso a días futuros ni al mes siguiente antes de que empiece
-- **Al mes 6:** `completed_at` se establece → desbloquea CuarentaMás Extra Intermedio
+- **Access:** only up to the current day (day N = days since enrollment + 1). No access to future days or to the next month before it begins
+- **At month 6:** `completed_at` is set → unlocks CuarentaMás Extra Intermedio
 
-### 2. CuarentaMás Extra — variantes con prerequisitos
+### 2. CuarentaMás Extra — variants with prerequisites
 
-**Progresión:**
+**Progression:**
 ```
 CuarentaMás Principiante → Extra Intermedio (6 meses) → Extra Avanzado (indefinido)
 CuarentaMás Intermedio/Avanzado ──────────────────────→ Extra Avanzado (acceso directo)
 ```
 
-| slug | Duración | Prerequisito |
+| slug | Duration | Prerequisite |
 |------|----------|--------------|
-| `cuarenta-mas-extra-intermedio` | 6 meses fijos | CuarentaMás completado (solo Principiante) |
-| `cuarenta-mas-extra-avanzado` | Indefinida (mensual rolling) | Extra Intermedio completado **O** CuarentaMás Intermedio/Avanzado completado |
+| `cuarenta-mas-extra-intermedio` | 6 fixed months | CuarentaMás completed (Principiante only) |
+| `cuarenta-mas-extra-avanzado` | Indefinite (monthly rolling) | Extra Intermedio completed **OR** CuarentaMás Intermedio/Avanzado completed |
 
-- **Acceso:** solo el mes actual (`months_elapsed`). No hay acceso a meses futuros, pero si a anteriores.
-- **Dentro del mes:** solo hasta el día actual
-- **Contenido:** biblioteca de planes mensuales reutilizables creados por Aura. El sistema asigna el plan del mes N automáticamente
+- **Access:** only the current month (`months_elapsed`). No access to future months, but yes to previous ones.
+- **Within the month:** only up to the current day
+- **Content:** library of reusable monthly plans created by Aura. The system assigns the month-N plan automatically
 
-> ⚠ **Cambio decidido por Aura (16-jun-2026), PENDIENTE de implementar:** CuarentaMás Extra pasará a ser un **cobro mensual recurrente cancelable** (como Strong & Fit), no de plazo fijo. Por ahora solo se cambió la **etiqueta** en el admin ("Mensual recurrente"). El cambio de fondo —`programs.billing_model` de `cuarenta-mas-extra` a `rolling_monthly` + ajustar la lógica de acceso/`completed_at`/checkout (`stripe-handlers.ts`, `clients-helpers.subscriptionProgressLabel`, prerequisitos)— queda para más adelante.
+> ⚠ **Change decided by Aura (16-jun-2026), PENDING implementation:** CuarentaMás Extra will become a **cancelable recurring monthly charge** (like Strong & Fit), not a fixed term. For now only the **label** was changed in admin ("Mensual recurrente"). The underlying change —`programs.billing_model` for `cuarenta-mas-extra` to `rolling_monthly` + adjusting the access/`completed_at`/checkout logic (`stripe-handlers.ts`, `clients-helpers.subscriptionProgressLabel`, prerequisites)— is left for later.
 
-### 3. Strong & Fit — suscripción mensual indefinida, acumulativa
+### 3. Strong & Fit — indefinite monthly subscription, cumulative
 
-| slug | Nivel |
+| slug | Level |
 |------|-------|
 | `strong-fit-principiante` | Principiante |
 | `strong-fit-intermedio` | Intermedio |
 | `strong-fit-avanzado` | Avanzado |
 
-- **Acceso acumulativo:** mes N = Series 1 a N visibles
-- **Serie más reciente:** solo hasta el día actual; series anteriores: acceso completo
-- **Expansión:** Aura puede agregar nuevas series en cualquier momento
+- **Cumulative access:** month N = Series 1 through N visible
+- **Most recent series:** only up to the current day; previous series: full access
+- **Expansion:** Aura can add new series at any time
 
 **Total Stripe Prices:** 5 (CuarentaMás) + 2 (Extra) + 3 (Strong & Fit) = **10 prices**
 
 ---
 
-## Campo clave: `months_elapsed`
+## Key field: `months_elapsed`
 
-Almacenado en `subscriptions`. Se incrementa en 1 por cada `invoice.paid` exitoso de Stripe (no se computa desde fechas). Es el árbitro inmutable de qué contenido puede ver cada cliente.
+Stored in `subscriptions`. Incremented by 1 for each successful Stripe `invoice.paid` (never computed from dates). It's the immutable arbiter of what content each client can see.
 
-El contenido está organizado por **semanas** dentro de cada mes (no días secuenciales). La lógica de acceso usa:
+Content is organized by **weeks** within each month (not sequential days). The access logic uses:
 
 ```
-semana_actual    = floor((today - current_period_start).days / 7) + 1   -- valor 1..4
-día_de_hoy       = nombre del día en español ('lunes'..'domingo')
+week_number  = floor((today - current_period_start).days / 7) + 1   -- value 1..4
+day_of_week  = name of the day in Spanish ('lunes'..'domingo')
 ```
 
-| Programa | Lógica de acceso |
+| Program | Access logic |
 |---------|-----------------|
-| CuarentaMás | Mes actual = `months_elapsed`. Acceso hasta `(semana_actual, día_de_hoy)` inclusive. Semanas y días anteriores: completos. |
-| Extra | Serie única: `series_number = months_elapsed`. Mismo control semana/día. |
-| Strong & Fit | Series accesibles: `series_number <= months_elapsed`. Solo la serie más reciente usa control semana/día; las anteriores son acceso completo. |
+| CuarentaMás | Current month = `months_elapsed`. Access up to `(week_number, day_of_week)` inclusive. Previous weeks and days: complete. |
+| Extra | Single series: `series_number = months_elapsed`. Same week/day control. |
+| Strong & Fit | Accessible series: `series_number <= months_elapsed`. Only the most recent series uses week/day control; previous ones have full access. |
 
-**Historial:** una vez que una semana completa ha pasado (o el mes anterior), el contenido queda accesible permanentemente para que la clienta pueda revisar cualquier día pasado junto a su registro de progreso.
+**History:** once a full week has passed (or the previous month), the content remains permanently accessible so the client can review any past day along with her progress log.
 
 ---
 
-## Base de Datos — Esquema Completo
+## Database — Complete Schema
 
 ```sql
--- USUARIOS
+-- USERS
 CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
   email TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
-  phone TEXT,                  -- capturado en /auth/register (obligatorio en el form, con lada de
-                               -- país, normalizado a dígitos) vía el trigger handle_new_user (migr.
-                               -- 008). Nullable a nivel DB: cuentas viejas/por-API pueden tenerlo null.
+  phone TEXT,                  -- captured in /auth/register (required in the form, with country
+                               -- code, normalized to digits) via the handle_new_user trigger (migr.
+                               -- 008). Nullable at the DB level: old/API-created accounts may have it null.
   birth_date DATE,
   avatar_url TEXT,
   role TEXT NOT NULL DEFAULT 'client', -- 'client' | 'admin'
@@ -147,13 +147,13 @@ CREATE TABLE profiles (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- ONBOARDING (cuestionario configurable por Aura)
+-- ONBOARDING (questionnaire configurable by Aura)
 CREATE TABLE onboarding_questions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sort_order INT NOT NULL,
   question_text TEXT NOT NULL,
   question_type TEXT NOT NULL, -- 'text' | 'number' | 'single_choice' | 'multi_choice'
-  options JSONB,               -- ["Opción A", "Opción B"] para tipos choice
+  options JSONB,               -- ["Option A", "Option B"] for choice types
   is_required BOOLEAN DEFAULT true,
   is_active BOOLEAN DEFAULT true
 );
@@ -161,18 +161,18 @@ CREATE TABLE onboarding_questions (
 CREATE TABLE onboarding_responses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID UNIQUE REFERENCES profiles(id),
-  responses JSONB NOT NULL,    -- { "question_id": "respuesta" }
+  responses JSONB NOT NULL,    -- { "question_id": "answer" }
   completed_at TIMESTAMPTZ
 );
 
--- PROGRAMAS
+-- PROGRAMS
 CREATE TABLE programs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
   billing_model TEXT NOT NULL, -- 'fixed_term_monthly' | 'rolling_monthly'
-  duration_months INT,         -- 6 para CuarentaMás, NULL para indefinidos
+  duration_months INT,         -- 6 for CuarentaMás, NULL for indefinite ones
   is_active BOOLEAN DEFAULT true
 );
 
@@ -188,17 +188,17 @@ CREATE TABLE program_variants (
   is_active BOOLEAN DEFAULT true
 );
 
--- Prerequisitos con lógica OR (mismo grupo = AND; grupos distintos = OR)
+-- Prerequisites with OR logic (same group = AND; different groups = OR)
 CREATE TABLE program_variant_prerequisites (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   program_variant_id UUID REFERENCES program_variants(id),
   prerequisite_group INT NOT NULL,
   required_program_slug TEXT NOT NULL,
-  required_variant_levels TEXT[],  -- NULL = cualquier nivel
+  required_variant_levels TEXT[],  -- NULL = any level
   required_status TEXT DEFAULT 'completed'
 );
 
--- CONTENIDO
+-- CONTENT
 CREATE TABLE program_series (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   program_id UUID REFERENCES programs(id),
@@ -214,17 +214,17 @@ CREATE TABLE program_series (
 CREATE TABLE program_days (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   series_id UUID REFERENCES program_series(id),
-  week_number  INT  NOT NULL,  -- 1, 2, 3 o 4 (semana dentro del mes)
+  week_number  INT  NOT NULL,  -- 1, 2, 3, or 4 (week within the month)
   day_of_week  TEXT NOT NULL,  -- 'lunes' | 'martes' | 'miercoles' | 'jueves'
                                -- | 'viernes' | 'sabado' | 'domingo'
-  workout_focus TEXT,          -- "Enfoque": descriptor libre de la actividad
+  workout_focus TEXT,          -- "Enfoque": free-text descriptor of the activity
                                -- ('Tren Inferior', 'Protocolo Cardiovascular', 'Descanso', etc.)
   title TEXT NOT NULL,
   description TEXT,
-  day_type TEXT DEFAULT 'workout', -- (v1.2: en desuso) El editor ya no expone selector de tipo.
-                               -- Todos los días son "Actividad Física"; el descriptor es workout_focus.
-                               -- Día de descanso = Aura crea un día con contenido de descanso.
-                               -- La card genérica de descanso solo aparece si NO existe fila para hoy.
+  day_type TEXT DEFAULT 'workout', -- (v1.2: deprecated) The editor no longer exposes a type selector.
+                               -- All days are "Actividad Física"; the descriptor is workout_focus.
+                               -- Rest day = Aura creates a day with rest-day content.
+                               -- The generic rest card only appears if NO row exists for today.
   duration_minutes INT,
   published BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -232,7 +232,7 @@ CREATE TABLE program_days (
   UNIQUE(series_id, week_number, day_of_week)
 );
 
--- Ejemplo Mes 1 CuarentaMás:
+-- Example Month 1 CuarentaMás:
 --   (s1, 1, 'lunes',     'Tren Inferior', 'Estrategia Antisedentarismo', ...)
 --   (s1, 1, 'martes',    'Tren Superior', 'Estrategia Antisedentarismo', ...)
 --   (s1, 1, 'miércoles', 'Protocolo Cardiovascular', 'Estrategia Antisedentarismo', ...)
@@ -257,23 +257,23 @@ CREATE TABLE program_day_blocks (
   -- exercise_list: { "exercises": [{ "id": "uuid", "name": "...", "sets": 3,
   --                  "reps": "12", "rest_seconds": 60, "notes": "...",
   --                  "metrics": ["reps_done", "weight_kg"] }] }
-  -- cardio_zone2:  {}  -- calculadora fija; la clienta ingresa su edad en el portal
-  --                    -- y ve su rango Zona 2 = (220-edad)*0.60 a (220-edad)*0.70
+  -- cardio_zone2:  {}  -- fixed calculator; the client enters her age in the portal
+  --                    -- and sees her Zone 2 range = (220-age)*0.60 to (220-age)*0.70
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Mapeo variante → series (permite reutilizar contenido entre variantes)
+-- Variant → series mapping (allows reusing content across variants)
 CREATE TABLE variant_series_map (
   program_variant_id UUID REFERENCES program_variants(id),
   series_id UUID REFERENCES program_series(id),
   PRIMARY KEY (program_variant_id, series_id)
 );
 
--- PILARES MENSUALES (solo CuarentaMás/Extra; cambian por mes/serie, no por día)
--- Contenido paralelo a la actividad física: Alimentación con intención,
+-- MONTHLY PILLARS (CuarentaMás/Extra only; change per month/series, not per day)
+-- Content parallel to the physical activity: Alimentación con intención,
 -- Autoconocimiento, Manejo de estrés/descanso/sueño, Respiraciones y suelo pélvico.
--- Reusan el mismo sistema de bloques (tablas espejo de program_days/program_day_blocks).
+-- Reuse the same block system (mirror tables of program_days/program_day_blocks).
 CREATE TABLE program_series_pillars (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   series_id UUID REFERENCES program_series(id) ON DELETE CASCADE,
@@ -289,14 +289,14 @@ CREATE TABLE program_series_pillars (
 CREATE TABLE program_pillar_blocks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pillar_id UUID REFERENCES program_series_pillars(id) ON DELETE CASCADE,
-  block_type TEXT NOT NULL,    -- mismos tipos que program_day_blocks (incl. cardio_zone2)
+  block_type TEXT NOT NULL,    -- same types as program_day_blocks (incl. cardio_zone2)
   sort_order INT NOT NULL,
   content JSONB NOT NULL
 );
--- Portal: /portal/pilares muestra los pilares publicados del mes actual
--- (months_elapsed → serie), solo para suscripciones CuarentaMás/Extra.
+-- Portal: /portal/pilares shows the published pillars for the current month
+-- (months_elapsed → series), only for CuarentaMás/Extra subscriptions.
 
--- SUSCRIPCIONES
+-- SUBSCRIPTIONS
 CREATE TABLE subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id),
@@ -309,12 +309,12 @@ CREATE TABLE subscriptions (
   cancel_at_period_end BOOLEAN DEFAULT false,
   months_elapsed INT DEFAULT 1,
   enrollment_date DATE NOT NULL DEFAULT CURRENT_DATE,
-  completed_at TIMESTAMPTZ,    -- se establece al mes 6 en CuarentaMás y Extra Intermedio
+  completed_at TIMESTAMPTZ,    -- set at month 6 for CuarentaMás and Extra Intermedio
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Auditoría de eventos de Stripe
+-- Audit log of Stripe events
 CREATE TABLE subscription_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subscription_id UUID REFERENCES subscriptions(id),
@@ -324,7 +324,7 @@ CREATE TABLE subscription_events (
   processed_at TIMESTAMPTZ DEFAULT now()
 );
 
--- SEGUIMIENTO DE PROGRESO
+-- PROGRESS TRACKING
 CREATE TABLE progress_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id),
@@ -335,160 +335,160 @@ CREATE TABLE progress_logs (
   exercises_done JSONB,
   -- { "exercise-uuid": { "completed": true,
   --                      "series": [{ "reps_done": 12, "weight_kg": 15.0 }, ...] } }
-  -- (N objetos en series = N sets; campos null si no se llenaron)
-  notes TEXT,                 -- ⚠ la columna se llama 'notes' (no 'general_notes').
-                              -- El código lo expone como general_notes vía alias en el SELECT
-                              -- (general_notes:notes) y escribe en 'notes' en el upsert.
+  -- (N objects in series = N sets; fields null if not filled in)
+  notes TEXT,                 -- ⚠ the column is called 'notes' (not 'general_notes').
+                              -- The code exposes it as general_notes via an alias in the SELECT
+                              -- (general_notes:notes) and writes to 'notes' in the upsert.
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(profile_id, program_day_id) -- 1 registro por (clienta, día); el upsert usa este onConflict
+  UNIQUE(profile_id, program_day_id) -- 1 record per (client, day); the upsert uses this onConflict
 );
 
--- ⚠ DRIFT (corregido 10-jun-2026): el bloque viejo listaba 'measured_at' +
--- UNIQUE(profile_id, measured_at) + waist/hip NUMERIC(5,2), que NO coinciden con
--- la tabla aplicada (migración 001). Lo de abajo es el esquema REAL. No se captura
--- en ninguna fase (body_metrics queda vacío); el dato existe solo para futuro.
+-- ⚠ DRIFT (fixed 10-jun-2026): the old block listed 'measured_at' +
+-- UNIQUE(profile_id, measured_at) + waist/hip NUMERIC(5,2), which do NOT match
+-- the applied table (migration 001). Below is the REAL schema. It isn't captured
+-- in any phase (body_metrics stays empty); the field exists only for future use.
 CREATE TABLE body_metrics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id),
-  metric_date DATE NOT NULL,           -- ⚠ real: 'metric_date' (no 'measured_at')
+  metric_date DATE NOT NULL,           -- ⚠ actual: 'metric_date' (not 'measured_at')
   weight_kg NUMERIC(5,2),
-  waist_cm NUMERIC(5,1),               -- ⚠ real: NUMERIC(5,1)
-  hip_cm NUMERIC(5,1),                 -- ⚠ real: NUMERIC(5,1)
+  waist_cm NUMERIC(5,1),               -- ⚠ actual: NUMERIC(5,1)
+  hip_cm NUMERIC(5,1),                 -- ⚠ actual: NUMERIC(5,1)
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
-  -- NO existe UNIQUE(profile_id, measured_at).
+  -- There is NO UNIQUE(profile_id, measured_at).
 );
 
 CREATE TABLE progress_photos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id),
-  body_metrics_id UUID REFERENCES body_metrics(id), -- queda NULL (no se capturan métricas)
-  storage_path TEXT NOT NULL,  -- bucket privado 'progress', prefijo {profile_id}/
-  taken_at DATE NOT NULL DEFAULT CURRENT_DATE, -- ⚠ la columna real es 'taken_at' (no 'photo_date')
-  caption TEXT,                -- comentario opcional de la clienta (migración 005)
-  -- angle TEXT existía en el plan original pero NO está en la tabla real; sin uso.
+  body_metrics_id UUID REFERENCES body_metrics(id), -- stays NULL (metrics aren't captured)
+  storage_path TEXT NOT NULL,  -- private bucket 'progress', prefix {profile_id}/
+  taken_at DATE NOT NULL DEFAULT CURRENT_DATE, -- ⚠ the actual column is 'taken_at' (not 'photo_date')
+  caption TEXT,                -- optional client comment (migration 005)
+  -- angle TEXT existed in the original plan but is NOT in the actual table; unused.
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- MENSAJERÍA
--- ⚠ DRIFT (corregido 9-jun-2026, pre-Fase 4): el bloque original de este SPEC
--- listaba columnas que NO existen en la tabla aplicada (migración 001). Lo de
--- abajo es el esquema REAL. El destino se modela SOLO vía message_recipients
--- (no hay recipient_id ni broadcast_filter en messages). Si la Fase 4 decide
--- agregar broadcast_filter/unique/created_at, será en una migración 006.
+-- MESSAGING
+-- ⚠ DRIFT (fixed 9-jun-2026, pre-Phase 4): the original block in this SPEC
+-- listed columns that do NOT exist in the applied table (migration 001). Below
+-- is the REAL schema. The recipient is modeled ONLY via message_recipients
+-- (there's no recipient_id or broadcast_filter on messages). If Phase 4 decides
+-- to add broadcast_filter/unique/created_at, it'll be in migration 006.
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id UUID REFERENCES profiles(id),
-  subject TEXT NOT NULL,       -- ⚠ real: NOT NULL (el SPEC viejo lo daba nullable)
+  subject TEXT NOT NULL,       -- ⚠ actual: NOT NULL (the old SPEC had it nullable)
   body TEXT NOT NULL,
   is_broadcast BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
-  -- NO existe recipient_id ni broadcast_filter (el SPEC viejo los listaba).
+  -- There is NO recipient_id or broadcast_filter (the old SPEC listed them).
 );
 
 CREATE TABLE message_recipients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id UUID REFERENCES messages(id),
-  recipient_id UUID REFERENCES profiles(id), -- ⚠ real: 'recipient_id' (no 'profile_id')
-  read_at TIMESTAMPTZ          -- null = no leído
-  -- NO existe created_at ni UNIQUE(message_id, recipient_id) declarado.
-  -- (candidatos a migración 006 si se necesitan; decidir en el brainstorm de Fase 4.)
+  recipient_id UUID REFERENCES profiles(id), -- ⚠ actual: 'recipient_id' (not 'profile_id')
+  read_at TIMESTAMPTZ          -- null = unread
+  -- There is NO created_at or UNIQUE(message_id, recipient_id) declared.
+  -- (candidates for migration 006 if needed; decide in the Phase 4 brainstorm.)
 );
--- ⚠ RLS pendiente: en 001 NO hay policy de SELECT sobre `messages` para clientas
--- (solo messages_admin_write). La clienta necesita leer subject/body de los
--- mensajes donde tiene fila en message_recipients → agregar en migración 006.
+-- ⚠ RLS pending: in 001 there is NO SELECT policy on `messages` for clients
+-- (only messages_admin_write). The client needs to read the subject/body of
+-- messages where she has a row in message_recipients → add in migration 006.
 
--- FINANZAS
--- ⚠ DRIFT (corregido 9-jun-2026, pre-Fase 5): el bloque original listaba
--- amount_mxn/paid_at y invoice_date DATE, que NO coinciden con la tabla aplicada
--- (migración 001). Lo de abajo es el esquema REAL (lo que escribe recordInvoice en
--- lib/webhooks/stripe-handlers.ts). El dashboard financiero (Fase 5 ✓) lee
--- amount_paid + currency, e invoice_date es timestamptz. NO existe paid_at.
--- ✓ Fase 5: corregido el bug por el que el PRIMER pago (billing_reason=
--- 'subscription_create') no se registraba; backfill aplicado a los pagos previos.
+-- FINANCES
+-- ⚠ DRIFT (fixed 9-jun-2026, pre-Phase 5): the original block listed
+-- amount_mxn/paid_at and invoice_date DATE, which do NOT match the applied table
+-- (migration 001). Below is the REAL schema (what recordInvoice writes in
+-- lib/webhooks/stripe-handlers.ts). The financial dashboard (Phase 5 ✓) reads
+-- amount_paid + currency, and invoice_date is timestamptz. There is NO paid_at.
+-- ✓ Phase 5: fixed the bug where the FIRST payment (billing_reason=
+-- 'subscription_create') wasn't recorded; backfill applied to prior payments.
 CREATE TABLE invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subscription_id UUID REFERENCES subscriptions(id),
   stripe_invoice_id TEXT UNIQUE NOT NULL,
-  amount_paid NUMERIC(10,2) NOT NULL,  -- ⚠ real: 'amount_paid' (no 'amount_mxn')
-  currency TEXT DEFAULT 'mxn',         -- ⚠ real: existe 'currency' (el SPEC viejo no lo tenía)
+  amount_paid NUMERIC(10,2) NOT NULL,  -- ⚠ actual: 'amount_paid' (not 'amount_mxn')
+  currency TEXT DEFAULT 'mxn',         -- ⚠ actual: 'currency' exists (the old SPEC didn't have it)
   status TEXT NOT NULL,        -- 'paid' | 'open' | 'void' | 'uncollectible'
-  invoice_date TIMESTAMPTZ NOT NULL,   -- ⚠ real: timestamptz (no DATE)
+  invoice_date TIMESTAMPTZ NOT NULL,   -- ⚠ actual: timestamptz (not DATE)
   created_at TIMESTAMPTZ DEFAULT now()
-  -- NO existe paid_at (el SPEC viejo lo listaba).
+  -- There is NO paid_at (the old SPEC listed it).
 );
 ```
 
-**Seguridad:** Row Level Security (RLS) en Supabase en todas las tablas. Clientes solo ven sus propios datos. Admins ven todo (`is_admin()`). La seguridad vive en la base de datos, no solo en la aplicación. **Defensa en profundidad (auditoría Fase 6, merge `bb05894`):** además del middleware y RLS, las server-actions, las queries que usan service-role y las páginas admin verifican rol con `requireAdmin()`/`requireAdminPage()` (`lib/admin/auth.ts`). Input de contenido validado server-side (zod) y HTML de Tiptap sanitizado al guardar (`sanitize-html`). **Migración 009** endureció: `with check` explícito en políticas `for all` de datos de cliente, `search_path` fijo en `is_admin()`, y normalización de phone en el trigger `handle_new_user`. El acceso al portal lo concede `subscriptionGrantsAccess` (`lib/content/subscription-access.ts`): estados **`active`/`trialing`/`past_due`** (past_due muestra banner de pago pendiente; el corte lo define Stripe Smart Retries).
+**Security:** Row Level Security (RLS) in Supabase on all tables. Clients only see their own data. Admins see everything (`is_admin()`). Security lives in the database, not just in the application. **Defense in depth (Phase 6 audit, merge `bb05894`):** beyond middleware and RLS, server-actions, queries using service-role, and admin pages verify role with `requireAdmin()`/`requireAdminPage()` (`lib/admin/auth.ts`). Content input validated server-side (zod) and Tiptap HTML sanitized on save (`sanitize-html`). **Migration 009** hardened: explicit `with check` on `for all` policies for client data, fixed `search_path` on `is_admin()`, and phone normalization in the `handle_new_user` trigger. Portal access is granted by `subscriptionGrantsAccess` (`lib/content/subscription-access.ts`): states **`active`/`trialing`/`past_due`** (past_due shows a pending-payment banner; the cutoff is defined by Stripe Smart Retries).
 
 ---
 
-## Estructura de la Aplicación (App Router)
+## Application Structure (App Router)
 
 ```
 /app
   /(marketing)
-    /checkout/[variantSlug]       ← landing de pago (viene del quiz de WordPress)
+    /checkout/[variantSlug]       ← payment landing (comes from the WordPress quiz)
 
   /auth
     /login
-    /register                     ← nombre + Núm. Celular (con lada, obligatorio) + correo + contraseña
+    /register                     ← name + phone number (with country code, required) + email + password
     /callback
     /reset-password
 
   /onboarding
-    /questionnaire                ← guard: suscripción activa + onboarding_completed=false
+    /questionnaire                ← guard: active subscription + onboarding_completed=false
 
-  /portal                         ← guard: suscripción activa + onboarding_completed=true
-    /today                        ← contenido del día + progreso integrado (1 sola pantalla)
-    /pilares                      ← pilares mensuales (gate CuarentaMás/Extra)
-    /activando                    ← polling post-pago: espera webhook de Stripe antes de redirigir
-    /sin-suscripcion              ← página de aterrizaje cuando no hay suscripción activa
-    /history                      ← "Mi Progreso": tabs Desempeño (Recharts) + Fotos
-    /history/[logId]              ← detalle de un día anterior: contenido + registro guardado (lectura)
-    /messages                     ← bandeja read-only Aura→clienta (Fase 4) + WhatsApp a Aura
-    /messages/[id]                ← detalle del mensaje (marca read_at) (Fase 4)
-    /settings                     ← "Mi cuenta": edición nombre/teléfono + contraseña + avatar + ficha de suscripción + historial de pagos  [Fase 6 ✓]
+  /portal                         ← guard: active subscription + onboarding_completed=true
+    /today                        ← day's content + integrated progress (1 single screen)
+    /pilares                      ← monthly pillars (gate CuarentaMás/Extra)
+    /activando                    ← post-payment polling: waits for the Stripe webhook before redirecting
+    /sin-suscripcion              ← landing page when there's no active subscription
+    /history                      ← "Mi Progreso": Desempeño (Recharts) + Fotos tabs
+    /history/[logId]              ← detail of a past day: content + saved log (read-only)
+    /messages                     ← read-only Aura→client inbox (Phase 4) + WhatsApp to Aura
+    /messages/[id]                ← message detail (marks read_at) (Phase 4)
+    /settings                     ← "Mi cuenta": name/phone editing + password + avatar + subscription card + payment history  [Phase 6 ✓]
 
   /admin                          ← guard: role='admin'
     /dashboard
-    /clients                      ← lista de clientes (filtros, paginación, CSV)  [Fase 6 ✓]
-    /clients/[clientId]           ← ficha de 6 tabs  [Fase 6 ✓]
-    /payments                     ← listado completo de invoices  [Fase 6 ✓]
+    /clients                      ← client list (filters, pagination, CSV)  [Phase 6 ✓]
+    /clients/[clientId]           ← 6-tab profile  [Phase 6 ✓]
+    /payments                     ← full invoice listing  [Phase 6 ✓]
     /content/[programId]/series/[seriesId]/days/[dayId]
     /messages
-    /onboarding-settings          ← constructor del cuestionario  [Fase 6 ✓]
+    /onboarding-settings          ← questionnaire builder  [Phase 6 ✓]
 
   /api
     /webhooks/stripe
     /subscriptions/create-checkout
     /subscriptions/customer-portal
-    /admin/upload                 ← upload admin a bucket público 'content'
-    /admin/clients/[clientId]                 ← DELETE clienta (guard + cascade 007)  [Fase 6 ✓]
-    /admin/clients/[clientId]/photos/[photoId] ← DELETE foto de clienta (admin)  [Fase 6 ✓]
-    /portal/progress              ← upsert del registro del día (auto-guardado)
-    /portal/photos                ← POST subir foto (bucket privado 'progress')
-    /portal/photos/[id]           ← DELETE borrar foto propia
-    /cron/purge-messages          ← (Fase 4) Vercel Cron: borra mensajes >180 días (Bearer CRON_SECRET)
+    /admin/upload                 ← admin upload to public bucket 'content'
+    /admin/clients/[clientId]                 ← DELETE client (guard + cascade 007)  [Phase 6 ✓]
+    /admin/clients/[clientId]/photos/[photoId] ← DELETE client photo (admin)  [Phase 6 ✓]
+    /portal/progress              ← upsert of the day's log (autosave)
+    /portal/photos                ← POST upload photo (private bucket 'progress')
+    /portal/photos/[id]           ← DELETE delete own photo
+    /cron/purge-messages          ← (Phase 4) Vercel Cron: deletes messages >180 days old (Bearer CRON_SECRET)
 ```
 
-> **Mensajería (Fase 4):** el envío (admin), marcar leído y eliminar usan **server actions**
-> (`lib/admin/messageActions.ts`, `lib/portal/messageActions.ts`), no route handlers.
+> **Messaging (Phase 4):** sending (admin), marking read, and deleting use **server actions**
+> (`lib/admin/messageActions.ts`, `lib/portal/messageActions.ts`), not route handlers.
 
-### Lógica de middleware (en orden)
-1. No autenticado → `/auth/login`
-2. Autenticado pero sin fila en `profiles` (`role=null`) → `/auth/login`
-3. Sin suscripción activa → `/portal/sin-suscripcion` (excepto `/portal/activando` y `/portal/sin-suscripcion`, que son accesibles sin suscripción)
-4. Suscripción activa + `onboarding_completed=false` → `/onboarding/questionnaire`
-5. Admin visitando `/portal` → `/admin/dashboard`
-6. Cliente visitando `/admin` → `/portal/today`
+### Middleware logic (in order)
+1. Not authenticated → `/auth/login`
+2. Authenticated but no row in `profiles` (`role=null`) → `/auth/login`
+3. No active subscription → `/portal/sin-suscripcion` (except `/portal/activando` and `/portal/sin-suscripcion`, which are accessible without a subscription)
+4. Active subscription + `onboarding_completed=false` → `/onboarding/questionnaire`
+5. Admin visiting `/portal` → `/admin/dashboard`
+6. Client visiting `/admin` → `/portal/today`
 
 ---
 
-## Vista del Día con Progreso Integrado (`/portal/today`)
+## Day View with Integrated Progress (`/portal/today`)
 
-Una sola pantalla — sin navegación adicional para registrar progreso:
+A single screen — no additional navigation needed to log progress:
 
 ```
 ┌─────────────────────────────────────┐
@@ -521,80 +521,80 @@ Una sola pantalla — sin navegación adicional para registrar progreso:
 └─────────────────────────────────────┘
 ```
 
-El sistema determina el contenido a mostrar con:
+The system determines the content to display with:
 ```
-contenido = program_days WHERE
-  series_id   = serie del mes actual (months_elapsed)
+content = program_days WHERE
+  series_id   = current month's series (months_elapsed)
   week_number = floor((today - current_period_start).days / 7) + 1
-  day_of_week = nombre del día de hoy en español
+  day_of_week = today's day name in Spanish
 ```
-Si no existe fila para ese `(week_number, day_of_week)` → mostrar card de descanso.
+If no row exists for that `(week_number, day_of_week)` → show the rest-day card.
 
-- El banner de progreso muestra "Mes N · Semana N" en lugar de "Día N de 180"
-- El badge `workout_focus` ("Enfoque": "Tren Inferior", "Protocolo Cardiovascular", "Descanso", etc.) aparece como tag (ya no hay badge de tipo de día)
-- Campos de progreso opcionales
-- Guardado automático con debounce
-- Si ya hay progreso registrado hoy, se muestran los valores previos
-- Métricas de ejercicio extensibles: el campo `"metrics"` en el JSON del ejercicio define qué campos aparecen
-
----
-
-## Historial / Mi Progreso (`/portal/history`)
-
-> **Implementado en Fase 3 (v1.3).** La pantalla sigue el prototipo `client-progress.jsx`: **2 tabs (Desempeño · Fotos)**, no los 3 tabs que describía la v1.1. Las **métricas corporales** (peso/cintura/cadera) NO se piden ni registran; `body_metrics` queda sin captura. Detalle de día = **solo lectura** (resuelve P3).
-
-La clienta puede ver su desempeño a lo largo del mes, revisar días pasados con su registro, y subir fotos de progreso privadas.
-
-### Tab "Desempeño"
-
-- **Gráficas (Recharts)** de las métricas de ejercicio (peso/reps/otras) **del mes corriente** (`log_date >= current_period_start`). Selector de ejercicio (pills) + **toggle de métrica dinámico** según el array `metrics` del ejercicio. **Sin** selector de periodo y **sin** stat cards.
-- **Relación de ejercicios: por NOMBRE normalizado** (no por uuid), para conectar el mismo ejercicio a lo largo de los días aunque Aura cree cada día desde cero. Agregación por día: **peso = promedio de las series**, **reps = suma**.
-- Debajo: lista **"Historial de ejercicios"** — cronológica (reciente primero) de los días con `progress_log`. Cada fila: fecha, título, `workout_focus` como tag, y `N/M` ejercicios completados. Click → `/portal/history/[logId]`.
-
-### Tab "Fotos"
-
-- Galería en **bucket privado de Storage (`progress`)** servida con **signed URLs** (TTL **600s / 10 min**, bajado de 1h en STG-2). Grid de 3 columnas con **filtro por mes**.
-- Subir foto: archivo/cámara + **comentario opcional** (no editable); fecha = hoy. **Compresión en cliente** a 1280px (lado mayor) + JPEG antes de subir. Límites: **5MB/archivo**, **máx 250 fotos** por clienta (badge `[N/250]`).
-- Visor (lightbox) con navegación y **borrar** (solo la dueña; admin puede por RLS, sin UI aún).
-
-### Vista de Detalle (`/portal/history/[logId]`)
-
-Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura** (reusa `BlockView` con la prop `loggedExercises`):
-- Todos los bloques de contenido (texto, video, PDF, imagen, cardio_zone2) visibles normalmente
-- Lista de ejercicios muestra los valores que la clienta registró (reps, peso por serie) pre-cargados y **no editables** (`ExerciseListLogged`), con ✓ si se marcó completo
-- Notas generales del día visibles
-- Badge "📅 {fecha del log}" en el encabezado (en lugar de "HOY")
-- Sin botón de guardar
-- Validación de pertenencia: el `logId` debe ser de la clienta autenticada (si no, 404)
+- The progress banner shows "Mes N · Semana N" instead of "Día N de 180"
+- The `workout_focus` badge ("Enfoque": "Tren Inferior", "Protocolo Cardiovascular", "Descanso", etc.) appears as a tag (there's no longer a day-type badge)
+- Optional progress fields
+- Automatic debounced save
+- If progress is already logged for today, the previous values are shown
+- Extensible exercise metrics: the `"metrics"` field in the exercise's JSON defines which fields appear
 
 ---
 
-## Panel de Administración
+## History / Mi Progreso (`/portal/history`)
 
-### Dashboard Financiero — `/admin/dashboard` (Fase 5 ✓ implementada)
-- **KPIs:** MRR (suma de suscripciones `active` × `program_variants.price_mxn`; predictivo, etiquetado "*Estimado", sin badge delta), total suscripciones activas, "Renuevan este mes" (vencen en ≤30 días + monto), "Requieren atención" (conteo `past_due`, enlaza a `/admin/clients`).
-- **Ingresos por mes:** gráfica de barras (Recharts), ventana fija de 12 meses (fuente: `invoices.amount_paid` agrupado por `invoice_date`, real cobrado — distinto del MRR a propósito).
-- **Clientes por variante:** barras horizontales (conteo de activas por `program_variants.name`).
-- **Ingresos por programa:** donut (`invoices.amount_paid` agrupado por programa).
-- **Pagos recientes:** tabla (fecha, cliente, programa, monto, estado), últimas 10 filas de `invoices`. Botón **"Ver todos →"** enlaza a `/admin/payments` (Fase 6 ✓).
-- **Capa de datos:** `lib/admin/finance-helpers.ts` (funciones puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin `is_admin()`). Fuente = tabla `invoices`, no Stripe API.
+> **Implemented in Phase 3 (v1.3).** The screen follows the `client-progress.jsx` prototype: **2 tabs (Desempeño · Fotos)**, not the 3 tabs described in v1.1. **Body metrics** (weight/waist/hip) are NOT requested or recorded; `body_metrics` remains uncaptured. Day detail = **read-only** (resolves P3).
 
-### Página de Pagos — `/admin/payments` (Fase 6 ✓ implementada)
-- Listado completo de `invoices` (`getAllPayments`, orden `invoice_date` desc): Fecha · Cliente (enlace a su ficha) · Programa·variante · Monto · Estado.
-- **Filtro por estado** (Todos/Pagado/Pendiente/Anulado/Fallido) + **paginación de 10**; botón "← Dashboard". Filtro/paginación client-side (volumen bajo).
-- **Capa compartida:** `lib/admin/pagination.ts` (`paginate`, reusado con `/admin/clients`) + `lib/admin/payment-status.ts` (`STATUS_LABEL`, reusado con el dashboard) + `filterPaymentsByStatus` puro (TDD).
+The client can see her performance over the course of the month, review past days along with her log, and upload private progress photos.
 
-### Gestión de Clientes — `/admin/clients` (Fase 6 ✓ implementada)
-- **Lista** (`getClientsList`, una fila por clienta agrupando por `profile_id` y eligiendo la suscripción primaria): búsqueda por nombre/correo, filtros pill de programa **|** estado de pago, **paginación de 10**, **CSV export** (respeta filtros activos, vía `clientsToCSV`). Columna programa = pill con el programa + variante como subtítulo.
-- **Ficha individual** `/admin/clients/[clientId]` (`getClientDetail`): 6 tabs — Resumen (suscripciones + etiqueta de progreso por billing model + botón Eliminar), Onboarding, Progreso (`progress_logs`), **Fotos** (signed URLs + filtro por mes + **borrado admin**, cierra follow-up de Fase 3), Pagos (`invoices`), Mensajes (+ botón WhatsApp si hay `phone`). Métricas corporales no se muestran (`body_metrics` no se captura).
-- **Eliminar clienta**: endpoint `DELETE /api/admin/clients/[clientId]` con guard `canDeleteClient` (409 si tiene suscripción no cancelada — **no toca Stripe**), borra fotos de Storage y `auth.admin.deleteUser` → cascade vía migración **007** (`ON DELETE CASCADE` en la cadena de FKs de profiles/subscriptions). Endpoint de foto: `DELETE /api/admin/clients/[clientId]/photos/[photoId]`.
-- **CSV export** de clientas (para newsletter/win-back de no-activas) — incluido en la lista (diferido desde Fase 4).
-- **Capa de datos:** `lib/admin/clients-queries.ts` (server-only, RLS admin) + `lib/admin/clients-helpers.ts` (funciones puras, TDD: `filterClients`/`pickPrimarySubscription`/`subscriptionProgressLabel`/`canDeleteClient`/`clientsToCSV`/`paginate`) + `lib/admin/date-helpers.ts` (compartido con el portal).
+### "Desempeño" Tab
 
-### CMS de Contenido
-- Navegación: Programa → Serie/Mes → Grilla semanal → Día
-- **CRUD de Series** [Fase 6 ✓]: desde `/admin/content/[programId]` el admin puede crear, editar y eliminar series. Botón "Nueva serie" → `SeriesFormModal` (modo create): número de mes, título, descripción (opcional) y checkboxes de variantes (al menos una requerida). Menú "⋯" en header de cada `SeriesAccordion` → editar (mismos campos + toggle Publicado) o eliminar (diálogo con advertencia de cascade). Server actions en `lib/admin/seriesActions.ts` (`createSeries`/`updateSeries`/`deleteSeries`). Mapeo variante↔serie por `variant_series_map`; el DELETE borra explícitamente esa tabla antes de `program_series` (FK sin ON DELETE CASCADE).
-- **Vista de serie:** grilla 4 filas (semanas) × 7 columnas (días de la semana). Cada celda muestra el `workout_focus` del día o "—" si es descanso. Color por estado: publicado (lavanda), borrador (gris), vacío (blanco). Al hacer clic en una celda se abre el editor de ese día.
+- **Charts (Recharts)** of exercise metrics (weight/reps/others) **for the current month** (`log_date >= current_period_start`). Exercise selector (pills) + **dynamic metric toggle** based on the exercise's `metrics` array. **No** period selector and **no** stat cards.
+- **Exercise matching: by normalized NAME** (not by uuid), to connect the same exercise across days even though Aura creates each day from scratch. Per-day aggregation: **weight = average of the sets**, **reps = sum**.
+- Below: **"Historial de ejercicios"** list — chronological (most recent first) of days with a `progress_log`. Each row: date, title, `workout_focus` as a tag, and `N/M` exercises completed. Click → `/portal/history/[logId]`.
+
+### "Fotos" Tab
+
+- Gallery in a **private Storage bucket (`progress`)** served with **signed URLs** (TTL **600s / 10 min**, lowered from 1h in STG-2). 3-column grid with **filter by month**.
+- Upload photo: file/camera + **optional comment** (not editable); date = today. **Client-side compression** to 1280px (longer side) + JPEG before uploading. Limits: **5MB/file**, **max 250 photos** per client (badge `[N/250]`).
+- Viewer (lightbox) with navigation and **delete** (owner only; admin can via RLS, no UI yet).
+
+### Detail View (`/portal/history/[logId]`)
+
+Renders the same visual structure as `/portal/today` but in **read-only mode** (reuses `BlockView` with the `loggedExercises` prop):
+- All content blocks (text, video, PDF, image, cardio_zone2) visible normally
+- Exercise list shows the values the client logged (reps, weight per set) pre-loaded and **not editable** (`ExerciseListLogged`), with ✓ if marked complete
+- Day's general notes visible
+- Badge "📅 {log date}" in the header (instead of "HOY")
+- No save button
+- Ownership validation: the `logId` must belong to the authenticated client (otherwise, 404)
+
+---
+
+## Admin Panel
+
+### Financial Dashboard — `/admin/dashboard` (Phase 5 ✓ implemented)
+- **KPIs:** MRR (sum of `active` subscriptions × `program_variants.price_mxn`; predictive, labeled "*Estimado", no delta badge), total active subscriptions, "Renuevan este mes" (expiring in ≤30 days + amount), "Requieren atención" (count of `past_due`, links to `/admin/clients`).
+- **Ingresos por mes:** bar chart (Recharts), fixed 12-month window (source: `invoices.amount_paid` grouped by `invoice_date`, actually collected — intentionally different from MRR).
+- **Clientes por variante:** horizontal bars (count of active subscriptions by `program_variants.name`).
+- **Ingresos por programa:** donut chart (`invoices.amount_paid` grouped by program).
+- **Pagos recientes:** table (date, client, program, amount, status), last 10 rows of `invoices`. **"Ver todos →"** button links to `/admin/payments` (Phase 6 ✓).
+- **Data layer:** `lib/admin/finance-helpers.ts` (pure functions, TDD) + `lib/admin/finance-queries.ts` (server-only, admin RLS `is_admin()`). Source = `invoices` table, not the Stripe API.
+
+### Payments Page — `/admin/payments` (Phase 6 ✓ implemented)
+- Full listing of `invoices` (`getAllPayments`, ordered by `invoice_date` desc): Fecha · Cliente (link to their profile) · Programa·variante · Monto · Estado.
+- **Status filter** (Todos/Pagado/Pendiente/Anulado/Fallido) + **pagination of 10**; "← Dashboard" button. Client-side filter/pagination (low volume).
+- **Shared layer:** `lib/admin/pagination.ts` (`paginate`, reused with `/admin/clients`) + `lib/admin/payment-status.ts` (`STATUS_LABEL`, reused with the dashboard) + pure `filterPaymentsByStatus` (TDD).
+
+### Client Management — `/admin/clients` (Phase 6 ✓ implemented)
+- **List** (`getClientsList`, one row per client, grouped by `profile_id` and picking the primary subscription): search by name/email, program **|** payment-status pill filters, **pagination of 10**, **CSV export** (respects active filters, via `clientsToCSV`). Program column = pill with the program + variant as a subtitle.
+- **Individual profile** `/admin/clients/[clientId]` (`getClientDetail`): 6 tabs — Resumen (subscriptions + progress label by billing model + Eliminar button), Onboarding, Progreso (`progress_logs`), **Fotos** (signed URLs + filter by month + **admin deletion**, closes out the Phase 3 follow-up), Pagos (`invoices`), Mensajes (+ WhatsApp button if `phone` exists). Body metrics aren't shown (`body_metrics` isn't captured).
+- **Delete client**: `DELETE /api/admin/clients/[clientId]` endpoint with `canDeleteClient` guard (409 if there's a non-canceled subscription — **doesn't touch Stripe**), deletes Storage photos and `auth.admin.deleteUser` → cascade via migration **007** (`ON DELETE CASCADE` across the profiles/subscriptions FK chain). Photo endpoint: `DELETE /api/admin/clients/[clientId]/photos/[photoId]`.
+- **CSV export** of clients (for newsletter/win-back of inactive ones) — included in the list (deferred from Phase 4).
+- **Data layer:** `lib/admin/clients-queries.ts` (server-only, admin RLS) + `lib/admin/clients-helpers.ts` (pure functions, TDD: `filterClients`/`pickPrimarySubscription`/`subscriptionProgressLabel`/`canDeleteClient`/`clientsToCSV`/`paginate`) + `lib/admin/date-helpers.ts` (shared with the portal).
+
+### Content CMS
+- Navigation: Program → Series/Month → Weekly grid → Day
+- **Series CRUD** [Phase 6 ✓]: from `/admin/content/[programId]` the admin can create, edit, and delete series. "Nueva serie" button → `SeriesFormModal` (create mode): month number, title, description (optional), and variant checkboxes (at least one required). "⋯" menu in each `SeriesAccordion`'s header → edit (same fields + Publicado toggle) or delete (dialog with a cascade warning). Server actions in `lib/admin/seriesActions.ts` (`createSeries`/`updateSeries`/`deleteSeries`). Variant↔series mapping via `variant_series_map`; the DELETE explicitly deletes that table before `program_series` (FK without ON DELETE CASCADE).
+- **Series view:** 4-row (weeks) × 7-column (days of the week) grid. Each cell shows the day's `workout_focus` or "—" if it's a rest day. Color by state: published (lavender), draft (gray), empty (white). Clicking a cell opens that day's editor.
   ```
            Lun         Mar    Mié         Jue    Vie         Sáb    Dom
   Sem 1  [T.Inf ✓]   [—]   [T.Sup ✓]   [—]   [Full ✓]   [—]    [—]
@@ -602,57 +602,57 @@ Renderiza la misma estructura visual que `/portal/today` pero en **modo lectura*
   Sem 3  [T.Inf]     [—]   [T.Sup]     [—]   [Full]     [—]    [—]
   Sem 4  [vacío]     [—]   [vacío]     [—]   [vacío]    [—]    [—]
   ```
-- Al crear/editar un día, Aura define: semana, día de semana, `workout_focus` (Enfoque, texto libre), título, duración (sin selector de tipo — todos son "Actividad Física")
-- Editor de bloques arrastrables (dnd-kit):
-  - **Texto:** editor Tiptap con bold, italic, encabezados (H2/H3/H4), listas (UL y OL)
-  - **YouTube:** pegar URL → extrae video_id → preview del embed
-  - **PDF:** upload a Supabase Storage → guarda storage_path
-  - **Imagen:** upload a Supabase Storage + alt text + preview
-  - **Lista de ejercicios:** nombre, series×reps, descanso, notas, URL de video demo por ejercicio, y qué métricas registrará la cliente (reps / peso)
-  - **Calculadora Cardio Zona 2:** bloque fijo (la clienta ingresa su edad en el portal)
-- Estado por día como selector Publicado / Borrador (y por serie)
-- Timeline expandible para Extra y Strong & Fit (misma grilla por cada serie)
+- When creating/editing a day, Aura sets: week, day of the week, `workout_focus` (Enfoque, free text), title, duration (no type selector — all days are "Actividad Física")
+- Draggable block editor (dnd-kit):
+  - **Text:** Tiptap editor with bold, italic, headings (H2/H3/H4), lists (UL and OL)
+  - **YouTube:** paste URL → extracts video_id → embed preview
+  - **PDF:** upload to Supabase Storage → saves storage_path
+  - **Image:** upload to Supabase Storage + alt text + preview
+  - **Exercise list:** name, sets×reps, rest, notes, demo video URL per exercise, and which metrics the client will log (reps / weight)
+  - **Cardio Zone 2 Calculator:** fixed block (the client enters her age in the portal)
+- Per-day state as a Publicado / Borrador selector (and per series)
+- Expandable timeline for Extra and Strong & Fit (same grid per series)
 
-### Mensajería
-- Individual (a una cliente) o broadcast (filtrado por programa)
-- Historial de enviados
-- Notificación por email al destinatario (Resend)
+### Messaging
+- Individual (to one client) or broadcast (filtered by program)
+- Sent history
+- Email notification to the recipient (Resend)
 
-### Configuración de Onboarding — `/admin/onboarding-settings` (Fase 6 ✓ implementada)
-- Constructor (`OnboardingBuilder`): crear, editar (modal `OnboardingQuestionEditor`), **reordenar con drag** (dnd-kit) y **activar/desactivar** preguntas. Solo desactivar (`is_active=false`), sin borrado físico, para no dejar respuestas huérfanas en el jsonb.
-- Tipos: texto libre, número, selección única, selección múltiple (los dos últimos con editor de opciones).
-- **Capa de datos:** `lib/admin/onboarding-helpers.ts` (`validateQuestion`/`reindexOrder`, puras TDD) + `lib/admin/onboardingActions.ts` (server actions `saveQuestion`/`reorderQuestions`/`setQuestionActive`, RLS admin, sin migración). El cuestionario del cliente (`/onboarding/questionnaire`) refleja las activas ordenadas, sin cambios.
+### Onboarding Configuration — `/admin/onboarding-settings` (Phase 6 ✓ implemented)
+- Builder (`OnboardingBuilder`): create, edit (`OnboardingQuestionEditor` modal), **reorder via drag** (dnd-kit), and **activate/deactivate** questions. Deactivate only (`is_active=false`), no hard delete, so as not to leave orphaned responses in the jsonb.
+- Types: free text, number, single choice, multiple choice (the last two with an options editor).
+- **Data layer:** `lib/admin/onboarding-helpers.ts` (`validateQuestion`/`reindexOrder`, pure TDD) + `lib/admin/onboardingActions.ts` (server actions `saveQuestion`/`reorderQuestions`/`setQuestionActive`, admin RLS, no migration). The client's questionnaire (`/onboarding/questionnaire`) reflects the active ones in order, unchanged.
 
 ---
 
-## Integración Stripe
+## Stripe Integration
 
-### Webhooks manejados
+### Webhooks Handled
 
-| Evento | Acción |
+| Event | Action |
 |--------|--------|
-| `checkout.session.completed` | Crea `subscriptions` (months_elapsed=1), email de bienvenida |
-| `invoice.paid` | Crea `invoices` (incluye el PRIMER pago `subscription_create` — corregido en Fase 5); en renovaciones incrementa months_elapsed y detecta `completed_at` (mes 6 en CuarentaMás y Extra Intermedio) |
-| `customer.subscription.updated` | Actualiza status y cancel_at_period_end |
-| `customer.subscription.deleted` | Marca cancelada |
-| `invoice.payment_failed` | Actualiza a past_due, email de aviso |
+| `checkout.session.completed` | Creates `subscriptions` (months_elapsed=1), welcome email |
+| `invoice.paid` | Creates `invoices` (includes the FIRST payment `subscription_create` — fixed in Phase 5); on renewals increments months_elapsed and detects `completed_at` (month 6 for CuarentaMás and Extra Intermedio) |
+| `customer.subscription.updated` | Updates status and cancel_at_period_end |
+| `customer.subscription.deleted` | Marks canceled |
+| `invoice.payment_failed` | Updates to past_due, notice email |
 
-Todos los eventos se registran en `subscription_events` para auditoría.
+All events are logged in `subscription_events` for auditing.
 
 ### Checkout
-- `variantSlug` viene en la URL (del quiz de WordPress)
-- Servidor verifica prerequisites antes de crear Stripe Checkout Session
-- Prerequisitos: tabla `program_variant_prerequisites` con lógica AND/OR por grupos
+- `variantSlug` comes in the URL (from the WordPress quiz)
+- Server verifies prerequisites before creating the Stripe Checkout Session
+- Prerequisites: `program_variant_prerequisites` table with AND/OR logic by groups
 
 ---
 
-## Variables de Entorno
+## Environment Variables
 
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=          # solo servidor, nunca expuesta al cliente
+SUPABASE_SERVICE_ROLE_KEY=          # server only, never exposed to the client
 
 # Stripe
 STRIPE_SECRET_KEY=
@@ -661,11 +661,11 @@ STRIPE_WEBHOOK_SECRET=
 
 # Resend
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=no-reply@auramaristany.com  # dominio verificado en Resend; en dev sin dominio: onboarding@resend.dev
+RESEND_FROM_EMAIL=no-reply@auramaristany.com  # domain verified in Resend; in dev without a domain: onboarding@resend.dev
 
-# Mensajería (Fase 4)
-NEXT_PUBLIC_AURA_WHATSAPP=                      # número de Aura, formato internacional solo dígitos
-CRON_SECRET=                                    # secreto del Vercel Cron de retención de mensajes (prod)
+# Messaging (Phase 4)
+NEXT_PUBLIC_AURA_WHATSAPP=                      # Aura's number, international format, digits only
+CRON_SECRET=                                    # secret for the Vercel Cron message-retention job (prod)
 
 # App
 NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
@@ -673,71 +673,71 @@ NEXT_PUBLIC_APP_URL=https://app.auramaristany.com
 
 ---
 
-## Archivos Críticos del Sistema
+## Critical System Files
 
-| Archivo | Rol |
+| File | Role |
 |---------|-----|
-| `/supabase/migrations/001_initial_schema.sql` | Esquema completo + RLS + función `get_accessible_content()` |
-| `/lib/content/access.ts` | Lógica de acceso para los 3 programas con control de día máximo |
-| `/app/api/webhooks/stripe/route.ts` | Ciclo de vida de suscripciones |
-| `/middleware.ts` | Protección por rol, suscripción y onboarding |
-| `/components/admin/DayEditor.tsx` | Editor de contenido de Aura |
-| `/components/portal/TodayView.tsx` | Vista del día con progreso integrado |
+| `/supabase/migrations/001_initial_schema.sql` | Complete schema + RLS + `get_accessible_content()` function |
+| `/lib/content/access.ts` | Access logic for the 3 programs with max-day control |
+| `/app/api/webhooks/stripe/route.ts` | Subscription lifecycle |
+| `/middleware.ts` | Protection by role, subscription, and onboarding |
+| `/components/admin/DayEditor.tsx` | Aura's content editor |
+| `/components/portal/TodayView.tsx` | Day view with integrated progress |
 
 ---
 
-## Plan de Desarrollo
+## Development Plan
 
-| Fase | Semanas | Entregable |
+| Phase | Weeks | Deliverable |
 |------|---------|-----------|
-| 0 — Fundación | 1-2 | Login/logout funcional, skeleton en Vercel |
-| 1 — Suscripción MVP | 3-5 | Quiz → pago → onboarding → portal |
-| 2 — Contenido | 6-9 | Aura crea contenido, cliente lo ve y registra progreso |
-| 3 — Historial | 10-11 | Gráficas de métricas + galería de fotos |
-| 4 — Mensajería | 12 | Comunicación Aura ↔ clientes |
-| 5 — Financiero | 13 | Dashboard de MRR e ingresos |
-| 6 — Pulido + Launch | 14-15 | App lista para producción |
+| 0 — Foundation | 1-2 | Working login/logout, skeleton on Vercel |
+| 1 — Subscription MVP | 3-5 | Quiz → payment → onboarding → portal |
+| 2 — Content | 6-9 | Aura creates content, client views it and logs progress |
+| 3 — History | 10-11 | Metric charts + photo gallery |
+| 4 — Messaging | 12 | Aura ↔ client communication |
+| 5 — Financial | 13 | MRR and revenue dashboard |
+| 6 — Polish + Launch | 14-15 | App ready for production |
 
 ---
 
-## Verificación End-to-End
+## End-to-End Verification
 
-1. URL con variantSlug → registro → tarjeta Stripe test → cuestionario → `/portal/today`
-2. Cliente en Semana 1, Miércoles: no puede ver el Miércoles de Semana 2 (no existe celda accesible aún)
-3. Días de descanso: días de la semana sin fila en `program_days` → portal muestra card de descanso (sin error)
-4. Strong & Fit mes 2: Semanas 1-4 de Serie 1 completas + Serie 2 hasta (semana_actual, día_de_hoy)
-5. Extra mes 3: solo Serie 3 visible, sin acceso a Serie 2 ni Serie 4
-6. Sin `completed_at`: checkout de Extra falla con mensaje claro
-7. Ejercicio marcado + reps anotadas → recargar → datos persisten
-8. Video YouTube: thumbnail propio → clic → iframe sin sugerencias
-9. Historial: entrar a `/portal/history`, seleccionar un día pasado → ver contenido + registro en lectura
-10. Respuestas de onboarding de cliente visibles en su ficha de admin
-11. MRR del dashboard = suma manual de suscripciones activas × precio
+1. URL with variantSlug → registration → Stripe test card → questionnaire → `/portal/today`
+2. Client in Week 1, Wednesday: cannot see Week 2's Wednesday (no accessible cell exists yet)
+3. Rest days: days of the week with no row in `program_days` → portal shows the rest-day card (no error)
+4. Strong & Fit month 2: Weeks 1-4 of Series 1 complete + Series 2 up to (week_number, day_of_week)
+5. Extra month 3: only Series 3 visible, no access to Series 2 or Series 4
+6. Without `completed_at`: Extra checkout fails with a clear message
+7. Exercise marked + reps logged → reload → data persists
+8. YouTube video: custom thumbnail → click → iframe with no suggestions
+9. History: go to `/portal/history`, select a past day → view content + log in read-only mode
+10. Client's onboarding responses visible on their admin profile
+11. Dashboard MRR = manual sum of active subscriptions × price
 
 ---
 
-*Spec generado el 3 de junio de 2026 · Versión 1.1 — Cambios: modelo semanal (week_number + day_of_week) en program_days; historial de días anteriores en /portal/history*
+*Spec generated on 3 de junio de 2026 · Version 1.1 — Changes: weekly model (week_number + day_of_week) in program_days; history of past days in /portal/history*
 
-*Versión 1.2 (9 de junio de 2026) — Cambios tras smoke de Fase 2: se elimina el selector de tipo de día (todos son "Actividad Física"; el Enfoque/`workout_focus` describe la actividad y los días de descanso llevan contenido); nuevo block type `cardio_zone2` (calculadora); tablas de pilares mensuales (`program_series_pillars`, `program_pillar_blocks`) + sección `/portal/pilares` para CuarentaMás/Extra. Pendiente ronda de ajustes de UI del editor (acercar al prototipo design-handoff).*
+*Version 1.2 (9 de junio de 2026) — Changes after the Phase 2 smoke test: the day-type selector is removed (all days are "Actividad Física"; the Enfoque/`workout_focus` describes the activity and rest days carry content); new `cardio_zone2` block type (calculator); monthly pillar tables (`program_series_pillars`, `program_pillar_blocks`) + `/portal/pilares` section for CuarentaMás/Extra. A round of editor UI adjustments still pending (bringing it closer to the design-handoff prototype).*
 
-*Versión 1.4 (9 de junio de 2026) — Fase 4 (Mensajería) implementada en rama `feature/fase-4-mensajeria` (NO mergeada; pendiente aplicar migración 006 al remoto + smoke). Mensajería unidireccional Aura→clientas in-app (individual + broadcast por programa/variante, modelo snapshot), bandeja read-only + marcar leído + badge de no-leídos. Infra de email `lib/email/` (Resend + React Email, best-effort, no-op sin key) con email de mensaje nuevo + **emails de ciclo de vida** en los webhooks de Stripe (bienvenida/pago-fallido/cancelación). Enlaces a **WhatsApp** (portal→Aura, admin→clienta). Corregido el drift de §messages (esquema real). **Migración 006**: policy SELECT de `messages` para clientas + UPDATE de `read_at` por la dueña + índices. CSV export de clientas diferido a Fase 5. Spec/plan en `docs/superpowers/`.*
+*Version 1.4 (9 de junio de 2026) — Phase 4 (Messaging) implemented on the `feature/fase-4-mensajeria` branch (NOT merged; pending applying migration 006 to remote + smoke test). One-way in-app Aura→client messaging (individual + broadcast by program/variant, snapshot model), read-only inbox + mark-as-read + unread badge. Email infra `lib/email/` (Resend + React Email, best-effort, no-op without a key) with new-message email + **lifecycle emails** on the Stripe webhooks (welcome/failed-payment/cancellation). **WhatsApp** links (portal→Aura, admin→client). Fixed the §messages drift (actual schema). **Migration 006**: SELECT policy on `messages` for clients + `read_at` UPDATE by the owner + indexes. Client CSV export deferred to Phase 5. Spec/plan in `docs/superpowers/`.*
 
-*Versión 1.3 (9 de junio de 2026) — Fase 3 (Historial) completada y mergeada a main. `/portal/history` con **2 tabs (Desempeño · Fotos)** según prototipo (no 3); **sin métricas corporales** (`body_metrics` sin captura); gráficas Recharts del **mes corriente** con relación de ejercicios **por nombre** (no uuid); detalle `/portal/history/[logId]` **solo lectura** (resuelve P3). Fotos en **bucket privado `progress`** con signed URLs, comentario opcional, compresión cliente 1280px, límites 5MB/**250 fotos** (badge `[N/250]`). Migración `005_progress_photos.sql` aplicada: bucket privado + RLS de storage + columna `caption`. Corrección de esquema: la columna real de `progress_photos` es **`taken_at`** (no `photo_date`) y **no** existe `angle`. Follow-ups: regenerar `lib/supabase/types.ts` (incluir `progress_photos`/`body_metrics`), UI admin para borrar fotos, notas de admin sobre el registro (diferido a Fase 4).*
+*Version 1.3 (9 de junio de 2026) — Phase 3 (History) completed and merged to main. `/portal/history` with **2 tabs (Desempeño · Fotos)** per the prototype (not 3); **no body metrics** (`body_metrics` uncaptured); Recharts charts for the **current month** with exercise matching **by name** (not uuid); `/portal/history/[logId]` detail **read-only** (resolves P3). Photos in a **private bucket `progress`** with signed URLs, optional comment, 1280px client-side compression, limits of 5MB/**250 photos** (badge `[N/250]`). Migration `005_progress_photos.sql` applied: private bucket + storage RLS + `caption` column. Schema fix: the actual column on `progress_photos` is **`taken_at`** (not `photo_date`) and `angle` does **not** exist. Follow-ups: regenerate `lib/supabase/types.ts` (include `progress_photos`/`body_metrics`), admin UI to delete photos, admin notes on the log (deferred to Phase 4).*
 
-*Versión 1.5 (10 de junio de 2026) — Fase 5 (Dashboard Financiero) completada y **mergeada a main** (merge `a9ecb32`). `/admin/dashboard`: KPIs (MRR "*Estimado" = activas × `price_mxn`, sin badge delta; activas; renuevan en ≤30 días + monto; `past_due` → `/admin/clients`), ingresos por mes (barras Recharts, 12m fijo), **clientes por variante** (barras), ingresos por programa (donut), pagos recientes (últimas 10). Capa de datos: `lib/admin/finance-helpers.ts` (puras, TDD) + `lib/admin/finance-queries.ts` (server-only, RLS admin). ✓ **Bug corregido:** el primer pago (`billing_reason='subscription_create'`) ya se registra en `invoices`; **backfill** aplicado (`scripts/backfill-first-invoices.ts`, idempotente). E2E validado con cuentas reales. Diferido a **Fase 6:** página `/admin/payments` + botón "Ver todos", `/admin/clients`+ficha, CSV export de clientas. Spec/plan en `docs/superpowers/` (`2026-06-10-fase-5-financiero-*`).*
+*Version 1.5 (10 de junio de 2026) — Phase 5 (Financial Dashboard) completed and **merged to main** (merge `a9ecb32`). `/admin/dashboard`: KPIs (MRR "*Estimado" = active × `price_mxn`, no delta badge; active; renewing in ≤30 days + amount; `past_due` → `/admin/clients`), revenue by month (Recharts bars, fixed 12m), **clients by variant** (bars), revenue by program (donut), recent payments (last 10). Data layer: `lib/admin/finance-helpers.ts` (pure, TDD) + `lib/admin/finance-queries.ts` (server-only, admin RLS). ✓ **Bug fixed:** the first payment (`billing_reason='subscription_create'`) now gets recorded in `invoices`; **backfill** applied (`scripts/backfill-first-invoices.ts`, idempotent). E2E validated with real accounts. Deferred to **Phase 6:** `/admin/payments` page + "Ver todos" button, `/admin/clients`+profile, client CSV export. Spec/plan in `docs/superpowers/` (`2026-06-10-fase-5-financiero-*`).*
 
-*Versión 1.6 (10 de junio de 2026) — Fase 6 (Pulido + Launch) EN CURSO, sub-bloques mergeados a main: **(1) Gestión de Clientes** (merge `0d23c5e`) — `/admin/clients` lista (filtros, paginación 10, CSV) + ficha de 6 tabs (incl. borrado admin de fotos) + **borrado total de cliente** (`DELETE /api/admin/clients/[clientId]`, guard 409 si sub no cancelada, **migración 007 `ON DELETE CASCADE`** aplicada); **(3) Página de Pagos** (merge `d52f224`) — `/admin/payments` + "Ver todos →" en el dashboard; extrae `paginate`/`STATUS_LABEL` a módulos compartidos; **lenguaje neutro** ('clienta(s)' → 'cliente(s)') en toda la UI; **(4b) Constructor de Onboarding** (merge `9477a8c`) — `/admin/onboarding-settings` (CRUD de `onboarding_questions`: modal 4 tipos, reordenar drag, activar/desactivar; sin migración). Drift corregido: `body_metrics` real usa `metric_date`/`numeric(5,1)`/sin UNIQUE. **(4a) Núm. Celular obligatorio en `/auth/register`** (merge `bdb4e83`) — campo con lada de país (validado `lib/auth/phone.ts`, 11–15 dígitos, normalizado) → `signUp` metadata → **migración 008** (`handle_new_user` copia phone a `profiles.phone`, aplicada y verificada). Activa el botón WhatsApp admin→cliente. **Pendiente Fase 6:** conectar Resend, deploy a Vercel (+ CRON_SECRET), Stripe live + precios reales, auditoría de seguridad. 159/159 tests. Specs/planes en `docs/superpowers/` (`2026-06-10-gestion-clientes-*`, `2026-06-10-admin-payments-*`, `2026-06-10-onboarding-builder-*`, `2026-06-10-telefono-registro-*`).*
+*Version 1.6 (10 de junio de 2026) — Phase 6 (Polish + Launch) IN PROGRESS, sub-blocks merged to main: **(1) Client Management** (merge `0d23c5e`) — `/admin/clients` list (filters, pagination of 10, CSV) + 6-tab profile (incl. admin photo deletion) + **full client deletion** (`DELETE /api/admin/clients/[clientId]`, 409 guard if sub not canceled, **migration 007 `ON DELETE CASCADE`** applied); **(3) Payments Page** (merge `d52f224`) — `/admin/payments` + "Ver todos →" on the dashboard; extracts `paginate`/`STATUS_LABEL` into shared modules; **neutral language** ('clienta(s)' → 'cliente(s)') across the whole UI; **(4b) Onboarding Builder** (merge `9477a8c`) — `/admin/onboarding-settings` (CRUD for `onboarding_questions`: 4-type modal, drag reorder, activate/deactivate; no migration). Fixed drift: the actual `body_metrics` uses `metric_date`/`numeric(5,1)`/no UNIQUE. **(4a) Required phone number on `/auth/register`** (merge `bdb4e83`) — field with country code (validated by `lib/auth/phone.ts`, 11–15 digits, normalized) → `signUp` metadata → **migration 008** (`handle_new_user` copies phone to `profiles.phone`, applied and verified). Activates the admin→client WhatsApp button. **Pending for Phase 6:** connect Resend, deploy to Vercel (+ CRON_SECRET), Stripe live + real prices, security audit. 159/159 tests. Specs/plans in `docs/superpowers/` (`2026-06-10-gestion-clientes-*`, `2026-06-10-admin-payments-*`, `2026-06-10-onboarding-builder-*`, `2026-06-10-telefono-registro-*`).*
 
-*Versión 1.7 (11 de junio de 2026) — Fase 6 sub-bloque **A: Auditoría de seguridad + ciclo de corrección** (merge `bb05894`). Auditoría read-only (4 auditores paralelos, reporte en `docs/superpowers/audits/`, **0 críticos**, 15 hallazgos). Corregidos los 5 medios + bonus: **DEF-1** (`lib/admin/auth.ts`: `requireAdmin`/`requireAdminPage` en server-actions, queries service-role y páginas admin); **SUB-1** (`lib/content/subscription-access.ts`: el acceso al portal lo conceden los estados **`active`/`trialing`/`past_due`**, unificado en middleware/`getTodayContent`/`getPerformanceData`/`pillars`; banner de pago pendiente con CTA WhatsApp); **INP-2** (validación de input con zod + sanitización del HTML de Tiptap con `sanitize-html`); **INP-3** (mensaje genérico en registro anti-enumeración + normalización de phone server-side); **RLS-1/RLS-2/HYG-1** → **migración 009** (`with check` explícito, `search_path` en `is_admin()`, phone normalizado en `handle_new_user`, aplicada y verificada). + **G3** (usuario autenticado no puede re-login en `/auth/login|register`). 195/195 tests, smoke+re-smoke OK. **Pendiente Fase 6:** ⚠ BUG G4 (el pago no se registra en `invoices` pese a `stripe listen` activo — la sub queda `active` pero el invoice no aparece), logout en UI, Resend (+ SMTP de confirmación), deploy a Vercel, Stripe live + precios, `/portal/settings`. Specs/planes en `docs/superpowers/` (`2026-06-11-fase6-auditoria-seguridad-*`, `2026-06-11-fase6-fixes-seguridad-*`).*
+*Version 1.7 (11 de junio de 2026) — Phase 6 sub-block **A: Security audit + correction cycle** (merge `bb05894`). Read-only audit (4 parallel auditors, report in `docs/superpowers/audits/`, **0 critical**, 15 findings). Fixed the 5 medium ones + bonus: **DEF-1** (`lib/admin/auth.ts`: `requireAdmin`/`requireAdminPage` in server-actions, service-role queries, and admin pages); **SUB-1** (`lib/content/subscription-access.ts`: portal access is granted by the states **`active`/`trialing`/`past_due`**, unified across middleware/`getTodayContent`/`getPerformanceData`/`pillars`; pending-payment banner with a WhatsApp CTA); **INP-2** (input validation with zod + Tiptap HTML sanitization with `sanitize-html`); **INP-3** (generic message on registration to prevent enumeration + server-side phone normalization); **RLS-1/RLS-2/HYG-1** → **migration 009** (explicit `with check`, `search_path` on `is_admin()`, phone normalized in `handle_new_user`, applied and verified). + **G3** (an authenticated user can't re-login at `/auth/login|register`). 195/195 tests, smoke+re-smoke OK. **Pending for Phase 6:** ⚠ BUG G4 (the payment isn't recorded in `invoices` despite `stripe listen` being active — the sub stays `active` but the invoice doesn't show up), UI logout, Resend (+ confirmation SMTP), deploy to Vercel, Stripe live + prices, `/portal/settings`. Specs/plans in `docs/superpowers/` (`2026-06-11-fase6-auditoria-seguridad-*`, `2026-06-11-fase6-fixes-seguridad-*`).*
 
-*Versión 1.8 (11 de junio de 2026) — Fase 6: **A1 (BUG G4)** resuelto (merge `1e838d7`) + **B1 (logout en UI)** (merge `0dde433`). **G4:** el primer invoice no se registraba porque Stripe emite `invoice.paid` ~1s antes que `checkout.session.completed` (único creador de la fila de sub); fix = registrar el primer invoice en `handleCheckoutCompleted` (expand `latest_invoice`) + `recordInvoice` idempotente (`upsert onConflict stripe_invoice_id`); backfill de 2 subs huérfanas aplicado. **B1:** `LogoutButton` en el sidebar admin (se elimina el link roto "Ver portal de cliente") + `/portal/settings` mínimo (datos de cuenta de solo lectura + logout; arregla la pestaña "Configuración" que era 404). 197/197 tests, smoke OK. **Pendiente Fase 6 (orden):** B2 enriquecer `/portal/settings` con edición (necesario MVP) → 8 hallazgos bajos de la auditoría + limpieza arrastrada → (en paralelo) decisiones de Aura P1 precios/P5 dominio → bloque ops Resend (+ SMTP confirmación)/Vercel/Stripe live. Specs/planes en `docs/superpowers/` (`2026-06-11-fase6-b1-logout-*`).*
+*Version 1.8 (11 de junio de 2026) — Phase 6: **A1 (BUG G4)** resolved (merge `1e838d7`) + **B1 (UI logout)** (merge `0dde433`). **G4:** the first invoice wasn't being recorded because Stripe emits `invoice.paid` ~1s before `checkout.session.completed` (the sole creator of the sub row); fix = record the first invoice in `handleCheckoutCompleted` (expand `latest_invoice`) + idempotent `recordInvoice` (`upsert onConflict stripe_invoice_id`); backfill of 2 orphaned subs applied. **B1:** `LogoutButton` in the admin sidebar (removes the broken "Ver portal de cliente" link) + minimal `/portal/settings` (read-only account data + logout; fixes the "Configuración" tab that was a 404). 197/197 tests, smoke OK. **Pending for Phase 6 (order):** B2 enrich `/portal/settings` with editing (needed for MVP) → 8 low-severity audit findings + carried-over cleanup → (in parallel) Aura's decisions on P1 pricing/P5 domain → ops block Resend (+ confirmation SMTP)/Vercel/Stripe live. Specs/plans in `docs/superpowers/` (`2026-06-11-fase6-b1-logout-*`).*
 
-*Versión 1.9 (14 de junio de 2026) — Fase 6: **B2 — `/portal/settings` completo** (merge `4271c85`). La pestaña "Configuración" pasa de solo-lectura a la pantalla "Mi cuenta" del cliente: **edición de nombre y teléfono** + **cambio de contraseña** (server actions en `lib/portal/settingsActions.ts`; identidad siempre de `getUser()` —nunca del cliente, hallazgo INP-4—; teléfono normalizado con `lib/auth/phone`; la contraseña **actual** se re-verifica con un cliente *stateless* `@supabase/supabase-js` sin cookies para no rotar la sesión; errores crudos loggeados server-side + mensaje genérico al cliente); **foto de perfil** (route handler `app/api/portal/avatar/route.ts` → **bucket público `avatars`**, ruta fija `${user.id}/avatar.<ext>` con `upsert` + URL cache-busted; subida comprimida a **≤800px** y recomprimida a JPEG vía `lib/portal/photo-compress` generalizado; avatar genérico con iniciales si no hay foto); **ficha de suscripción** (`SubscriptionCard`: programa en pill + variante debajo al estilo admin, estado, fecha de inicio, próximo cobro + monto, barra **"Mes X de Y"** con `months_elapsed`/`duration_months`); **historial de pagos** paginado **10/página** (`PaymentHistory`, reusa `paginate`/`STATUS_LABEL`, `?page=` server-side); más header del portal (logo + fecha) y logout. Email **solo-lectura permanente**. Lectura de suscripción/invoices vía RLS de dueño (`subscriptions_own_or_admin`/`invoices_own_or_admin`). **Migración 010** (bucket público `avatars` + policy `avatars_public_read`, aplicada y verificada). 216/216 tests, tsc/lint/build verdes, smoke+re-smoke OK. **Pendiente Fase 6 (orden):** C 8 hallazgos bajos de la auditoría + D limpieza arrastrada → (en paralelo) decisiones de Aura P1 precios/P5 dominio → bloque ops Resend (+ SMTP confirmación)/Vercel/Stripe live. Specs/planes en `docs/superpowers/` (`2026-06-13-b2-portal-settings-*`).*
+*Version 1.9 (14 de junio de 2026) — Phase 6: **B2 — `/portal/settings` complete** (merge `4271c85`). The "Configuración" tab moves from read-only to the client's "Mi cuenta" screen: **name and phone editing** + **password change** (server actions in `lib/portal/settingsActions.ts`; identity always from `getUser()` —never from the client, finding INP-4—; phone normalized with `lib/auth/phone`; the **current** password is re-verified with a *stateless* `@supabase/supabase-js` client with no cookies so as not to rotate the session; raw errors logged server-side + generic message to the client); **profile photo** (route handler `app/api/portal/avatar/route.ts` → **public bucket `avatars`**, fixed path `${user.id}/avatar.<ext>` with `upsert` + cache-busted URL; upload compressed to **≤800px** and recompressed to JPEG via generalized `lib/portal/photo-compress`; generic initials avatar if there's no photo); **subscription card** (`SubscriptionCard`: program in a pill + variant below it in admin style, status, start date, next charge + amount, **"Mes X de Y"** bar with `months_elapsed`/`duration_months`); **payment history** paginated **10/page** (`PaymentHistory`, reuses `paginate`/`STATUS_LABEL`, server-side `?page=`); plus portal header (logo + date) and logout. Email **permanently read-only**. Subscription/invoice reads via owner RLS (`subscriptions_own_or_admin`/`invoices_own_or_admin`). **Migration 010** (public bucket `avatars` + `avatars_public_read` policy, applied and verified). 216/216 tests, tsc/lint/build green, smoke+re-smoke OK. **Pending for Phase 6 (order):** C 8 low-severity audit findings + D carried-over cleanup → (in parallel) Aura's decisions on P1 pricing/P5 domain → ops block Resend (+ confirmation SMTP)/Vercel/Stripe live. Specs/plans in `docs/superpowers/` (`2026-06-13-b2-portal-settings-*`).*
 
-*Versión 2.1 (16 de junio de 2026) — Fase 6: **CRUD de Series en admin** completo (10 commits, HEAD `d2b3d70`). El botón "Nueva serie" en `/admin/content/[programId]` ya es funcional. Crear (número de mes, título, descripción, variantes por checkbox), editar (título, descripción, published, variantes), eliminar con diálogo de cascade warning. Server actions `createSeries`/`updateSeries`/`deleteSeries` en `lib/admin/seriesActions.ts`; `getAdminProgram` devuelve ahora `variants[]` y `variantIds[]` por serie; `SeriesAccordion` incorpora menú ⋯ con Editar/Eliminar + `SeriesFormModal` + `SeriesDeleteDialog`; `NewSeriesButton` mantiene `page.tsx` como Server Component. Error 23505 (mes duplicado) se muestra inline bajo el campo Mes #. El DELETE borra `variant_series_map` explícitamente (FK sin CASCADE). 252 tests, smoke OK.*
+*Version 2.1 (16 de junio de 2026) — Phase 6: **Series CRUD in admin** complete (10 commits, HEAD `d2b3d70`). The "Nueva serie" button in `/admin/content/[programId]` is now functional. Create (month number, title, description, variants via checkbox), edit (title, description, published, variants), delete with a cascade-warning dialog. Server actions `createSeries`/`updateSeries`/`deleteSeries` in `lib/admin/seriesActions.ts`; `getAdminProgram` now returns `variants[]` and `variantIds[]` per series; `SeriesAccordion` adds a ⋯ menu with Editar/Eliminar + `SeriesFormModal` + `SeriesDeleteDialog`; `NewSeriesButton` keeps `page.tsx` as a Server Component. Error 23505 (duplicate month) is shown inline under the Mes # field. DELETE explicitly deletes `variant_series_map` (FK without CASCADE). 252 tests, smoke OK.*
 
-*Versión 2.2 (16 de junio de 2026) — Fase 6 bloque Ops: **DEMO EN LÍNEA desplegado**. La app está pública en **https://app.auramaristany.com** (Vercel Production) como **demo para feedback de Aura, NO lanzamiento productivo** (sin cobros reales). **Decisiones (brainstorm):** Stripe en **TEST mode** (Aura quiere ver el demo funcionando antes de definir precios → flip a live es trabajo futuro); **mismo proyecto Supabase** (`bgvxaagfnzvzamtxqbkg`) como prod; datos demo se conservan (se borran solo los clientes al lanzar). **A2 (Resend + confirmación):** dominio `auramaristany.com` verificado en Resend (DNS en **IONOS**, registros en subdominio `send` + DKIM `resend._domainkey`, sin tocar el correo IONOS existente); SMTP de Supabase Auth → Resend (`smtp.resend.com:465`, user `resend`); **Confirm email activado**; `RESEND_FROM_EMAIL=no-reply@auramaristany.com`; Site URL + Redirect URLs de Supabase Auth apuntados a `app.auramaristany.com`. **A3 (deploy):** repo **privado** `github.com/bijeded/auramaristany` conectado al proyecto Vercel `project-a24no` (team "Aura Maristany's projects"; `main`→Production, ramas→Preview); `"framework":"nextjs"` en `vercel.json`; **11 env vars** de Production (Stripe **test**); webhook Stripe test (`we_1Tj1aZ…`, 4 eventos) → `STRIPE_WEBHOOK_SECRET`; `vercel --prod` aliased a `app.auramaristany.com` (verificado: `/auth/login` 200, rutas protegidas redirigen). **Datos demo cargados** (admin `hola@auramaristany.com`/`09876543` + 20 clientes `/12345678`) vía `scripts/seed-demo.ts` **reescrito ADITIVO y SIN secretos** (borra solo datos de usuario con service_role + vacía buckets `avatars`/`progress`, NO toca el catálogo; eliminado un token de Management API hardcodeado). Fix de build roto en main (`updateSeries` seteaba `updated_at` a mano → TS2322; lo maneja el trigger). **Pendiente:** Task 5 smoke E2E con Aura + correcciones menores de la verificación de navegador; **antes de lanzar:** Stripe **live** + precios reales, WhatsApp real de Aura, limpieza de datos demo, env vars de Preview. Spec/plan en `docs/superpowers/` (`2026-06-16-fase6-ops-demo-deploy-*`).*
+*Version 2.2 (16 de junio de 2026) — Phase 6 Ops block: **LIVE DEMO deployed**. The app is public at **https://app.auramaristany.com** (Vercel Production) as a **demo for Aura's feedback, NOT a production launch** (no real charges). **Decisions (brainstorm):** Stripe in **TEST mode** (Aura wants to see the demo working before setting prices → flipping to live is future work); **same Supabase project** (`bgvxaagfnzvzamtxqbkg`) as prod; demo data is kept (only client data gets deleted at launch). **A2 (Resend + confirmation):** domain `auramaristany.com` verified in Resend (DNS in **IONOS**, records on the `send` subdomain + DKIM `resend._domainkey`, without touching the existing IONOS email); Supabase Auth SMTP → Resend (`smtp.resend.com:465`, user `resend`); **Confirm email enabled**; `RESEND_FROM_EMAIL=no-reply@auramaristany.com`; Supabase Auth Site URL + Redirect URLs pointed at `app.auramaristany.com`. **A3 (deploy):** **private** repo `github.com/bijeded/auramaristany` connected to the Vercel project `project-a24no` (team "Aura Maristany's projects"; `main`→Production, branches→Preview); `"framework":"nextjs"` in `vercel.json`; **11 Production env vars** (Stripe **test**); test Stripe webhook (`we_1Tj1aZ…`, 4 events) → `STRIPE_WEBHOOK_SECRET`; `vercel --prod` aliased to `app.auramaristany.com` (verified: `/auth/login` 200, protected routes redirect). **Demo data loaded** (admin `hola@auramaristany.com`/`09876543` + 20 clients `/12345678`) via `scripts/seed-demo.ts` **rewritten ADDITIVE and WITHOUT secrets** (deletes only user data with service_role + empties the `avatars`/`progress` buckets, does NOT touch the catalog; removed a hardcoded Management API token). Fixed a broken build on main (`updateSeries` was setting `updated_at` by hand → TS2322; the trigger handles it). **Pending:** Task 5 E2E smoke test with Aura + minor fixes from the browser verification; **before launch:** Stripe **live** + real prices, Aura's real WhatsApp, demo data cleanup, Preview env vars. Spec/plan in `docs/superpowers/` (`2026-06-16-fase6-ops-demo-deploy-*`).*
 
-*Versión 2.3 (16 de junio de 2026) — Fase 6: **correcciones pre-demo + fix del workflow de deploy** (commit `bf7216a`, 252 tests). Ajustes UI pedidos antes de compartir con Aura: dashboard admin muestra la fecha con día ("16 de junio, 2026") y el logo AURA centrado; lista de Clientes con header alineado y **pills de filtro de estado cambiadas** (se quita "Con pago fallido" —redundante con "Vencidas"— y se agrega **"Canceladas"** para poder filtrar cuentas canceladas; `StatusFilter`/`filterClients`/`STATE_FILTERS`); CMS de Contenido muestra **"Mensual recurrente"** para CuarentaMás Extra (especializado por slug; ver nota de cambio de billing en la sección de Programas); fecha de `/portal/settings` capitalizada como el resto del portal. **Fix del workflow de deploy:** los auto-deploys de Git estaban **bloqueados por Vercel** porque el email de los commits (`…@MBP-14-de-Fran.domain.name`, auto-generado) no matcheaba la cuenta de GitHub `bijeded`; se configuró `git user.email` = `francisco.venegas.velasco@gmail.com` (global) y, tras el push con email correcto, el deploy de Production construye y promueve normalmente. Repo `github.com/bijeded/auramaristany` (privado) → Vercel `project-a24no`; `git push main` → Production en `app.auramaristany.com`.*
+*Version 2.3 (16 de junio de 2026) — Phase 6: **pre-demo fixes + deploy workflow fix** (commit `bf7216a`, 252 tests). UI tweaks requested before sharing with Aura: admin dashboard shows the date with the day ("16 de junio, 2026") and the AURA logo centered; Clientes list with an aligned header and **changed status-filter pills** (removes "Con pago fallido" —redundant with "Vencidas"— and adds **"Canceladas"** to allow filtering canceled accounts; `StatusFilter`/`filterClients`/`STATE_FILTERS`); Content CMS shows **"Mensual recurrente"** for CuarentaMás Extra (special-cased by slug; see the billing-change note in the Programs section); `/portal/settings` date capitalized like the rest of the portal. **Deploy workflow fix:** Git auto-deploys were **blocked by Vercel** because the commit email (`…@MBP-14-de-Fran.domain.name`, auto-generated) didn't match the GitHub account `bijeded`; `git user.email` was set to `francisco.venegas.velasco@gmail.com` (global) and, after pushing with the correct email, the Production deploy builds and promotes normally. Repo `github.com/bijeded/auramaristany` (private) → Vercel `project-a24no`; `git push main` → Production at `app.auramaristany.com`.*
 
-*Versión 2.0 (15 de junio de 2026) — Fase 6 sub-bloque **C+D: pulido de auditoría + limpieza de tipos** (merge `b32f0c5`). **Fase C — los 8 hallazgos bajos de la auditoría:** **STG-2** (expiración de signed URLs de fotos 3600→600s vía constante `lib/storage/signed-url.ts`); **INP-5** (`validateMessageContent`: subject ≤200 / body ≤5000 en `sendMessage`); **EDGE-3** (`toDayOfWeek` usa `getUTCDay()` —era bug real: el runner local es UTC-6—, alineado con el cómputo de semana UTC); **MW-3** (`matcher` del middleware excluye `api/webhooks` y `api/cron`; literal **inline** porque Next no analiza una constante referenciada → si no, el matcher se ignoraba); **EDGE-5** (`/api/portal/progress` deriva el `subscriptionId` del server con `getAccessSubscriptionId(user.id)` e ignora el del body); **INP-1** (`logAndGeneric` en `lib/admin/errors.ts`: errores crudos de Postgres → log server-side + mensaje genérico, 19 fugas cerradas en actions/rutas admin); **SVC-2** (`create-checkout` sin service-role, todo RLS-aware); **INP-4** (onboarding se guarda vía server action `lib/onboarding/responsesActions.ts` con validación server-side contra `onboarding_questions` activas, identidad de `getUser()`). **Fase D — limpieza:** **`lib/supabase/types.ts` completado a mano** (refleja migr. 001–010; **0 casts `as any`/`as unknown as` injustificados**, solo se conservan los inevitables de JOINs anidados/SDK marcados `// keep:`; raíz: faltaba `Relationships: []` por tabla → postgrest-js v2+ devolvía `never` en mutaciones; + `"trialing"` añadido a `SubscriptionStatus`); `try/catch` en `stripe.subscriptions.retrieve` que **re-lanza** para preservar el retry de Stripe; `formatDate` unificado en `lib/admin/date-helpers.ts` (`weekdayLabel`/`longDateLabel`/`dayLabel`); tests de `cloneDay`/`cloneWeek`. **Bonus destapados:** fix `BILLING_LABELS` (`ongoing_monthly`→`rolling_monthly`, la UI mostraba el valor crudo), `dayLabel` ahora tolera `timestamptz`, y **fix de bug pre-existente**: `router.refresh()` tras guardar progreso en `useProgressForm` (la Router Cache de Next servía el RSC viejo al volver a `/portal/today` → el ejercicio/nota guardados se veían en blanco). Sin migraciones nuevas. **Fuera de scope (registrado):** transaccionalidad de `saveBlocks`/`savePillarBlocks`. 247/247 tests, tsc/build verdes, smoke OK. **Pendiente Fase 6 (orden):** decisiones de Aura P1 precios/P5 dominio → bloque ops Resend (+ SMTP confirmación)/Vercel/Stripe live. Specs/planes en `docs/superpowers/` (`2026-06-15-fase6-cd-pulido-limpieza-*`).*
+*Version 2.0 (15 de junio de 2026) — Phase 6 sub-block **C+D: audit polish + type cleanup** (merge `b32f0c5`). **Phase C — the 8 low-severity audit findings:** **STG-2** (photo signed-URL expiration 3600→600s via the `lib/storage/signed-url.ts` constant); **INP-5** (`validateMessageContent`: subject ≤200 / body ≤5000 in `sendMessage`); **EDGE-3** (`toDayOfWeek` uses `getUTCDay()` —this was a real bug: the local runner is UTC-6—, aligned with the UTC week computation); **MW-3** (the middleware's `matcher` excludes `api/webhooks` and `api/cron`; **inline** literal because Next doesn't analyze a referenced constant → otherwise the matcher was ignored); **EDGE-5** (`/api/portal/progress` derives `subscriptionId` from the server with `getAccessSubscriptionId(user.id)` and ignores the one from the body); **INP-1** (`logAndGeneric` in `lib/admin/errors.ts`: raw Postgres errors → server-side log + generic message, 19 leaks closed across admin actions/routes); **SVC-2** (`create-checkout` without service-role, fully RLS-aware); **INP-4** (onboarding is saved via the `lib/onboarding/responsesActions.ts` server action with server-side validation against active `onboarding_questions`, identity from `getUser()`). **Phase D — cleanup:** **`lib/supabase/types.ts` completed by hand** (reflects migr. 001–010; **0 unjustified `as any`/`as unknown as` casts**, only the unavoidable ones from nested JOINs/SDK marked `// keep:` are kept; root cause: `Relationships: []` was missing per table → postgrest-js v2+ was returning `never` on mutations; + `"trialing"` added to `SubscriptionStatus`); `try/catch` in `stripe.subscriptions.retrieve` that **re-throws** to preserve Stripe's retry; `formatDate` unified in `lib/admin/date-helpers.ts` (`weekdayLabel`/`longDateLabel`/`dayLabel`); tests for `cloneDay`/`cloneWeek`. **Bonuses uncovered:** fixed `BILLING_LABELS` (`ongoing_monthly`→`rolling_monthly`, the UI was showing the raw value), `dayLabel` now tolerates `timestamptz`, and a **pre-existing bug fix**: `router.refresh()` after saving progress in `useProgressForm` (Next's Router Cache was serving the stale RSC on returning to `/portal/today` → the saved exercise/note appeared blank). No new migrations. **Out of scope (logged):** `saveBlocks`/`savePillarBlocks` transactionality. 247/247 tests, tsc/build green, smoke OK. **Pending for Phase 6 (order):** Aura's decisions on P1 pricing/P5 domain → ops block Resend (+ confirmation SMTP)/Vercel/Stripe live. Specs/plans in `docs/superpowers/` (`2026-06-15-fase6-cd-pulido-limpieza-*`).*
