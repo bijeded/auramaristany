@@ -178,7 +178,11 @@ Execute OpenSpec tasks with the `task-execution` loop. Feature branches (`featur
 
 ## Codebase memory
 
-Project indexed in codebase-memory (`Users-franciscovenegas-Desktop-Cowork-Aura`). Re-index in `fast` mode after archiving a change so the snapshot doesn't drift.
+Project indexed in codebase-memory (`Users-franciscovenegas-Desktop-Cowork-Aura`). Re-index after archiving a change so the snapshot doesn't drift; `detect_changes()` reads the live working diff without re-indexing.
+
+⚠ Two gotchas, learned the hard way:
+- **Re-indexing ERASES the stored ADR.** Always re-record it with `manage_adr(mode='update')` *after* `index_repository`, never before — otherwise it is silently lost.
+- **`fast` mode excludes more than `full`:** it also drops `docs/`, `__tests__/`, `scripts/` and `supabase/migrations/`. Use `full` when you need test or script coverage for impact analysis.
 
 ---
 
