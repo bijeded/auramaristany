@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ProgressLog } from "@/lib/content/queries";
+import { lbToKg, kgToLb } from "@/lib/content/weight-units";
+
+export type WeightUnit = "kg" | "lb";
 
 export interface ExerciseSeriesEntry {
   reps_done: string;
@@ -51,19 +54,29 @@ function initFromLog(
 }
 
 function serializeExercises(
-  exercises: Record<string, ExerciseFormState>
+  exercises: Record<string, ExerciseFormState>,
+  weightUnits: Record<string, WeightUnit>
 ): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(exercises).map(([id, s]) => [
-      id,
-      {
-        completed: s.completed,
-        series: s.series.map((sv) => ({
-          reps_done: sv.reps_done !== "" ? Number(sv.reps_done) : null,
-          weight_kg: sv.weight_kg !== "" ? Number(sv.weight_kg) : null,
-        })),
-      },
-    ])
+    Object.entries(exercises).map(([id, s]) => {
+      const inLb = weightUnits[id] === "lb";
+      return [
+        id,
+        {
+          completed: s.completed,
+          series: s.series.map((sv) => ({
+            reps_done: sv.reps_done !== "" ? Number(sv.reps_done) : null,
+            // El almacenamiento SIEMPRE es kg canónico (A1)
+            weight_kg:
+              sv.weight_kg !== ""
+                ? inLb
+                  ? lbToKg(Number(sv.weight_kg))
+                  : Number(sv.weight_kg)
+                : null,
+          })),
+        },
+      ];
+    })
   );
 }
 
@@ -80,18 +93,20 @@ export function useProgressForm({
     existingLog?.general_notes ?? ""
   );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  // A1: unidad de entrada por ejercicio (solo sesión; la hidratación siempre es kg)
+  const [weightUnits, setWeightUnits] = useState<Record<string, WeightUnit>>({});
   const router = useRouter();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestRef = useRef({ exercises, generalNotes });
+  const latestRef = useRef({ exercises, generalNotes, weightUnits });
 
   useEffect(() => {
-    latestRef.current = { exercises, generalNotes };
-  }, [exercises, generalNotes]);
+    latestRef.current = { exercises, generalNotes, weightUnits };
+  }, [exercises, generalNotes, weightUnits]);
 
   const save = useCallback(async () => {
     setSaveStatus("saving");
-    const { exercises: ex, generalNotes: notes } = latestRef.current;
+    const { exercises: ex, generalNotes: notes, weightUnits: units } = latestRef.current;
     const completed = Object.values(ex).every((s) => s.completed);
 
     try {
@@ -101,7 +116,7 @@ export function useProgressForm({
         body: JSON.stringify({
           dayId,
           subscriptionId,
-          exercisesDone: serializeExercises(ex),
+          exercisesDone: serializeExercises(ex, units),
           generalNotes: notes,
           completed,
         }),
@@ -158,6 +173,37 @@ export function useProgressForm({
     [scheduleSave]
   );
 
+  const setWeightUnit = useCallback(
+    (exerciseId: string, unit: WeightUnit) => {
+      setWeightUnits((prevUnits) => {
+        const current = prevUnits[exerciseId] ?? "kg";
+        if (current === unit) return prevUnits;
+        // Convierte in place los valores ya tecleados a la nueva unidad
+        setExercises((prev) => {
+          const ex = prev[exerciseId];
+          if (!ex) return prev;
+          const convert = unit === "lb" ? kgToLb : lbToKg;
+          return {
+            ...prev,
+            [exerciseId]: {
+              ...ex,
+              series: ex.series.map((sv) => ({
+                ...sv,
+                weight_kg:
+                  sv.weight_kg !== "" && !Number.isNaN(Number(sv.weight_kg))
+                    ? String(convert(Number(sv.weight_kg)))
+                    : sv.weight_kg,
+              })),
+            },
+          };
+        });
+        return { ...prevUnits, [exerciseId]: unit };
+      });
+      scheduleSave();
+    },
+    [scheduleSave]
+  );
+
   const updateGeneralNotes = useCallback(
     (notes: string) => {
       setGeneralNotes(notes);
@@ -176,8 +222,10 @@ export function useProgressForm({
     exercises,
     generalNotes,
     saveStatus,
+    weightUnits,
     updateCompleted,
     updateSeries,
     updateGeneralNotes,
+    setWeightUnit,
   };
 }
