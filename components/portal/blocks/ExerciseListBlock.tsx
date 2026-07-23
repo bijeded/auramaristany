@@ -1,8 +1,9 @@
 "use client";
 
-import { Play, CheckCircle2, Circle } from "lucide-react";
+import { Play, Check } from "lucide-react";
 import { useState } from "react";
 import type { ExerciseFormState, ExerciseSeriesEntry } from "@/hooks/useProgressForm";
+import { formatRestLabel } from "@/lib/content/rest-label";
 
 export interface Exercise {
   id: string;
@@ -259,17 +260,6 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
                     {ex.name}
                   </p>
                 </div>
-                <button
-                  onClick={() => onUpdateCompleted(ex.id, !done)}
-                  aria-label={done ? "Desmarcar ejercicio" : "Marcar como completado"}
-                  className="flex-shrink-0 ml-2"
-                >
-                  {done ? (
-                    <CheckCircle2 size={26} color="#4caf7d" fill="rgba(76,175,125,0.15)" />
-                  ) : (
-                    <Circle size={26} color="var(--gris-linea)" />
-                  )}
-                </button>
               </div>
 
               {/* Badges */}
@@ -293,7 +283,7 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
                     color: "var(--gris-texto)",
                   }}
                 >
-                  Descanso {ex.rest_seconds}s
+                  Descanso {formatRestLabel(ex.rest_seconds)}
                 </span>
               </div>
 
@@ -320,6 +310,26 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
                   onUpdateSeries={(index, field, value) => onUpdateSeries(ex.id, index, field, value)}
                 />
               )}
+
+              {/* A3 — explicit "Hecho" toggle button (≥48px tap target) */}
+              <button
+                onClick={() => onUpdateCompleted(ex.id, !done)}
+                aria-pressed={done}
+                aria-label={done ? `Desmarcar ${ex.name}` : `Marcar ${ex.name} como completado`}
+                className="w-full mt-3 flex items-center justify-center gap-2 rounded-full font-body"
+                style={{
+                  minHeight: 48,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  transition: "all 0.2s ease",
+                  background: done ? "var(--lavanda)" : "#fff",
+                  color: done ? "#fff" : "var(--lavanda-dark)",
+                  border: "1.5px solid var(--lavanda)",
+                }}
+              >
+                <Check size={18} strokeWidth={3} />
+                {done ? "Hecho" : "Marcar como hecho"}
+              </button>
             </div>
           );
         })}

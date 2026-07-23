@@ -1,3 +1,5 @@
+import { formatRestLabel } from "@/lib/content/rest-label";
+
 export interface ReadOnlyExercise {
   id: string;
   name: string;
@@ -39,7 +41,7 @@ export function ExerciseListReadOnly({ content }: { content: ExerciseListReadOnl
             {ex.rest_seconds != null && (
               <>
                 {" · "}
-                Descanso: {ex.rest_seconds} seg
+                Descanso: {formatRestLabel(ex.rest_seconds)}
               </>
             )}
           </p>
