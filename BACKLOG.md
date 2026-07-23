@@ -26,7 +26,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A5** | "Sin actividad" filter in Clients | M | Pending |
 | **A8** | Color and background in the text editor | M | ✅ Done |
 | **A9** | Cancellation + exit survey | M | Pending |
-| **A12** | 7-day calendar in the portal | M | Pending |
+| **A12** | 7-day calendar in the portal | M | ✅ Done |
 | **A6** | Booking system (WordPress) | L | Pending |
 | **A7** | "Agendar" block in the editor | M | Blocked by A6 |
 | **A4** | Automated messages | L | Do after A5 |
@@ -91,11 +91,9 @@ Cancel from the account + ask for a reason (radio buttons).
 - **Touches:** `components/portal/settings/SubscriptionCard.tsx` + `lib/portal/settingsActions.ts` · `lib/webhooks/stripe-handlers.ts` (`customer.subscription.updated`) · storing the reason (new table or JSONB → **migration**).
 - **Watch out:** `subscriptions.cancel_at_period_end` **already exists** and the webhook already handles it; today cancellation happens via Stripe's Customer Portal.
 
-### A12 · 7-day calendar in the portal — `M`
-New tab: titles of the next 7 days' activities, **not enterable**.
-- **Decided:** 7-day window **cut off at the current period**. If it crosses into the next month, **do not** show those activities (not yet paid for).
-- **Touches:** `components/portal/PortalNav.tsx` (4 → 5 tabs; review mobile layout) · new route in `app/portal/` · title reads backed by `lib/content/access.ts` / `lib/content/queries.ts`.
-- **⚠ Watch out:** this brushes against the "sin acceso a días futuros" rule. It's respected because these are **titles only** with no navigation into the activity. Don't filter out unpublished content. Decide whether the window includes today.
+### A12 · 7-day calendar in the portal — `M` — ✅ Done (PR #4, archived `2026-07-23-a12-portal-week-calendar`)
+`/portal/semana` ("Semana" tab): today (linked to Hoy) + next 7 days, titles only, cut at `current_period_end`; days 29–31 repeat week 4. Nav: 6 tabs — Hoy→`Sun`, "Configuración"→"Perfil" (`User`).
+- **Note:** unpublished days render as "Descanso" — the `program_days` RLS policy (`published = true or is_admin()`) filters them; decided to keep RLS as the boundary (no service-role, no migration).
 
 ### A6 · Booking system (WordPress) — `L`
 Biweekly calls via Zoom/Meet.
