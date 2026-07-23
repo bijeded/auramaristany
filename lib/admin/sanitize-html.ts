@@ -21,5 +21,16 @@ export function sanitizeRichText(html: string): string {
       mark: { "background-color": [HEX_COLOR], color: [HEX_COLOR] },
     },
     allowedSchemes: ["http", "https", "mailto"],
+    transformTags: {
+      // data-color solo hex — misma política que style (hallazgo security-review A8)
+      mark: (tagName, attribs) => {
+        if (attribs["data-color"] && !HEX_COLOR.test(attribs["data-color"])) {
+          const rest = { ...attribs };
+          delete rest["data-color"];
+          return { tagName, attribs: rest };
+        }
+        return { tagName, attribs };
+      },
+    },
   });
 }

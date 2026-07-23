@@ -35,15 +35,26 @@ function ColorDropdown({
   const [open, setOpen] = useState(false);
   const [custom, setCustom] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Cierre al hacer click fuera (patrón DayCellMenu)
+  // Cierre al hacer click fuera (patrón DayCellMenu) + Escape con retorno de foco
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const swatches = kind === "text" ? TEXT_COLORS : BG_COLORS;
@@ -62,8 +73,10 @@ function ColorDropdown({
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={kind === "text" ? "Color de texto" : "Color de fondo"}
+        aria-haspopup="true"
         aria-expanded={open}
         className="p-1.5 rounded text-[var(--gris-texto)]"
         onClick={() => setOpen((o) => !o)}
@@ -91,9 +104,14 @@ function ColorDropdown({
                 aria-label={s.label}
                 title={s.label}
                 onClick={() => apply(s.hex)}
-                className="rounded-full"
-                style={{ width: 24, height: 24, background: s.hex, border: "1px solid var(--gris-linea)", margin: 4 }}
-              />
+                className="flex items-center justify-center"
+                style={{ width: 36, height: 36 }}
+              >
+                <span
+                  className="rounded-full"
+                  style={{ width: 24, height: 24, background: s.hex, border: "1px solid var(--gris-linea)", display: "block" }}
+                />
+              </button>
             ))}
           </div>
           <div className="flex gap-1">
@@ -101,6 +119,12 @@ function ColorDropdown({
               type="text"
               value={custom}
               onChange={(e) => setCustom(e.target.value.trim())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (customValid) apply(custom);
+                }
+              }}
               placeholder="#a1b2c3"
               aria-label="Color personalizado (hex)"
               className="font-body w-full rounded px-2 py-1"

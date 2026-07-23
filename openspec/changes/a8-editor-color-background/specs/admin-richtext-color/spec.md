@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Text color and background highlight in the Text block editor
-The admin Text block editor SHALL offer a text-color control (6 brand swatches + "auto") and a background control (5 brand swatches + "sin fondo"), each with a custom hex input accepting only `#rrggbb` values. Applied colors MUST be emitted as inline `color` / `background-color` styles.
+The admin Text block editor SHALL offer a text-color control (5 brand swatches + "Automático") and a background control (5 brand swatches + "Sin fondo"), each with a custom hex input accepting only `#rrggbb` values. Applied colors MUST be emitted as inline `color` / `background-color` styles.
 
 #### Scenario: Applying a swatch
 - **WHEN** the admin selects text and taps the `#7a63d4` swatch

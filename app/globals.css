@@ -89,3 +89,8 @@ h1, h2, h3, h4 {
   border-color: var(--lavanda);
   color: #fff;
 }
+
+/* A8 — mark sin background-color inline no debe caer al amarillo del UA */
+.portal-richtext mark {
+  background: transparent;
+}

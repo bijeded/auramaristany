@@ -58,3 +58,14 @@ describe("sanitizeRichText — colores A8", () => {
     expect(sanitizeRichText('<p><span style="color:#11223344">x</span></p>')).not.toContain("#1122334");
   });
 });
+
+describe("sanitizeRichText — data-color restringido (hallazgo security-review)", () => {
+  it("elimina data-color no-hex pero conserva el hex válido", () => {
+    const bad = '<p><mark data-color="javascript:x" style="background-color:#eddbd8">x</mark></p>';
+    const out = sanitizeRichText(bad);
+    expect(out).not.toContain("javascript:");
+    expect(out).toContain("background-color:#eddbd8");
+    const good = '<p><mark data-color="#eddbd8" style="background-color:#eddbd8">x</mark></p>';
+    expect(sanitizeRichText(good)).toContain('data-color="#eddbd8"');
+  });
+});
