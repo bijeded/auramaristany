@@ -1,7 +1,15 @@
 import sanitizeHtml from "sanitize-html";
 
-// Solo hex #rrggbb — anclado: imposible colar url(), expression(), var(), etc. (A8)
+// Formas seguras y ancladas (A8). El navegador normaliza hex → rgb(r, g, b) al
+// serializar estilos inline (CSSStyleDeclaration), así que ambas deben pasar.
+// Ancladas: imposible colar url(), expression(), var(), etc.
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const SAFE_COLOR = [
+  HEX_COLOR,
+  /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/i,
+];
+// Highlight de Tiptap emite `color: inherit` dentro del mark
+const SAFE_TEXT_COLOR = [...SAFE_COLOR, /^inherit$/];
 
 // Whitelist conservadora para el output de Tiptap (starter-kit + enlaces + color A8).
 export function sanitizeRichText(html: string): string {
@@ -17,8 +25,8 @@ export function sanitizeRichText(html: string): string {
       mark: ["style", "data-color"],
     },
     allowedStyles: {
-      span: { color: [HEX_COLOR] },
-      mark: { "background-color": [HEX_COLOR], color: [HEX_COLOR] },
+      span: { color: SAFE_COLOR },
+      mark: { "background-color": SAFE_COLOR, color: SAFE_TEXT_COLOR },
     },
     allowedSchemes: ["http", "https", "mailto"],
     transformTags: {

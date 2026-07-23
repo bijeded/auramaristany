@@ -10,6 +10,8 @@ import type { Editor } from "@tiptap/react";
 
 // A8 — paleta validada por contraste (ver openspec archive a8-editor-color-background)
 const TEXT_COLORS: { hex: string; label: string }[] = [
+  { hex: "#1a1a1a", label: "Negro" },
+  { hex: "#ffffff", label: "Blanco" },
   { hex: "#6b6b6b", label: "Gris" },
   { hex: "#7a63d4", label: "Lavanda oscuro" },
   { hex: "#9982f4", label: "Lavanda" },
@@ -17,6 +19,9 @@ const TEXT_COLORS: { hex: string; label: string }[] = [
   { hex: "#3a9468", label: "Verde" },
 ];
 const BG_COLORS: { hex: string; label: string }[] = [
+  { hex: "#1a1a1a", label: "Negro" },
+  { hex: "#ffffff", label: "Blanco" },
+  { hex: "#fce588", label: "Amarillo" },
   { hex: "#eddbd8", label: "Rosa" },
   { hex: "#f6ecea", label: "Rosa suave" },
   { hex: "#efeafe", label: "Lavanda suave" },
