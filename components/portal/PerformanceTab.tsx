@@ -6,6 +6,7 @@ import { ChevronRight, Dumbbell } from "lucide-react";
 import { PerformanceChart } from "./PerformanceChart";
 import type { PerfExercise } from "@/lib/content/history-helpers";
 import type { HistoryListItem } from "@/lib/content/history";
+import type { WeightUnit } from "@/hooks/useProgressForm";
 
 const METRIC_LABELS: Record<string, string> = {
   reps_done: "Reps",
@@ -28,6 +29,8 @@ export function PerformanceTab({
   const [exIdx, setExIdx] = useState(0);
   const selected = performance[exIdx];
   const [metric, setMetric] = useState<string>(selected?.metrics[0] ?? "weight_kg");
+  // A1 — unidad de visualización del Peso (solo presentación; los datos son kg)
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
 
   // Asegura que la métrica seleccionada exista para el ejercicio actual.
   const activeMetric = selected?.metrics.includes(metric)
@@ -68,10 +71,10 @@ export function PerformanceTab({
             ))}
           </div>
 
-          {/* Toggle de métrica */}
-          {selected && selected.metrics.length > 1 && (
+          {/* Toggle de métrica + unidad kg/lb */}
+          {selected && (selected.metrics.length > 1 || activeMetric === "weight_kg") && (
             <div className="flex gap-2" style={{ marginBottom: 12 }}>
-              {selected.metrics.map((m) => (
+              {selected.metrics.length > 1 && selected.metrics.map((m) => (
                 <button
                   key={m}
                   onClick={() => setMetric(m)}
@@ -86,11 +89,35 @@ export function PerformanceTab({
                   {METRIC_LABELS[m] ?? m}
                 </button>
               ))}
+
+              {/* Toggle kg/lb — solo para la métrica Peso */}
+              {activeMetric === "weight_kg" && (
+                <div className="flex gap-0 ml-auto rounded-full" style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}>
+                  {(["kg", "lb"] as const).map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => setWeightUnit(u)}
+                      aria-pressed={weightUnit === u}
+                      className="font-body px-3 py-1"
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        minWidth: 44,
+                        background: weightUnit === u ? "var(--lavanda)" : "#fff",
+                        color: weightUnit === u ? "#fff" : "var(--gris-texto)",
+                      }}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           <div className="rounded-xl p-3" style={{ background: "#fff", border: "1.5px solid var(--gris-linea)", marginBottom: 24 }}>
-            {selected && <PerformanceChart points={selected.points} metric={activeMetric} />}
+            {selected && <PerformanceChart points={selected.points} metric={activeMetric} weightUnit={weightUnit} />}
           </div>
         </>
       )}
