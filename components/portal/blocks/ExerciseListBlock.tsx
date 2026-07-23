@@ -2,7 +2,7 @@
 
 import { Play, Check } from "lucide-react";
 import { useState } from "react";
-import type { ExerciseFormState, ExerciseSeriesEntry } from "@/hooks/useProgressForm";
+import type { ExerciseFormState, ExerciseSeriesEntry, WeightUnit } from "@/hooks/useProgressForm";
 import { formatRestLabel } from "@/lib/content/rest-label";
 
 export interface Exercise {
@@ -23,6 +23,7 @@ interface ExerciseListBlockContent {
 interface Props {
   content: ExerciseListBlockContent;
   formState: Record<string, ExerciseFormState>;
+  weightUnits: Record<string, WeightUnit>;
   onUpdateCompleted: (exerciseId: string, completed: boolean) => void;
   onUpdateSeries: (
     exerciseId: string,
@@ -30,6 +31,41 @@ interface Props {
     field: keyof ExerciseSeriesEntry,
     value: string
   ) => void;
+  onSetWeightUnit: (exerciseId: string, unit: WeightUnit) => void;
+}
+
+// A1 — selector kg/lb por ejercicio (la unidad es del momento de captura; se guarda kg)
+function UnitToggle({ unit, onChange }: { unit: WeightUnit; onChange: (u: WeightUnit) => void }) {
+  return (
+    <div
+      role="group"
+      aria-label="Unidad de peso"
+      className="inline-flex rounded-full"
+      style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}
+    >
+      {(["kg", "lb"] as const).map((u) => (
+        <button
+          key={u}
+          type="button"
+          onClick={() => onChange(u)}
+          aria-pressed={unit === u}
+          className="font-body"
+          style={{
+            minWidth: 44,
+            minHeight: 32,
+            padding: "4px 12px",
+            fontSize: 12,
+            fontWeight: 600,
+            background: unit === u ? "var(--lavanda)" : "#fff",
+            color: unit === u ? "#fff" : "var(--gris-texto)",
+            transition: "all 0.15s ease",
+          }}
+        >
+          {u}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function ExerciseVideoDemo({ videoUrl, name }: { videoUrl: string; name: string }) {
@@ -96,11 +132,15 @@ function ExerciseVideoDemo({ videoUrl, name }: { videoUrl: string; name: string 
 function MetricInputs({
   exercise,
   state,
+  unit,
   onUpdateSeries,
+  onSetUnit,
 }: {
   exercise: Exercise;
   state: ExerciseFormState;
+  unit: WeightUnit;
   onUpdateSeries: (index: number, field: keyof ExerciseSeriesEntry, value: string) => void;
+  onSetUnit: (unit: WeightUnit) => void;
 }) {
   const showReps = exercise.metrics.includes("reps_done");
   const showWeight = exercise.metrics.includes("weight_kg");
@@ -112,18 +152,21 @@ function MetricInputs({
 
   return (
     <div className="mt-3 rounded-lg p-3" style={{ background: "var(--gris-claro)" }}>
-      <p
-        className="font-body mb-2"
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--gris-texto)",
-          letterSpacing: "0.4px",
-          textTransform: "uppercase",
-        }}
-      >
-        Mi registro · {exercise.sets} series de {exercise.reps} reps
-      </p>
+      <div className="flex items-center justify-between mb-2">
+        <p
+          className="font-body"
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--gris-texto)",
+            letterSpacing: "0.4px",
+            textTransform: "uppercase",
+          }}
+        >
+          Mi registro · {exercise.sets} series de {exercise.reps} reps
+        </p>
+        {showWeight && <UnitToggle unit={unit} onChange={onSetUnit} />}
+      </div>
 
       {/* Column headers */}
       <div className="grid mb-1" style={{ gridTemplateColumns: gridCols, gap: "6px" }}>
@@ -135,7 +178,7 @@ function MetricInputs({
         )}
         {showWeight && (
           <p className="font-body text-center" style={{ fontSize: 11, fontWeight: 600, color: "var(--gris-texto)" }}>
-            Peso (kg)
+            Peso ({unit})
           </p>
         )}
       </div>
@@ -190,7 +233,7 @@ function MetricInputs({
   );
 }
 
-export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpdateSeries }: Props) {
+export function ExerciseListBlock({ content, formState, weightUnits, onUpdateCompleted, onUpdateSeries, onSetWeightUnit }: Props) {
   const { exercises } = content;
   const doneCount = exercises.filter((e) => formState[e.id]?.completed).length;
   const allDone = doneCount === exercises.length;
@@ -305,7 +348,9 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
                 <MetricInputs
                   exercise={ex}
                   state={state}
+                  unit={weightUnits[ex.id] ?? "kg"}
                   onUpdateSeries={(index, field, value) => onUpdateSeries(ex.id, index, field, value)}
+                  onSetUnit={(unit) => onSetWeightUnit(ex.id, unit)}
                 />
               )}
 
