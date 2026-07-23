@@ -60,3 +60,97 @@ describe("useProgressForm — refresca /portal/today tras guardar (bug: form en 
     expect(refreshMock).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// A1 — unidad kg/lb por ejercicio (estado siempre visible en la unidad elegida;
+// el payload guardado SIEMPRE va en kg)
+// ---------------------------------------------------------------------------
+
+describe("useProgressForm — unidad de peso kg/lb", () => {
+  it("por defecto la unidad es kg y el payload va tal cual", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { result } = renderHook(() => useProgressForm(baseParams));
+
+    act(() => {
+      result.current.updateSeries("ex-1", 0, "weight_kg", "20");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(result.current.weightUnits["ex-1"] ?? "kg").toBe("kg");
+    expect(body.exercisesDone["ex-1"].series[0].weight_kg).toBe(20);
+  });
+
+  it("setWeightUnit a lb convierte los valores tecleados in place (kg → lb)", () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+    const { result } = renderHook(() => useProgressForm(baseParams));
+
+    act(() => {
+      result.current.updateSeries("ex-1", 0, "weight_kg", "24.9");
+      result.current.setWeightUnit("ex-1", "lb");
+    });
+
+    expect(result.current.weightUnits["ex-1"]).toBe("lb");
+    expect(result.current.exercises["ex-1"].series[0].weight_kg).toBe("54.9");
+    // input vacío permanece vacío
+    expect(result.current.exercises["ex-1"].series[1].weight_kg).toBe("");
+  });
+
+  it("con unidad lb, el payload guardado se convierte a kg", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const { result } = renderHook(() => useProgressForm(baseParams));
+
+    act(() => {
+      result.current.setWeightUnit("ex-1", "lb");
+    });
+    act(() => {
+      result.current.updateSeries("ex-1", 0, "weight_kg", "55");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls.at(-1)![1].body);
+    expect(body.exercisesDone["ex-1"].series[0].weight_kg).toBe(24.9);
+  });
+
+  it("round-trip lb → kg vuelve al valor original", () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+    const { result } = renderHook(() => useProgressForm(baseParams));
+
+    act(() => {
+      result.current.updateSeries("ex-1", 0, "weight_kg", "24.9");
+      result.current.setWeightUnit("ex-1", "lb");
+    });
+    act(() => {
+      result.current.setWeightUnit("ex-1", "kg");
+    });
+
+    expect(result.current.exercises["ex-1"].series[0].weight_kg).toBe("24.9");
+  });
+});
+
+// Regresión: StrictMode doble-invoca updaters — la conversión no debe aplicarse 2 veces
+import { StrictMode, createElement, type ReactNode } from "react";
+
+describe("useProgressForm — setWeightUnit bajo StrictMode", () => {
+  it("convierte una sola vez aunque los updaters se doble-invoquen", () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(StrictMode, null, children);
+    const { result } = renderHook(() => useProgressForm(baseParams), { wrapper });
+
+    act(() => {
+      result.current.updateSeries("ex-1", 0, "weight_kg", "24.9");
+    });
+    act(() => {
+      result.current.setWeightUnit("ex-1", "lb");
+    });
+
+    expect(result.current.exercises["ex-1"].series[0].weight_kg).toBe("54.9");
+  });
+});

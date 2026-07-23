@@ -11,7 +11,7 @@ import { ExerciseListBlock } from "./blocks/ExerciseListBlock";
 import { CardioZone2Block } from "./blocks/CardioZone2Block";
 import { PortalHeader } from "./PortalHeader";
 import { useProgressForm } from "@/hooks/useProgressForm";
-import type { ExerciseSeriesEntry } from "@/hooks/useProgressForm";
+import type { ExerciseSeriesEntry, WeightUnit } from "@/hooks/useProgressForm";
 
 const PROGRAM_NAMES: Record<string, string> = {
   "cuarenta-mas": "CuarentaMás",
@@ -252,13 +252,17 @@ function SaveStatusBar({ status }: { status: "idle" | "saving" | "saved" | "erro
 function BlockRenderer({
   block,
   formState,
+  weightUnits,
   onUpdateCompleted,
   onUpdateSeries,
+  onSetWeightUnit,
 }: {
   block: DayBlock;
   formState: ReturnType<typeof useProgressForm>["exercises"];
+  weightUnits: Record<string, WeightUnit>;
   onUpdateCompleted: (exerciseId: string, completed: boolean) => void;
   onUpdateSeries: (exerciseId: string, index: number, field: keyof ExerciseSeriesEntry, value: string) => void;
+  onSetWeightUnit: (exerciseId: string, unit: WeightUnit) => void;
 }) {
   switch (block.block_type) {
     case "text":
@@ -296,8 +300,10 @@ function BlockRenderer({
             }
           }
           formState={formState}
+          weightUnits={weightUnits}
           onUpdateCompleted={onUpdateCompleted}
           onUpdateSeries={onUpdateSeries}
+          onSetWeightUnit={onSetWeightUnit}
         />
       );
     case "cardio_zone2":
@@ -315,7 +321,7 @@ export function TodayView({ content }: { content: TodayContent | null }) {
     )
     .map(({ id, sets }) => ({ id, sets })) ?? [];
 
-  const { exercises, generalNotes, saveStatus, updateCompleted, updateSeries, updateGeneralNotes } =
+  const { exercises, generalNotes, saveStatus, weightUnits, updateCompleted, updateSeries, updateGeneralNotes, setWeightUnit } =
     useProgressForm({
       dayId: content?.day.id ?? "",
       subscriptionId: content?.subscriptionId ?? "",
@@ -356,8 +362,10 @@ export function TodayView({ content }: { content: TodayContent | null }) {
                     key={block.id}
                     block={block}
                     formState={exercises}
+                    weightUnits={weightUnits}
                     onUpdateCompleted={updateCompleted}
                     onUpdateSeries={updateSeries}
+                    onSetWeightUnit={setWeightUnit}
                   />
                 ))}
 

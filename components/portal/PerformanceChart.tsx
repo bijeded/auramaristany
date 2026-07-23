@@ -10,6 +10,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { PerfPoint } from "@/lib/content/history-helpers";
+import { kgToLb } from "@/lib/content/weight-units";
+import type { WeightUnit } from "@/hooks/useProgressForm";
 
 const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   reps_done: { label: "Reps", unit: "" },
@@ -24,14 +26,21 @@ function shortDate(iso: string): string {
 export function PerformanceChart({
   points,
   metric,
+  weightUnit = "kg",
 }: {
   points: PerfPoint[];
   metric: string;
+  weightUnit?: WeightUnit;
 }) {
-  const unit = METRIC_LABELS[metric]?.unit ?? "";
+  // A1 — la serie es kg canónico; la conversión a lb es solo de presentación
+  const inLb = metric === "weight_kg" && weightUnit === "lb";
+  const unit = inLb ? " lb" : METRIC_LABELS[metric]?.unit ?? "";
   const data = points
     .filter((p) => p.values[metric] != null)
-    .map((p) => ({ date: shortDate(p.date), value: p.values[metric] as number }));
+    .map((p) => {
+      const raw = p.values[metric] as number;
+      return { date: shortDate(p.date), value: inLb ? kgToLb(raw) : raw };
+    });
 
   if (data.length < 2) {
     return (
