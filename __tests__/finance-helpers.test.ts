@@ -131,6 +131,43 @@ describe("computeRenewalsThisMonth", () => {
 });
 
 // ---------------------------------------------------------------------------
+// A11: computeRenewalsWithinDays (generalization of computeRenewalsThisMonth)
+// ---------------------------------------------------------------------------
+
+import { computeRenewalsWithinDays } from "@/lib/admin/finance-helpers";
+
+describe("computeRenewalsWithinDays", () => {
+  const now = new Date("2026-06-15T12:00:00Z");
+  const subs = [
+    { current_period_end: "2026-06-20T00:00:00Z", price_mxn: 990 },  // +5d
+    { current_period_end: "2026-07-05T00:00:00Z", price_mxn: 1490 }, // +20d
+    { current_period_end: "2026-06-01T00:00:00Z", price_mxn: 500 },  // past
+    { current_period_end: null, price_mxn: 700 },
+  ];
+
+  it("cuenta solo subs dentro de la ventana de 7 días", () => {
+    expect(computeRenewalsWithinDays(subs, 7, now)).toEqual({ count: 1, amount: 990 });
+  });
+
+  it("con 30 días incluye también el vencimiento a 20 días", () => {
+    expect(computeRenewalsWithinDays(subs, 30, now)).toEqual({ count: 2, amount: 2480 });
+  });
+
+  it("incluye el límite exacto de la ventana", () => {
+    const boundary = [{ current_period_end: "2026-06-22T12:00:00Z", price_mxn: 100 }]; // exactly +7d
+    expect(computeRenewalsWithinDays(boundary, 7, now)).toEqual({ count: 1, amount: 100 });
+  });
+
+  it("ignora pasados y nulos", () => {
+    expect(computeRenewalsWithinDays(subs.slice(2), 7, now)).toEqual({ count: 0, amount: 0 });
+  });
+
+  it("computeRenewalsThisMonth sigue equivaliendo a la ventana de 30 días", () => {
+    expect(computeRenewalsThisMonth(subs, now)).toEqual(computeRenewalsWithinDays(subs, 30, now));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Task 3 (payments): filterPaymentsByStatus
 // ---------------------------------------------------------------------------
 

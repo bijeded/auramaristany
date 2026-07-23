@@ -103,11 +103,12 @@ export function groupRevenueByProgram(invoices: FinanceInvoiceRow[]): ProgramRev
 // Task 6: computeRenewalsThisMonth
 // ---------------------------------------------------------------------------
 
-export function computeRenewalsThisMonth(
+export function computeRenewalsWithinDays(
   subs: { current_period_end: string | null; price_mxn: number }[],
+  days: number,
   now: Date = new Date()
 ): { count: number; amount: number } {
-  const horizon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const horizon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   let count = 0;
   let amount = 0;
   for (const s of subs) {
@@ -119,6 +120,14 @@ export function computeRenewalsThisMonth(
     }
   }
   return { count, amount };
+}
+
+// 30-day wrapper kept for backward compatibility (dashboard "Renuevan este mes")
+export function computeRenewalsThisMonth(
+  subs: { current_period_end: string | null; price_mxn: number }[],
+  now: Date = new Date()
+): { count: number; amount: number } {
+  return computeRenewalsWithinDays(subs, 30, now);
 }
 
 // ---------------------------------------------------------------------------
