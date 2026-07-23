@@ -18,10 +18,10 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 
 | ID | Item | Size | Status |
 |----|------|:----:|--------|
-| **A2** | Rest in minutes | S | Pending |
-| **A3** | More visible exercise checkbox | S | Visual decision pending |
-| **A10** | Bars in "Ingresos por programa" | S | Pending |
-| **A11** | 5th stat card: expiring in 7 days | S | Pending |
+| **A2** | Rest in minutes | S | ✅ Done |
+| **A3** | More visible exercise checkbox | S | ✅ Done |
+| **A10** | Bars in "Ingresos por programa" | S | ✅ Done |
+| **A11** | 5th stat card: expiring in 7 days | S | ✅ Done |
 | **A1** | kg / lb selector | M | Pending |
 | **A5** | "Sin actividad" filter in Clients | M | Pending |
 | **A8** | Color and background in the text editor | M | Palette decision pending |
@@ -39,7 +39,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **L7** | Minor demo fixes | S | Needs detailing |
 | **L8** | production-checklist | M | At the end |
 | **L9** | Admin UI for plans/prices? | L | Decision pending |
-| **L10** | Preview env vars in Vercel | S | Pending |
+| **L10** | Preview env vars in Vercel | S | ✅ Done |
 | **D1–D7** | Deferred / technical debt | — | See below |
 
 ---
@@ -163,7 +163,7 @@ Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this
 | **D4** | 250-photo cap not race-safe | S | Acceptable for single-user. |
 | **D5** | `getSentMessages` loads all `message_recipients` | S | Scaling concern; fine for now. |
 | **D6** | Typo in `.env.example` | S | `noreply@auramristany.com` → `no-reply@auramaristany.com`. |
-| **D7** | Verify CI + gitleaks on the 1st PR | S | The `ci` gate has never been exercised. |
+| **D7** | Verify CI + gitleaks on the 1st PR | S | ✅ Done — exercised on PR #1 (2026-07-22). |
 
 ---
 
