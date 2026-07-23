@@ -205,6 +205,8 @@ export function useProgressForm({
 
       // Solo re-guarda si hubo valores que convertir (un flip en vacío no crea registro).
       // Decisión eager sobre el snapshot del ref — los updaters deben permanecer puros.
+      // (El snapshot puede ser stale para un valor tecleado en el mismo tick; inofensivo:
+      // ese updateSeries ya programó su propio save.)
       const snapshot = latestRef.current.exercises[exerciseId];
       if (snapshot?.series.some((sv) => isConvertible(sv.weight_kg))) scheduleSave();
     },
