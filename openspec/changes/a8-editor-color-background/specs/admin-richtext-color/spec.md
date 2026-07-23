@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Text color and background highlight in the Text block editor
-The admin Text block editor SHALL offer a text-color control (5 brand swatches + "Automático") and a background control (5 brand swatches + "Sin fondo"), each with a custom hex input accepting only `#rrggbb` values. Applied colors MUST be emitted as inline `color` / `background-color` styles.
+The admin Text block editor SHALL offer a text-color control (7 swatches incl. negro/blanco + "Automático") and a background control (8 swatches incl. negro/blanco/amarillo + "Sin fondo"), each with a custom hex input accepting only `#rrggbb` values. Applied colors MUST be emitted as inline `color` / `background-color` styles.
 
 #### Scenario: Applying a swatch
 - **WHEN** the admin selects text and taps the `#7a63d4` swatch
@@ -25,7 +25,7 @@ The Text block editor SHALL offer an underline toolbar button emitting the alrea
 - **THEN** the saved HTML contains `<u>` around it and it renders underlined in the portal
 
 ### Requirement: Sanitization preserves only hex color styles
-`sanitizeRichText` SHALL allow `span` and `mark` tags with a `style` attribute restricted to `color` and `background-color` whose values match `#rrggbb` exactly; every other style, tag, or value MUST be stripped.
+`sanitizeRichText` SHALL allow `span` and `mark` tags with a `style` attribute restricted to `color` and `background-color` whose values match `#rrggbb` or the browser-normalized `rgb(int,int,int)` form exactly (plus `inherit` for mark color); every other style, tag, or value MUST be stripped.
 
 #### Scenario: Valid colors survive
 - **WHEN** HTML with `<span style="color: #9982f4">` and `<mark style="background-color: #eddbd8">` is sanitized
