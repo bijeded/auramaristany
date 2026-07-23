@@ -22,7 +22,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A3** | More visible exercise checkbox | S | ✅ Done |
 | **A10** | Bars in "Ingresos por programa" | S | ✅ Done |
 | **A11** | 5th stat card: expiring in 7 days | S | ✅ Done |
-| **A1** | kg / lb selector | M | Pending |
+| **A1** | kg / lb selector | M | ✅ Done |
 | **A5** | "Sin actividad" filter in Clients | M | Pending |
 | **A8** | Color and background in the text editor | M | Palette decision pending |
 | **A9** | Cancellation + exit survey | M | Pending |
