@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Clock, MessageCircle, Settings, Layers } from "lucide-react";
+import { CalendarDays, Clock, MessageCircle, Sun, User, Layers } from "lucide-react";
 
 const BASE_ITEMS = [
-  { href: "/portal/today", label: "Hoy", icon: CalendarDays },
+  { href: "/portal/today", label: "Hoy", icon: Sun },
+  { href: "/portal/semana", label: "Semana", icon: CalendarDays },
   { href: "/portal/history", label: "Historial", icon: Clock },
   { href: "/portal/messages", label: "Mensajes", icon: MessageCircle },
-  { href: "/portal/settings", label: "Configuración", icon: Settings },
+  { href: "/portal/settings", label: "Perfil", icon: User },
 ] as const;
 
 const PILARES_ITEM = { href: "/portal/pilares", label: "Pilares", icon: Layers } as const;
@@ -17,7 +18,7 @@ export function PortalNav({ showPilares, unreadMessages = 0 }: { showPilares: bo
   const pathname = usePathname();
 
   const items = showPilares
-    ? [BASE_ITEMS[0], PILARES_ITEM, ...BASE_ITEMS.slice(1)]
+    ? [BASE_ITEMS[0], BASE_ITEMS[1], PILARES_ITEM, ...BASE_ITEMS.slice(2)]
     : [...BASE_ITEMS];
 
   return (
@@ -34,7 +35,7 @@ export function PortalNav({ showPilares, unreadMessages = 0 }: { showPilares: bo
           <Link
             key={href}
             href={href}
-            className="flex flex-col items-center gap-1 py-3 px-4 min-w-0 flex-1"
+            className="flex flex-col items-center gap-1 py-3 px-1 min-w-0 flex-1"
             style={{
               color: active ? "var(--lavanda)" : "var(--gris-suave)",
               textDecoration: "none",
