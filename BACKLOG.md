@@ -24,7 +24,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A11** | 5th stat card: expiring in 7 days | S | ✅ Done |
 | **A1** | kg / lb selector | M | ✅ Done |
 | **A5** | "Sin actividad" filter in Clients | M | Pending |
-| **A8** | Color and background in the text editor | M | Palette decision pending |
+| **A8** | Color and background in the text editor | M | ✅ Done |
 | **A9** | Cancellation + exit survey | M | Pending |
 | **A12** | 7-day calendar in the portal | M | Pending |
 | **A6** | Booking system (WordPress) | L | Pending |
