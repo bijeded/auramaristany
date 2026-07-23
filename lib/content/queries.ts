@@ -1,8 +1,12 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentDayKey, getCurrentSeriesNumber } from "./access";
+import {
+  getCurrentDayKey,
+  getCurrentSeriesNumber,
+  getUpcomingDayKeys,
+} from "./access";
 import { ACCESS_STATES } from "./subscription-access";
-import type { DayKey } from "./access";
+import type { DayKey, UpcomingDayKey } from "./access";
 import type { Json } from "@/lib/supabase/types";
 
 export interface Exercise {
@@ -186,6 +190,101 @@ export async function getTodayContent(
     existingLog,
     effectiveDate: today.toISOString().split("T")[0],
   };
+}
+
+// --- Calendario "Semana" (A12) ---
+
+export interface WeekCalendarRow {
+  date: string; // "YYYY-MM-DD"
+  day_of_week: string;
+  isToday: boolean;
+  /** null = día de descanso (sin program_day para esa clave) */
+  title: string | null;
+  day_type: string | null;
+  workout_focus: string | null;
+}
+
+interface WeekDayRow {
+  week_number: number;
+  day_of_week: string;
+  title: string;
+  day_type: string;
+  workout_focus: string | null;
+}
+
+/**
+ * Filas del calendario de 7 días (/portal/semana): hoy + próximos 7 días,
+ * recortado al periodo actual. Solo títulos/metadata — nunca bloques ni ids
+ * (los días futuros no son navegables). A diferencia de getTodayContent,
+ * NO filtra por `published` (decisión A12: el calendario muestra días sin
+ * publicar; /portal/today conserva su filtro).
+ */
+export async function getWeekCalendar(
+  userId: string
+): Promise<WeekCalendarRow[] | null> {
+  const supabase = await createClient();
+  // T12:00:00 avoids midnight-UTC → prior-day in negative-offset timezones
+  const today = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
+
+  const { data: rawSub } = await supabase
+    .from("subscriptions")
+    .select(
+      `id, months_elapsed, current_period_start, current_period_end, program_variant_id`
+    )
+    .eq("profile_id", userId)
+    .in("status", ACCESS_STATES)
+    .single();
+
+  const sub = rawSub as
+    | (Pick<SubRow, "id" | "months_elapsed" | "current_period_start" | "program_variant_id"> & {
+        current_period_end: string | null;
+      })
+    | null;
+  if (!sub || !sub.current_period_start) return null;
+
+  const dayKeys = getUpcomingDayKeys(
+    sub.current_period_start,
+    sub.current_period_end,
+    today
+  );
+  if (dayKeys.length === 0) return [];
+
+  const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
+  const { data: rawVariantSeries } = await supabase
+    .from("variant_series_map")
+    .select("series_id, program_series!inner ( series_number )")
+    .eq("program_variant_id", sub.program_variant_id);
+
+  // keep: variant_series_map JOIN program_series!inner — join shape not inferred.
+  const variantSeries = rawVariantSeries as VariantSeriesRow[] | null;
+  const seriesEntry = variantSeries?.find(
+    (m) => m.program_series.series_number === seriesNumber
+  );
+  if (!seriesEntry) return null;
+
+  const weekNumbers = Array.from(new Set(dayKeys.map((k) => k.week_number)));
+  const { data: rawDays } = await supabase
+    .from("program_days")
+    .select("week_number, day_of_week, title, day_type, workout_focus")
+    .eq("series_id", seriesEntry.series_id)
+    .in("week_number", weekNumbers);
+
+  const days = (rawDays ?? []) as WeekDayRow[];
+  const byKey = new Map(
+    days.map((d) => [`${d.week_number}:${d.day_of_week}`, d])
+  );
+
+  return dayKeys.map((k: UpcomingDayKey) => {
+    const day = byKey.get(`${k.week_number}:${k.day_of_week}`);
+    return {
+      date: k.date,
+      day_of_week: k.day_of_week,
+      isToday: k.isToday,
+      title: day?.title ?? null,
+      day_type: day?.day_type ?? null,
+      workout_focus: day?.workout_focus ?? null,
+    };
+  });
 }
 
 /** Decisión pura (testeable): extrae el id de la fila de sub que concede acceso. */

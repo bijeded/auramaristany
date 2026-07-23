@@ -109,6 +109,62 @@ export function getAccessibleSeries(
   return [{ series_number: monthsElapsed, fully_accessible: false }];
 }
 
+export interface UpcomingDayKey {
+  date: string; // "YYYY-MM-DD" (UTC)
+  week_number: number; // 1–4 (clamped, same as getCurrentDayKey)
+  day_of_week: DayOfWeek;
+  isToday: boolean;
+}
+
+/**
+ * Genera las claves de día para el calendario "Semana": hoy + los próximos
+ * 7 días (máx. 8), recortados al periodo de facturación actual.
+ * Días ≥ current_period_end se descartan (aún no pagados); días más allá de
+ * la semana 4 pero dentro del periodo se fijan en semana 4 (mismo clamp que
+ * getCurrentDayKey). Aritmética UTC, como el resto del módulo.
+ */
+export function getUpcomingDayKeys(
+  currentPeriodStart: string,
+  currentPeriodEnd: string | null,
+  today = new Date()
+): UpcomingDayKey[] {
+  const start = new Date(currentPeriodStart);
+  const startUTC = Date.UTC(
+    start.getUTCFullYear(),
+    start.getUTCMonth(),
+    start.getUTCDate()
+  );
+  const todayUTC = Date.UTC(
+    today.getUTCFullYear(),
+    today.getUTCMonth(),
+    today.getUTCDate()
+  );
+  let endUTC: number | null = null;
+  if (currentPeriodEnd) {
+    const end = new Date(currentPeriodEnd);
+    endUTC = Date.UTC(
+      end.getUTCFullYear(),
+      end.getUTCMonth(),
+      end.getUTCDate()
+    );
+  }
+
+  const keys: UpcomingDayKey[] = [];
+  for (let i = 0; i < 8; i++) {
+    const dayUTC = todayUTC + i * 86_400_000;
+    if (endUTC !== null && dayUTC >= endUTC) break; // siguiente periodo: fuera
+    const d = new Date(dayUTC);
+    const daysElapsed = Math.max(0, Math.floor((dayUTC - startUTC) / 86_400_000));
+    keys.push({
+      date: d.toISOString().split("T")[0],
+      week_number: Math.min(Math.floor(daysElapsed / 7) + 1, 4),
+      day_of_week: toDayOfWeek(d),
+      isToday: i === 0,
+    });
+  }
+  return keys;
+}
+
 /** The series_number to query for /portal/today is always months_elapsed. */
 export function getCurrentSeriesNumber(monthsElapsed: number): number {
   return monthsElapsed;
