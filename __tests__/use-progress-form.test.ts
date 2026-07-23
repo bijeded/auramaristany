@@ -133,3 +133,24 @@ describe("useProgressForm — unidad de peso kg/lb", () => {
     expect(result.current.exercises["ex-1"].series[0].weight_kg).toBe("24.9");
   });
 });
+
+// Regresión: StrictMode doble-invoca updaters — la conversión no debe aplicarse 2 veces
+import { StrictMode, createElement, type ReactNode } from "react";
+
+describe("useProgressForm — setWeightUnit bajo StrictMode", () => {
+  it("convierte una sola vez aunque los updaters se doble-invoquen", () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(StrictMode, null, children);
+    const { result } = renderHook(() => useProgressForm(baseParams), { wrapper });
+
+    act(() => {
+      result.current.updateSeries("ex-1", 0, "weight_kg", "24.9");
+    });
+    act(() => {
+      result.current.setWeightUnit("ex-1", "lb");
+    });
+
+    expect(result.current.exercises["ex-1"].series[0].weight_kg).toBe("54.9");
+  });
+});

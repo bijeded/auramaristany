@@ -7,6 +7,8 @@ import { lbToKg, kgToLb } from "@/lib/content/weight-units";
 
 export type WeightUnit = "kg" | "lb";
 
+// Invariante A1: los strings de peso del estado están en la unidad MOSTRADA
+// (weightUnits por ejercicio); serializeExercises convierte a kg canónico al guardar.
 export interface ExerciseSeriesEntry {
   reps_done: string;
   weight_kg: string;
@@ -175,31 +177,36 @@ export function useProgressForm({
 
   const setWeightUnit = useCallback(
     (exerciseId: string, unit: WeightUnit) => {
-      setWeightUnits((prevUnits) => {
-        const current = prevUnits[exerciseId] ?? "kg";
-        if (current === unit) return prevUnits;
-        // Convierte in place los valores ya tecleados a la nueva unidad
-        setExercises((prev) => {
-          const ex = prev[exerciseId];
-          if (!ex) return prev;
-          const convert = unit === "lb" ? kgToLb : lbToKg;
-          return {
-            ...prev,
-            [exerciseId]: {
-              ...ex,
-              series: ex.series.map((sv) => ({
-                ...sv,
-                weight_kg:
-                  sv.weight_kg !== "" && !Number.isNaN(Number(sv.weight_kg))
-                    ? String(convert(Number(sv.weight_kg)))
-                    : sv.weight_kg,
-              })),
-            },
-          };
-        });
-        return { ...prevUnits, [exerciseId]: unit };
+      // Lee la unidad vigente FUERA de los updaters (sin efectos dentro de ellos:
+      // StrictMode los doble-invoca y una conversión doble corrompería el valor).
+      const current = latestRef.current.weightUnits[exerciseId] ?? "kg";
+      if (current === unit) return;
+
+      const convert = unit === "lb" ? kgToLb : lbToKg;
+      const isConvertible = (v: string) => v !== "" && !Number.isNaN(Number(v));
+
+      // Updater puro: la conversión se recalcula dentro sin efectos laterales
+      setExercises((prev) => {
+        const ex = prev[exerciseId];
+        if (!ex) return prev;
+        return {
+          ...prev,
+          [exerciseId]: {
+            ...ex,
+            series: ex.series.map((sv) =>
+              isConvertible(sv.weight_kg)
+                ? { ...sv, weight_kg: String(convert(Number(sv.weight_kg))) }
+                : sv
+            ),
+          },
+        };
       });
-      scheduleSave();
+      setWeightUnits((prevUnits) => ({ ...prevUnits, [exerciseId]: unit }));
+
+      // Solo re-guarda si hubo valores que convertir (un flip en vacío no crea registro).
+      // Decisión eager sobre el snapshot del ref — los updaters deben permanecer puros.
+      const snapshot = latestRef.current.exercises[exerciseId];
+      if (snapshot?.series.some((sv) => isConvertible(sv.weight_kg))) scheduleSave();
     },
     [scheduleSave]
   );

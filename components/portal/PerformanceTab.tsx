@@ -92,7 +92,12 @@ export function PerformanceTab({
 
               {/* Toggle kg/lb — solo para la métrica Peso */}
               {activeMetric === "weight_kg" && (
-                <div className="flex gap-0 ml-auto rounded-full" style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}>
+                <div
+                  role="group"
+                  aria-label="Unidad de peso"
+                  className="flex gap-0 ml-auto rounded-full"
+                  style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}
+                >
                   {(["kg", "lb"] as const).map((u) => (
                     <button
                       key={u}
@@ -104,6 +109,7 @@ export function PerformanceTab({
                         fontSize: 12,
                         fontWeight: 600,
                         minWidth: 44,
+                        minHeight: 44,
                         background: weightUnit === u ? "var(--lavanda)" : "#fff",
                         color: weightUnit === u ? "#fff" : "var(--gris-texto)",
                       }}

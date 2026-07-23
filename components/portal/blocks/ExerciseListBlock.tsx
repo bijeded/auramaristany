@@ -52,7 +52,7 @@ function UnitToggle({ unit, onChange }: { unit: WeightUnit; onChange: (u: Weight
           className="font-body"
           style={{
             minWidth: 44,
-            minHeight: 32,
+            minHeight: 44,
             padding: "4px 12px",
             fontSize: 12,
             fontWeight: 600,
