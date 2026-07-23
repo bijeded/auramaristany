@@ -7,6 +7,7 @@ import {
 import {
   computeMRR,
   computeRenewalsThisMonth,
+  computeRenewalsWithinDays,
   groupClientsByVariant,
   groupRevenueByMonth,
   groupRevenueByProgram,
@@ -28,7 +29,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 function Kpi({ label, value, sub, danger, href }: { label: string; value: React.ReactNode; sub?: React.ReactNode; danger?: boolean; href?: string }) {
   return (
-    <Card style={{ flex: 1 }}>
+    <Card style={{ flex: "1 1 150px", minWidth: 150 }}>
       <div className="font-body" style={{ fontWeight: 500, fontSize: 12.5, marginBottom: 10, color: "var(--gris-texto)" }}>{label}</div>
       <span className="font-head" style={{ fontSize: 30, fontWeight: 600, color: danger ? "var(--error)" : "var(--negro)" }}>{value}</span>
       {sub && (
@@ -52,6 +53,7 @@ export default async function AdminDashboardPage() {
 
   const mrr = computeMRR(activeSubs);
   const renewals = computeRenewalsThisMonth(activeSubs, now);
+  const expiring7d = computeRenewalsWithinDays(activeSubs, 7, now);
   const byMonth = groupRevenueByMonth(invoices, 12, now);
   const clientsByVariant = groupClientsByVariant(activeSubs);
   const revenueByProgram = groupRevenueByProgram(invoices);
@@ -65,10 +67,11 @@ export default async function AdminDashboardPage() {
       <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13, marginBottom: 20 }}>{dateLabel}</p>
 
       {/* KPIs */}
-      <div className="flex" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
+      <div className="flex flex-wrap" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
         <Kpi label="Ingreso mensual recurrente" value={formatMXN(mrr)} sub={<em style={{ fontStyle: "italic" }}>*Estimado</em>} />
         <Kpi label="Suscripciones activas" value={String(activeSubs.length)} />
         <Kpi label="Renuevan este mes" value={String(renewals.count)} sub={formatMXN(renewals.amount)} />
+        <Kpi label="Vencen en 7 días" value={String(expiring7d.count)} sub={formatMXN(expiring7d.amount)} />
         <Kpi label="Requieren atención" value={String(pastDue)} danger sub="Ver clientes →" href="/admin/clients" />
       </div>
 
