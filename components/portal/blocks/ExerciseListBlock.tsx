@@ -233,8 +233,7 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
               }}
             >
               {/* Exercise header */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
                   <div
                     className="flex-shrink-0 flex items-center justify-center rounded-lg font-head"
                     style={{
@@ -259,7 +258,6 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
                   >
                     {ex.name}
                   </p>
-                </div>
               </div>
 
               {/* Badges */}
@@ -313,6 +311,7 @@ export function ExerciseListBlock({ content, formState, onUpdateCompleted, onUpd
 
               {/* A3 — explicit "Hecho" toggle button (≥48px tap target) */}
               <button
+                type="button"
                 onClick={() => onUpdateCompleted(ex.id, !done)}
                 aria-pressed={done}
                 aria-label={done ? `Desmarcar ${ex.name}` : `Marcar ${ex.name} como completado`}
