@@ -18,7 +18,12 @@ interface RawSubRow {
   current_period_end: string | null;
   enrollment_date: string;
   created_at: string;
-  profiles: { full_name: string; email: string; phone: string | null } | null;
+  profiles: {
+    full_name: string;
+    email: string;
+    phone: string | null;
+    progress_logs: { log_date: string }[] | null;
+  } | null;
   program_variants: { name: string; price_mxn: number; programs: { name: string } | null } | null;
 }
 
@@ -29,10 +34,10 @@ export async function getClientsList(): Promise<ClientListRow[]> {
   const { data } = await supabase
     .from("subscriptions")
     .select(
-      "profile_id, status, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone), program_variants(name, price_mxn, programs(name))"
+      "profile_id, status, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone, progress_logs(log_date)), program_variants(name, price_mxn, programs(name))"
     );
 
-  // keep: subscriptions JOIN profiles JOIN program_variants JOIN programs — nested join not inferred.
+  // keep: subscriptions JOIN profiles (+ progress_logs) JOIN program_variants JOIN programs — nested join not inferred.
   const rows = ((data ?? []) as RawSubRow[]).filter(
     (r) => r.profiles && r.program_variants
   );
@@ -48,6 +53,12 @@ export async function getClientsList(): Promise<ClientListRow[]> {
   for (const subs of Array.from(byProfile.values())) {
     const primary = pickPrimarySubscription(subs) as RawSubRow | null;
     if (!primary) continue;
+    // Última actividad = mayor log_date entre todos los progress_logs del cliente.
+    const logs = primary.profiles!.progress_logs ?? [];
+    const lastActivity = logs.reduce<string | null>(
+      (max, l) => (max === null || l.log_date > max ? l.log_date : max),
+      null
+    );
     result.push({
       profile_id: primary.profile_id,
       full_name: primary.profiles!.full_name,
@@ -59,6 +70,7 @@ export async function getClientsList(): Promise<ClientListRow[]> {
       current_period_end: primary.current_period_end,
       price_mxn: primary.program_variants!.price_mxn,
       status: primary.status,
+      last_activity_date: lastActivity,
     });
   }
 
