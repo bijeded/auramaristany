@@ -10,6 +10,7 @@ export type CancellationReason =
   | "otro"
   | "pago_fallido";
 export type CancellationSource = "voluntary" | "involuntary";
+export type BookingStatus = "active" | "canceled";
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type Database = {
@@ -97,6 +98,27 @@ export type Database = {
           source: CancellationSource;
         };
         Update: Partial<Database["public"]["Tables"]["cancellation_surveys"]["Insert"]>;
+        Relationships: [];
+      };
+      bookings: {
+        Row: {
+          id: string;
+          profile_id: string;
+          calendly_invitee_uri: string;
+          calendly_event_uri: string | null;
+          scheduled_at: string;
+          status: BookingStatus;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          calendly_invitee_uri: string;
+          calendly_event_uri?: string | null;
+          scheduled_at: string;
+          status?: BookingStatus;
+        };
+        Update: Partial<Database["public"]["Tables"]["bookings"]["Insert"]>;
         Relationships: [];
       };
       programs: {
