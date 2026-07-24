@@ -33,3 +33,13 @@ export function nextScheduledDate(bookings: BookingLike[], now: Date): string | 
 export function dayHasAgendarBlock(blocks: { block_type: string }[]): boolean {
   return blocks.some((b) => b.block_type === "agendar");
 }
+
+/**
+ * Escapa los metacaracteres LIKE (`\`, `%`, `_`) de un valor que viene de
+ * terceros, para usarlo como patrón literal en un filtro `ilike`. `_` es un
+ * carácter válido de email a la vez que comodín LIKE: sin escapar habilita
+ * atribución cruzada (ver getProfileIdByEmail). El backslash va primero.
+ */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/([\\%_])/g, "\\$1");
+}

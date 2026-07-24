@@ -1,7 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import type { BookingLike } from "./booking-helpers";
+import type { BookingStatus } from "@/lib/supabase/types";
+import { escapeLikePattern, type BookingLike } from "./booking-helpers";
 
 /**
  * Reservas del usuario autenticado (vía RLS — owner-select). Se usan para
@@ -26,14 +27,37 @@ export async function getUserBookings(userId: string): Promise<BookingLike[]> {
 }
 
 /**
- * Upsert idempotente de una reserva desde el webhook de Calendly
- * (invitee.created). Escribe con service-role — el cliente nunca escribe
- * reservas. onConflict en calendly_invitee_uri (Calendly reentrega eventos).
+ * Resuelve el profile_id a partir del email del invitee (service-role, se
+ * salta RLS). Devuelve null si ningún perfil coincide — el webhook entonces
+ * confirma el evento sin escribir (brecha de mapeo aceptada).
  *
- * ⚠ Sólo debe invocarse tras verificar la firma del webhook (PR del webhook).
- * TODO(webhook PR): una reentrega de invitee.created tras un invitee.canceled
- * resucitaría la fila a 'active'. Se resolverá con orden por timestamp del
- * evento cuando se maneje el payload completo del webhook.
+ * ⚠ El email viene de terceros (Calendly). Se escapan los metacaracteres LIKE
+ * (`%`, `_`, `\`) antes de `ilike`: `_` es un carácter válido de email y a la
+ * vez comodín LIKE — sin escapar, `john_doe@x` haría match con `johnXdoe@x`
+ * (atribución cruzada). Con escape, el match es literal pero case-insensitive.
+ */
+export async function getProfileIdByEmail(email: string): Promise<string | null> {
+  const supabase = createServiceClient();
+  const escaped = escapeLikePattern(email);
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("email", escaped)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * Upsert idempotente de una reserva (invitee.created) desde el webhook.
+ * Escribe con service-role — el cliente nunca escribe reservas. onConflict en
+ * calendly_invitee_uri (Calendly reentrega eventos).
+ *
+ * ⚠ Sólo debe invocarse tras verificar la firma del webhook.
+ * La cancelación NO pasa por aquí (ver markBookingCanceled): así una fila
+ * cancelada es terminal. Residual aceptado: una reentrega tardía y fuera de
+ * orden de invitee.created tras un cancel podría reactivar la fila; Calendly
+ * sólo reentrega el mismo evento como reintento (antes de cualquier cancel),
+ * por lo que no ocurre en la práctica (ver design.md, riesgo de webhook-lag).
  */
 export async function upsertBookingFromWebhook(params: {
   profileId: string;
@@ -55,13 +79,16 @@ export async function upsertBookingFromWebhook(params: {
 }
 
 /**
- * Marca una reserva como cancelada desde el webhook (invitee.canceled).
- * Service-role. Idempotente: si la fila no existe, no hace nada.
+ * Marca una reserva como cancelada (invitee.canceled). Update-only por
+ * invitee_uri (service-role): idempotente, sin resurrección y sin crear filas
+ * huérfanas si el cancel llega sin un created previo. No necesita el email.
+ *
+ * ⚠ Sólo debe invocarse tras verificar la firma del webhook.
  */
 export async function markBookingCanceled(calendlyInviteeUri: string): Promise<void> {
   const supabase = createServiceClient();
   await supabase
     .from("bookings")
-    .update({ status: "canceled" })
+    .update({ status: "canceled" satisfies BookingStatus })
     .eq("calendly_invitee_uri", calendlyInviteeUri);
 }

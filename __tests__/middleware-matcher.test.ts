@@ -20,6 +20,9 @@ describe("middleware matcher", () => {
   it("excluye api/webhooks (Stripe, máquina-a-máquina)", () => {
     expect(matches("/api/webhooks/stripe")).toBe(false);
   });
+  it("excluye api/webhooks/calendly (Calendly, máquina-a-máquina)", () => {
+    expect(matches("/api/webhooks/calendly")).toBe(false);
+  });
   it("excluye api/cron (Vercel Cron)", () => {
     expect(matches("/api/cron/purge-messages")).toBe(false);
   });
