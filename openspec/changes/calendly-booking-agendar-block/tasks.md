@@ -1,18 +1,18 @@
 ## 1. Data model & env
 
-- [ ] 1.1 Write migration 012 (011 = A9 cancellation is already applied): `bookings` table (`id`, `profile_id` FK, `calendly_invitee_uri` unique for idempotency, `calendly_event_uri`, `scheduled_at timestamptz`, `status` (`active`/`canceled`), `created_at`) + RLS (owner `select`; no client insert/update — service-role only). Apply via Supabase Management API (single-line SQL).
-- [ ] 1.2 Add `bookings` to `lib/supabase/types.ts` by hand (include `Relationships: []`).
-- [ ] 1.3 Add `NEXT_PUBLIC_CALENDLY_URL` and `CALENDLY_WEBHOOK_SIGNING_KEY` to `.env.example` (placeholders) and document in Vercel env list.
+- [x] 1.1 Write migration 012 (011 = A9 cancellation is already applied): `bookings` table (`id`, `profile_id` FK, `calendly_invitee_uri` unique for idempotency, `calendly_event_uri`, `scheduled_at timestamptz`, `status` (`active`/`canceled`), `created_at`) + RLS (owner `select`; no client insert/update — service-role only). Apply via Supabase Management API (single-line SQL).
+- [x] 1.2 Add `bookings` to `lib/supabase/types.ts` by hand (include `Relationships: []`).
+- [x] 1.3 Add `NEXT_PUBLIC_CALENDLY_URL` and `CALENDLY_WEBHOOK_SIGNING_KEY` to `.env.example` (placeholders) and document in Vercel env list.
 
 ## 2. Booking eligibility & dedup (pure helpers, TDD)
 
-- [ ] 2.1 Pure helper `hasFutureCall(bookings, now)` → boolean (a future, non-canceled row exists). Tests (AAA), including boundary at `now`.
-- [ ] 2.2 Pure helper `nextScheduledDate(bookings, now)` → the future call's date for the disabled-state copy. Tests.
-- [ ] 2.3 Pure helper `dayHasAgendarBlock(blocks)` → booking-eligibility from today's blocks. Tests.
+- [x] 2.1 Pure helper `hasFutureCall(bookings, now)` → boolean (a future, non-canceled row exists). Tests (AAA), including boundary at `now`.
+- [x] 2.2 Pure helper `nextScheduledDate(bookings, now)` → the future call's date for the disabled-state copy. Tests.
+- [x] 2.3 Pure helper `dayHasAgendarBlock(blocks)` → booking-eligibility from today's blocks. Tests.
 
 ## 3. Bookings queries (server-only)
 
-- [ ] 3.1 `lib/content/booking-queries.ts` (`import 'server-only'`): `getUserBookings(userId)` via RLS-aware client; `upsertBookingFromWebhook(...)` via service-role (onConflict `calendly_invitee_uri`); `markBookingCanceled(inviteeUri)`.
+- [x] 3.1 `lib/content/booking-queries.ts` (`import 'server-only'`): `getUserBookings(userId)` via RLS-aware client; `upsertBookingFromWebhook(...)` via service-role (onConflict `calendly_invitee_uri`); `markBookingCanceled(inviteeUri)`.
 
 ## 4. Calendly webhook
 
