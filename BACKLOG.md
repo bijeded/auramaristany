@@ -23,7 +23,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A10** | Bars in "Ingresos por programa" | S | ✅ Done |
 | **A11** | 5th stat card: expiring in 7 days | S | ✅ Done |
 | **A1** | kg / lb selector | M | ✅ Done |
-| **A5** | "Sin actividad" filter in Clients | M | Pending |
+| **A5** | "Sin actividad" filter in Clients | M | ✅ Done |
 | **A8** | Color and background in the text editor | M | ✅ Done |
 | **A9** | Cancellation + exit survey | M | Pending |
 | **A12** | 7-day calendar in the portal | M | ✅ Done |
@@ -74,10 +74,9 @@ The client chooses the weight unit; history must stay consistent.
 - **Touches:** exercise logging + `hooks/useProgressForm.ts` · `ExerciseListLogged` · `lib/content/history-helpers.ts` (`aggregateDayValue`/`buildPerformanceSeries` average weight) · `components/portal/PerformanceChart.tsx` (axis label) · user preference in `/portal/settings` (`lib/portal/settingsActions.ts`, `account-queries.ts`).
 - **Watch out:** the JSON key is literally `weight_kg` and `metrics: ["reps_done","weight_kg"]` — decide whether to keep the name (recommended) and only convert at the view layer. Likely **migration 011** for the preference in `profiles`.
 
-### A5 · "Sin actividad" filter in Clients — `M`
-New pill next to Activas/Vencidas/Canceladas: no `progress_logs` in 10 days.
-- **Touches:** `lib/admin/clients-queries.ts` (`getClientsList` → add last activity, max `progress_logs.log_date`) · `lib/admin/clients-helpers.ts` (`filterClients`, `STATE_FILTERS`, pure + TDD) · `components/admin/ClientsTable.tsx`.
-- **Watch out:** 🔗 **the "last activity" signal is reused by A4.** Build it here and keep it reusable.
+### A5 · "Sin actividad" filter in Clients — `M` — ✅ Done (PR #5, change `a5-clients-inactivity-filter`)
+4th exclusive pill next to Activas/Vencidas/Canceladas: active/trialing clients with no `progress_logs` in ≥10 days (never-logged counts as inactive).
+- **Shipped:** pure `isInactive(lastActivityDate, now, thresholdDays)` (UTC whole-day diff, server DEV_DATE-aware `now`) + reusable `last_activity_date` (max `progress_logs.log_date`) on `ClientListRow`. 🔗 **`last_activity_date` is the signal A4 reuses.** `trialing` added to `SubStatus`. Read-only, no migration.
 
 ### A8 · Color and background in the text editor — `M`
 Text color and background for the Text block (Tiptap).
@@ -162,6 +161,8 @@ Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this
 | **D5** | `getSentMessages` loads all `message_recipients` | S | Scaling concern; fine for now. |
 | **D6** | Typo in `.env.example` | S | `noreply@auramristany.com` → `no-reply@auramaristany.com`. |
 | **D7** | Verify CI + gitleaks on the 1st PR | S | ✅ Done — exercised on PR #1 (2026-07-22). |
+| **D8** | Visually review `trialing` "Prueba" badge | S | From A5. Badge added but unverified — no trialing sub in demo data. Check when one exists. |
+| **D9** | Extract shared `serverToday()` DEV_DATE helper | S | Code-review RULE CANDIDATE from A5. `now = DEV_DATE ? … : new Date()` inlined in ~5 places (`app/admin/clients/page.tsx`, `lib/content/queries.ts` ×3). Promote to a rule + refactor if it recurs. |
 
 ---
 
