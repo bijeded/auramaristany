@@ -81,8 +81,17 @@ export default async function PortalBookingPage() {
   const eligible = !!content && dayHasAgendarBlock(content.blocks);
   if (!eligible) return <NotAvailable />;
 
+  // El día ES elegible pero falta la config de Calendly → no es un "vuelve
+  // luego", es un error de configuración: el CTA de Hoy lleva a un callejón
+  // sin salida. Se registra en el servidor (el cliente ve el mismo mensaje
+  // amable). Recordar: NEXT_PUBLIC_* se inyecta en build → requiere redeploy.
   const calendlyUrl = process.env.NEXT_PUBLIC_CALENDLY_URL;
-  if (!calendlyUrl) return <NotAvailable />;
+  if (!calendlyUrl) {
+    console.warn(
+      "[booking] Día elegible pero NEXT_PUBLIC_CALENDLY_URL no está configurado; configúralo en el entorno y redeploya."
+    );
+    return <NotAvailable />;
+  }
 
   return (
     <Shell title="Agenda tu llamada">
