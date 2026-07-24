@@ -22,7 +22,7 @@ export interface Exercise {
 
 export interface DayBlock {
   id: string;
-  block_type: "text" | "youtube" | "pdf" | "image" | "exercise_list" | "cardio_zone2";
+  block_type: "text" | "youtube" | "pdf" | "image" | "exercise_list" | "cardio_zone2" | "agendar";
   sort_order: number;
   content: Record<string, unknown>;
 }

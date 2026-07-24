@@ -4,6 +4,7 @@ import { YoutubeBlock } from "./YoutubeBlock";
 import { PdfBlock } from "./PdfBlock";
 import { ImageBlock } from "./ImageBlock";
 import { CardioZone2Block } from "./CardioZone2Block";
+import { AgendarBlock } from "./AgendarBlock";
 import { ExerciseListReadOnly, type ReadOnlyExercise } from "./ExerciseListReadOnly";
 import { ExerciseListLogged } from "./ExerciseListLogged";
 import type { ExercisesDone } from "@/lib/content/history-helpers";
@@ -34,6 +35,9 @@ export function BlockView({
       return <ImageBlock content={block.content as { storage_path: string; alt: string }} />;
     case "cardio_zone2":
       return <CardioZone2Block />;
+    case "agendar":
+      // Solo lectura fuera de "Hoy" (historial/pilares): nota inerte.
+      return <AgendarBlock />;
     case "exercise_list":
       if (loggedExercises !== undefined) {
         return (

@@ -3,7 +3,7 @@ import { z } from "zod";
 export type ValidationResult = { ok: true } | { ok: false; error: string };
 
 const DAY_TYPES = ["workout", "rest", "cardio"] as const;
-const BLOCK_TYPES = ["text", "youtube", "pdf", "image", "cardio_zone2", "exercise_list"] as const;
+const BLOCK_TYPES = ["text", "youtube", "pdf", "image", "cardio_zone2", "exercise_list", "agendar"] as const;
 
 const daySchema = z.object({
   title: z.string().trim().min(1).max(200),

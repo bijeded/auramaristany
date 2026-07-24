@@ -46,6 +46,9 @@ describe("validateBlock", () => {
   it("rechaza block_type desconocido", () => {
     expect(validateBlock({ block_type: "iframe", content: {} }).ok).toBe(false);
   });
+  it("acepta el bloque agendar (sin contenido a configurar)", () => {
+    expect(validateBlock({ block_type: "agendar", content: {} }).ok).toBe(true);
+  });
   it("rechaza html de texto >50000", () => {
     expect(validateBlock({ block_type: "text", content: { html: "x".repeat(50001) } }).ok).toBe(false);
   });
