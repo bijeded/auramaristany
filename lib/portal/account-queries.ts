@@ -6,6 +6,7 @@ export type AccountSubscription = {
   program_name: string;
   variant_name: string;
   status: string;
+  cancel_at_period_end: boolean;
   enrollment_date: string;
   current_period_end: string | null;
   price_mxn: number;
@@ -28,6 +29,7 @@ export type AccountData = {
 
 type RawSub = {
   status: string;
+  cancel_at_period_end: boolean | null;
   enrollment_date: string;
   current_period_end: string | null;
   months_elapsed: number;
@@ -41,6 +43,7 @@ export function mapSubscription(rows: RawSub[] | null): AccountSubscription | nu
     program_name: r.program_variants.programs?.name ?? "—",
     variant_name: r.program_variants.name,
     status: r.status,
+    cancel_at_period_end: r.cancel_at_period_end ?? false,
     enrollment_date: r.enrollment_date,
     current_period_end: r.current_period_end,
     price_mxn: r.program_variants.price_mxn,
@@ -82,7 +85,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
 
   const { data: subRows } = await supabase
     .from("subscriptions")
-    .select("status, enrollment_date, current_period_end, months_elapsed, program_variants(name, price_mxn, programs(name, duration_months))")
+    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, program_variants(name, price_mxn, programs(name, duration_months))")
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .order("enrollment_date", { ascending: false });

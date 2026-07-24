@@ -11,6 +11,13 @@ const SAFE_COLOR = [
 // Highlight de Tiptap emite `color: inherit` dentro del mark
 const SAFE_TEXT_COLOR = [...SAFE_COLOR, /^inherit$/];
 
+// Texto plano: sin ningún tag ni atributo. Para campos cortos de texto libre
+// (p. ej. el `detail` de la encuesta de cancelación, A9). Devuelve el texto sin
+// HTML, ya recortado.
+export function sanitizePlainText(input: string): string {
+  return sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} }).trim();
+}
+
 // Whitelist conservadora para el output de Tiptap (starter-kit + enlaces + color A8).
 export function sanitizeRichText(html: string): string {
   return sanitizeHtml(html, {

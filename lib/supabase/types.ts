@@ -1,6 +1,15 @@
 export type UserRole = "client" | "admin";
 export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
 export type BillingModel = "fixed_term_monthly" | "rolling_monthly";
+export type CancellationReason =
+  | "precio_muy_caro"
+  | "no_tengo_tiempo"
+  | "no_logre_objetivo"
+  | "no_veo_resultados"
+  | "encontre_otra_opcion"
+  | "otro"
+  | "pago_fallido";
+export type CancellationSource = "voluntary" | "involuntary";
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type Database = {
@@ -68,6 +77,26 @@ export type Database = {
           completed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["onboarding_responses"]["Insert"]>;
+        Relationships: [];
+      };
+      cancellation_surveys: {
+        Row: {
+          id: string;
+          profile_id: string;
+          subscription_id: string | null;
+          reason: CancellationReason;
+          detail: string | null;
+          source: CancellationSource;
+          created_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          subscription_id?: string | null;
+          reason: CancellationReason;
+          detail?: string | null;
+          source: CancellationSource;
+        };
+        Update: Partial<Database["public"]["Tables"]["cancellation_surveys"]["Insert"]>;
         Relationships: [];
       };
       programs: {

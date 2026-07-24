@@ -8,11 +8,27 @@ const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
   select: () => ({ single: insertSingleMock }),
 }));
 const upsertMock = vi.fn((_payload: Record<string, unknown>, _opts?: Record<string, unknown>) => ({ error: null }));
-const updateEqMock = vi.fn((_col: string, _val: string) => ({ error: null }));
+// update().eq() is awaited directly ({ error }) by most handlers, and also chained
+// .select().maybeSingle() by handleSubscriptionDeleted (needs the deleted row's ids).
+const deletedRowMaybeSingle = vi.fn((): { data: unknown; error: unknown } => ({ data: null, error: null }));
+const updateEqMock = vi.fn((_col: string, _val: string) => ({
+  error: null,
+  select: () => ({ maybeSingle: deletedRowMaybeSingle }),
+}));
 const updateMock = vi.fn((_payload: Record<string, unknown>) => ({ eq: updateEqMock }));
 const selectEqSingleMock = vi.fn(() => ({ data: null }));
-const selectEqMock = vi.fn(() => ({ single: selectEqSingleMock }));
-const selectMock = vi.fn(() => ({ eq: selectEqMock, single: selectEqSingleMock }));
+// Chainable select: any number of .eq(), terminating in .single() or .maybeSingle().
+const selectMaybeSingleMock = vi.fn((): { data: unknown } => ({ data: null }));
+const selectChain: {
+  eq: () => typeof selectChain;
+  single: typeof selectEqSingleMock;
+  maybeSingle: typeof selectMaybeSingleMock;
+} = {
+  eq: () => selectChain,
+  single: selectEqSingleMock,
+  maybeSingle: selectMaybeSingleMock,
+};
+const selectMock = vi.fn(() => selectChain);
 const fromMock = vi.fn((_table: string) => ({ insert: insertMock, upsert: upsertMock, update: updateMock, select: selectMock }));
 
 vi.mock("@/lib/email/send", () => ({
@@ -35,6 +51,7 @@ import {
   handleCheckoutCompleted,
   handleSubscriptionUpdated,
   handleInvoicePaid,
+  handleSubscriptionDeleted,
 } from "@/lib/webhooks/stripe-handlers";
 import type Stripe from "stripe";
 
@@ -202,7 +219,7 @@ describe("handleInvoicePaid - subscription_create", () => {
 describe("handleSubscriptionUpdated", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    updateEqMock.mockReturnValue({ error: null });
+    updateEqMock.mockReturnValue({ error: null, select: () => ({ maybeSingle: deletedRowMaybeSingle }) });
   });
 
   it("updates current_period_start/end as ISO strings from subscription items", async () => {
@@ -225,5 +242,57 @@ describe("handleSubscriptionUpdated", () => {
     expect(payload.current_period_end).toBe(
       new Date(1751932800 * 1000).toISOString()
     );
+  });
+});
+
+describe("handleSubscriptionDeleted (A9 — involuntary logging)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // A prior describe pins updateEqMock via mockReturnValue; restore the chain here.
+    updateEqMock.mockImplementation((_col: string, _val: string) => ({
+      error: null,
+      select: () => ({ maybeSingle: deletedRowMaybeSingle }),
+    }));
+    deletedRowMaybeSingle.mockReturnValue({ data: { id: "db-sub-1", profile_id: "p-1" }, error: null });
+    // No pre-existing involuntary row by default (idempotency guard lookup).
+    selectMaybeSingleMock.mockReturnValue({ data: null });
+  });
+
+  function deletedEvent(reason: string | null): Stripe.Subscription {
+    return {
+      id: "sub_stripe_1",
+      cancellation_details: reason ? { reason } : null,
+    } as unknown as Stripe.Subscription;
+  }
+
+  it("inserts a pago_fallido row on payment_failed", async () => {
+    await handleSubscriptionDeleted(deletedEvent("payment_failed"));
+    expect(fromMock).toHaveBeenCalledWith("cancellation_surveys");
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ profile_id: "p-1", subscription_id: "db-sub-1", reason: "pago_fallido", source: "involuntary" })
+    );
+  });
+
+  it("inserts a pago_fallido row on payment_disputed", async () => {
+    await handleSubscriptionDeleted(deletedEvent("payment_disputed"));
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "pago_fallido", source: "involuntary" })
+    );
+  });
+
+  it("does NOT insert a survey row on cancellation_requested (voluntary already logged)", async () => {
+    await handleSubscriptionDeleted(deletedEvent("cancellation_requested"));
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT insert when there is no cancellation reason", async () => {
+    await handleSubscriptionDeleted(deletedEvent(null));
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent: does NOT insert a second pago_fallido row on redelivery", async () => {
+    selectMaybeSingleMock.mockReturnValue({ data: { id: "existing-row" } });
+    await handleSubscriptionDeleted(deletedEvent("payment_failed"));
+    expect(insertMock).not.toHaveBeenCalled();
   });
 });
