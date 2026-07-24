@@ -16,10 +16,10 @@
 
 ## 4. Calendly webhook
 
-- [ ] 4.1 `app/api/webhooks/calendly/route.ts`: verify Calendly signature (`CALENDLY_WEBHOOK_SIGNING_KEY`) before processing; reject invalid/missing signature.
-- [ ] 4.2 Handle `invitee.created`: map invitee email → `profiles.email` → `user_id`; idempotent upsert. Unmapped email → 200, no write.
-- [ ] 4.3 Handle `invitee.canceled`: mark matching row canceled (idempotent).
-- [ ] 4.4 Verify `api/webhooks/calendly` is already excluded by `middleware.ts` `matcher` (the existing literal excludes all of `api/webhooks`). Add a matcher test assertion; no matcher change expected.
+- [x] 4.1 `app/api/webhooks/calendly/route.ts`: verify Calendly signature (`CALENDLY_WEBHOOK_SIGNING_KEY`) before processing; reject invalid/missing signature.
+- [x] 4.2 Handle `invitee.created`: map invitee email → `profiles.email` → `user_id`; idempotent upsert. Unmapped email → 200, no write.
+- [x] 4.3 Handle `invitee.canceled`: mark matching row canceled (idempotent).
+- [x] 4.4 Verify `api/webhooks/calendly` is already excluded by `middleware.ts` `matcher` (the existing literal excludes all of `api/webhooks`). Add a matcher test assertion; no matcher change expected.
 
 ## 5. Agendar block — editor side
 
