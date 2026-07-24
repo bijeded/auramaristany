@@ -4,12 +4,13 @@ import { mapSubscription, mapInvoices, progressLabel } from "@/lib/portal/accoun
 describe("mapSubscription", () => {
   it("aplana los joins a un objeto plano", () => {
     const raw = [{
-      status: "active", enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
+      status: "active", cancel_at_period_end: false, enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
       months_elapsed: 3,
       program_variants: { name: "Intermedio", price_mxn: 999, programs: { name: "Fuerza", duration_months: 6 } },
     }];
     expect(mapSubscription(raw)).toEqual({
       program_name: "Fuerza", variant_name: "Intermedio", status: "active",
+      cancel_at_period_end: false,
       enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
       price_mxn: 999, months_elapsed: 3, duration_months: 6,
     });
