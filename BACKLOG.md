@@ -25,7 +25,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A1** | kg / lb selector | M | ✅ Done |
 | **A5** | "Sin actividad" filter in Clients | M | ✅ Done |
 | **A8** | Color and background in the text editor | M | ✅ Done |
-| **A9** | Cancellation + exit survey | M | Pending |
+| **A9** | Cancellation + exit survey | M | ✅ Done |
 | **A12** | 7-day calendar in the portal | M | ✅ Done |
 | **A6** | Booking system (WordPress) | L | Pending |
 | **A7** | "Agendar" block in the editor | M | Blocked by A6 |
@@ -40,7 +40,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **L8** | production-checklist | M | At the end |
 | **L9** | Admin UI for plans/prices? | L | Decision pending |
 | **L10** | Preview env vars in Vercel | S | ✅ Done |
-| **D1–D7** | Deferred / technical debt | — | See below |
+| **D1–D10** | Deferred / technical debt | — | See below |
 
 ---
 
@@ -84,11 +84,11 @@ Text color and background for the Text block (Tiptap).
 - **⚠ Gotcha:** `lib/admin/sanitize-html.ts` **strips styles** unless the whitelist is extended (`allowedStyles` with `color` / `background-color`). Without this, the color is lost on save and looks like a "bug".
 - **Still to decide:** palette limited to brand tokens (recommended) vs. free-form picker.
 
-### A9 · Cancellation + exit survey — `M`
-Cancel from the account + ask for a reason (radio buttons).
-- **Decided:** **end of the already-paid period, no refunds.** Verified in `scripts/seed-stripe.ts`: all 10 prices are `recurring: { interval: "month" }` → everything is monthly billing (CuarentaMás = 6 monthly cycles, **not** an installment payment) → **no refund case exists**.
-- **Touches:** `components/portal/settings/SubscriptionCard.tsx` + `lib/portal/settingsActions.ts` · `lib/webhooks/stripe-handlers.ts` (`customer.subscription.updated`) · storing the reason (new table or JSONB → **migration**).
-- **Watch out:** `subscriptions.cancel_at_period_end` **already exists** and the webhook already handles it; today cancellation happens via Stripe's Customer Portal.
+### A9 · Cancellation + exit survey — `M` — ✅ Done (PRs #6 backend + #7 UI, change `a9-cancellation-exit-survey`)
+Cancel from the account + optional exit survey (survey-first, all optional). **end of the already-paid period, no refunds** (all 10 prices are monthly `recurring`).
+- **Shipped:** migration 011 `cancellation_surveys` (dedicated table + RLS: owner insert-voluntary / select / delete-voluntary; blocks client-authored `pago_fallido`). `cancelSubscription`/`reactivateSubscription` server actions (getUser identity, zod ≤200 + `sanitizePlainText` on detail, Stripe `cancel_at_period_end`, optimistic mirror; reactivate deletes the latest voluntary row). `handleSubscriptionDeleted` logs `pago_fallido` on `payment_failed`/`payment_disputed`, **idempotent** (Stripe redelivers). UI: "Cancelar mi plan" red button at settings-page bottom (below lavender "Cerrar sesión") → survey-first modal (6 reasons + "Prefiero no decir", free-text detail for `encontre_otra_opcion`/`otro`); grace state "Tu plan termina el {fecha}" + Reactivar.
+- **⚠ Not yet tested end-to-end (see D10):** demo subs have fabricated `sub_seed_*` Stripe IDs → cancel 404s ("No se pudo guardar"). Verify after the demo refresh with a real test-checkout sub.
+- **Stripe enum:** the real `cancellation_details.reason` value is `payment_failed` (not `payment_failure`); no `canceled_by_retention_policy` handling.
 
 ### A12 · 7-day calendar in the portal — `M` — ✅ Done (PR #4, archived `2026-07-23-a12-portal-week-calendar`)
 `/portal/semana` ("Semana" tab): today (linked to Hoy) + next 7 days, titles only, cut at `current_period_end`; days 29–31 repeat week 4. Nav: 6 tabs — Hoy→`Sun`, "Configuración"→"Perfil" (`User`).
@@ -163,6 +163,7 @@ Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this
 | **D7** | Verify CI + gitleaks on the 1st PR | S | ✅ Done — exercised on PR #1 (2026-07-22). |
 | **D8** | Visually review `trialing` "Prueba" badge | S | From A5. Badge added but unverified — no trialing sub in demo data. Check when one exists. |
 | **D9** | Extract shared `serverToday()` DEV_DATE helper | S | Code-review RULE CANDIDATE from A5. `now = DEV_DATE ? … : new Date()` inlined in ~5 places (`app/admin/clients/page.tsx`, `lib/content/queries.ts` ×3). Promote to a rule + refactor if it recurs. |
+| **D10** | Verify A9 cancellation end-to-end after demo refresh | S | Demo subs use fabricated `sub_seed_*` Stripe IDs → `cancelSubscription`/`reactivateSubscription` 404 in Stripe test mode ("No se pudo guardar. Intenta más tarde."). Not a code bug. After **L6 demo refresh**, cancel a **real test-checkout** sub → grace state → Reactivar → confirm survey row written/deleted. Tie to **L4 smoke**. |
 
 ---
 
