@@ -10,6 +10,7 @@ import {
 } from "@/lib/portal/cancellation";
 import type { CancellationReason } from "@/lib/supabase/types";
 import { longDateLabel } from "@/lib/admin/date-helpers";
+import { Button } from "@/components/ui/button";
 
 export function CancelSubscriptionSection({ state }: { state: CancellationState }) {
   const router = useRouter();
@@ -58,14 +59,13 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
   // state.kind === "eligible"
   return (
     <>
-      <button
-        type="button"
+      <Button
+        className="w-full"
+        style={{ background: "#fff", color: "var(--error)" }}
         onClick={() => setModalOpen(true)}
-        className="font-head w-full rounded-xl"
-        style={{ fontSize: 15, fontWeight: 500, minHeight: 48, background: "var(--error)", color: "#fff", border: "none", cursor: "pointer" }}
       >
         Cancelar mi plan
-      </button>
+      </Button>
       {modalOpen && (
         <CancelSurveyModal
           onClose={() => setModalOpen(false)}
