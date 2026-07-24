@@ -51,3 +51,4 @@ supabase/.temp/
 
 # playwright MCP artifacts
 .playwright-mcp/
+evaluation.md

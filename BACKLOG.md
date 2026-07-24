@@ -27,8 +27,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A8** | Color and background in the text editor | M | ✅ Done |
 | **A9** | Cancellation + exit survey | M | ✅ Done |
 | **A12** | 7-day calendar in the portal | M | ✅ Done |
-| **A6** | Booking system (WordPress) | L | Pending |
-| **A7** | "Agendar" block in the editor | M | Blocked by A6 |
+| **A6+A7** | Booking system (Calendly) + "Agendar" block | M | In progress |
 | **A4** | Automated messages | L | Do after A5 |
 | **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
 | **L2** | Extra → recurring monthly billing | L | Pending |
@@ -94,16 +93,16 @@ Cancel from the account + optional exit survey (survey-first, all optional). **e
 `/portal/semana` ("Semana" tab): today (linked to Hoy) + next 7 days, titles only, cut at `current_period_end`; days 29–31 repeat week 4. Nav: 6 tabs — Hoy→`Sun`, "Configuración"→"Perfil" (`User`).
 - **Note:** unpublished days render as "Descanso" — the `program_days` RLS policy (`published = true or is_admin()`) filters them; decided to keep RLS as the boundary (no service-role, no migration).
 
-### A6 · Booking system (WordPress) — `L`
-Biweekly calls via Zoom/Meet.
-- **Decided:** lives in **WordPress with TheBooking**; the app sends a **signed link** proving an active subscription. The rules (1 call / 15 days, ≥1 day's notice) are controlled by WordPress.
-- **Touches:** endpoint that generates the signed link (HMAC + shared secret, **new env var**) · gate with `subscriptionGrantsAccess` (`lib/content/subscription-access.ts`) · WP-side configuration (outside the repo).
-- **Watch out:** the link must expire and must not be reusable by third parties. Identity comes from `getUser()` on the server, never from the client.
-
-### A7 · "Agendar" block in the editor — `M` · blocked by A6
-New block type that links to the booking system.
-- **Touches:** new `block_type` in `program_day_blocks` · palette and editor in `components/admin/blocks/` · zod in `lib/admin/content-validation.ts` · rendering in `components/portal/blocks/BlockView.tsx`.
-- **Watch out:** if WP enforces the rules, the block is basically a CTA with a signed link (`S`); if the rules moved into the app, it grows.
+### A6+A7 · Booking system (Calendly) + "Agendar" block — `M` · in progress
+Biweekly Zoom/Meet calls, booked from the portal. **Merged A6+A7** — the "Agendar" block *is* the booking CTA (idea A). Explored 2026-07-24.
+- **⚠ Deviation from the original plan:** TheBooking (WordPress) is **abandoned/unsupported** → switched to **Calendly** (free tier, embedded widget at `/portal/booking`). Because the embed lives on our **own same-origin route**, the **HMAC signed-link is dropped** — eligibility is re-derived server-side (`getUser()` + `subscriptionGrantsAccess`), the way every other portal gate works. No `BOOKING_SIGNING_SECRET`.
+- **Decided design:**
+  - **Cadence = content-driven.** Aura places the "agendar" block on program_days (e.g. a **3-day window** = the block on 3 consecutive days). No rolling-window math — the block only renders on its day (past/future days aren't navigable).
+  - **Dedup = ledger.** `bookings` table fed by a Calendly **inbound webhook** (`invitee.created`/`invitee.canceled`, signature-verified, idempotent upsert — Stripe-webhook pattern). Rule: **one future non-canceled call at a time**. The block renders its state from the ledger → auto-disables ("Tu llamada es el {fecha}") on the other window days once booked. Cancel → eligible again.
+  - **Identity mapping:** embed prefills `?email=` → webhook matches `profiles.email` → `user_id`. Caveat: invitee can edit the email (breaks mapping/dedup) — acceptable risk; consider passing `user_id` as a Calendly custom field/UTM.
+- **Touches:** migration 012 (`bookings` + RLS: owner-select, webhook writes via service-role) · `/portal/booking` server gate + embed · new `block_type` in `content-validation.ts` + editor (`components/admin/blocks/`) + palette + `BlockView.tsx` render · `/api/webhooks/calendly` (middleware matcher must exclude it) · env `NEXT_PUBLIC_CALENDLY_URL` + `CALENDLY_WEBHOOK_SIGNING_KEY`.
+- **External dependency (Aura):** Calendly account not needed to *build* (env placeholders + unit tests against the contract); needed at deploy for the event type (Zoom/Meet attached), webhook registration + signing key, and E2E smoke. Track like L1/L3.
+- **Edge to state explicitly:** disable rule is "has a future call" — a call still in the future when the next window opens keeps the block disabled until it passes (one upcoming call at a time; rare at monthly cadence).
 
 ### A4 · Automated messages — `L` · after A5
 Automated triggers: day 12 → reminder to schedule a video call; 10 days with no progress → "¿todo bien?".
@@ -171,6 +170,6 @@ Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this
 
 1. **Quick batch:** `A2` · `A3` · `A10` · `A11` — low risk, highly visible, first to exercise the CI gate.
 2. **Mediums:** `A1` · `A5` · `A8` · `A9` · `A12` (`A5` before `A4`).
-3. **Projects:** `A6` → `A7` → `A4`.
+3. **Projects:** `A6+A7` (Calendly booking) → `A4`.
 4. **In parallel (depends on Aura):** `L1` pricing · `L5` WhatsApp · `L3` onboarding questions.
 5. **Launch close-out:** `L2` · `L4` · `L6` · `L7` · `L10` → `L8` production-checklist.
