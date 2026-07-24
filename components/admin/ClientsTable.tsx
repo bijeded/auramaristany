@@ -11,15 +11,16 @@ import { paginate } from "@/lib/admin/pagination";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas"];
+const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Sin actividad"];
 const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
+  trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
   past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
   unpaid: { label: "Impaga", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
   canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
 };
 
-export function ClientsTable({ rows }: { rows: ClientListRow[] }) {
+export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [prog, setProg] = useState("Todas");
@@ -28,7 +29,7 @@ export function ClientsTable({ rows }: { rows: ClientListRow[] }) {
 
   const programs = useMemo(() => ["Todas", ...Array.from(new Set(rows.map((r) => r.program_name))).sort()], [rows]);
   const activas = rows.filter((r) => r.status === "active").length;
-  const filtered = filterClients(rows, { query: q, program: prog, status: estado });
+  const filtered = filterClients(rows, { query: q, program: prog, status: estado, now });
   const { items, totalPages, page: current } = paginate(filtered, page);
 
   function resetPage<T>(setter: (v: T) => void) {

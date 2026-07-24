@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { filterClients, type ClientListRow } from "@/lib/admin/clients-helpers";
+import { filterClients, isInactive, type ClientListRow } from "@/lib/admin/clients-helpers";
+
+const NOW = "2026-07-15";
 
 const base: ClientListRow = {
   profile_id: "p1",
@@ -12,6 +14,7 @@ const base: ClientListRow = {
   current_period_end: "2026-07-01",
   price_mxn: 999,
   status: "active",
+  last_activity_date: NOW, // reciente por defecto
 };
 
 const rows: ClientListRow[] = [
@@ -20,30 +23,66 @@ const rows: ClientListRow[] = [
   { ...base, profile_id: "p3", full_name: "Carla Díaz", email: "carla@x.com", status: "canceled" },
 ];
 
+describe("isInactive", () => {
+  it("actividad más vieja que el umbral ⇒ inactivo", () => {
+    expect(isInactive("2026-07-04", NOW, 10)).toBe(true); // 11 días
+  });
+  it("actividad exactamente en el umbral ⇒ inactivo", () => {
+    expect(isInactive("2026-07-05", NOW, 10)).toBe(true); // 10 días
+  });
+  it("actividad reciente dentro del umbral ⇒ activo", () => {
+    expect(isInactive("2026-07-06", NOW, 10)).toBe(false); // 9 días
+  });
+  it("nunca registró (null) ⇒ inactivo sin importar now", () => {
+    expect(isInactive(null, NOW, 10)).toBe(true);
+  });
+});
+
 describe("filterClients", () => {
   it("sin filtros devuelve todas las filas", () => {
-    expect(filterClients(rows, { query: "", program: "Todas", status: null })).toHaveLength(3);
+    expect(filterClients(rows, { query: "", program: "Todas", status: null, now: NOW })).toHaveLength(3);
   });
   it("busca por nombre o correo, case-insensitive", () => {
-    expect(filterClients(rows, { query: "bea", program: "Todas", status: null })).toHaveLength(1);
-    expect(filterClients(rows, { query: "ANA@", program: "Todas", status: null })[0].profile_id).toBe("p1");
+    expect(filterClients(rows, { query: "bea", program: "Todas", status: null, now: NOW })).toHaveLength(1);
+    expect(filterClients(rows, { query: "ANA@", program: "Todas", status: null, now: NOW })[0].profile_id).toBe("p1");
   });
   it("filtra por programa", () => {
-    const r = filterClients(rows, { query: "", program: "Strong & Fit", status: null });
+    const r = filterClients(rows, { query: "", program: "Strong & Fit", status: null, now: NOW });
     expect(r).toHaveLength(1);
     expect(r[0].profile_id).toBe("p2");
   });
   it("filtra 'Activas' por status active", () => {
-    const r = filterClients(rows, { query: "", program: "Todas", status: "Activas" });
+    const r = filterClients(rows, { query: "", program: "Todas", status: "Activas", now: NOW });
     expect(r.map((x) => x.profile_id)).toEqual(["p1"]);
   });
   it("filtra 'Vencidas' por past_due o unpaid", () => {
-    const r = filterClients(rows, { query: "", program: "Todas", status: "Vencidas" });
+    const r = filterClients(rows, { query: "", program: "Todas", status: "Vencidas", now: NOW });
     expect(r.map((x) => x.profile_id)).toEqual(["p2"]);
   });
   it("filtra 'Canceladas' por canceled", () => {
-    const r = filterClients(rows, { query: "", program: "Todas", status: "Canceladas" });
+    const r = filterClients(rows, { query: "", program: "Todas", status: "Canceladas", now: NOW });
     expect(r.map((x) => x.profile_id)).toEqual(["p3"]);
+  });
+
+  describe("'Sin actividad'", () => {
+    const inactiveActive = { ...base, profile_id: "q1", status: "active" as const, last_activity_date: "2026-07-01" }; // 14 días
+    const inactiveTrialing = { ...base, profile_id: "q2", status: "trialing" as const, last_activity_date: null };
+    const activeRecent = { ...base, profile_id: "q3", status: "active" as const, last_activity_date: NOW };
+    const inactiveCanceled = { ...base, profile_id: "q4", status: "canceled" as const, last_activity_date: "2026-01-01" };
+    const set = [inactiveActive, inactiveTrialing, activeRecent, inactiveCanceled];
+
+    it("incluye clientes active/trialing sin actividad ≥10 días (o sin registros)", () => {
+      const r = filterClients(set, { query: "", program: "Todas", status: "Sin actividad", now: NOW });
+      expect(r.map((x) => x.profile_id).sort()).toEqual(["q1", "q2"]);
+    });
+    it("excluye cancelados aunque estén inactivos", () => {
+      const r = filterClients(set, { query: "", program: "Todas", status: "Sin actividad", now: NOW });
+      expect(r.map((x) => x.profile_id)).not.toContain("q4");
+    });
+    it("excluye activos con actividad reciente", () => {
+      const r = filterClients(set, { query: "", program: "Todas", status: "Sin actividad", now: NOW });
+      expect(r.map((x) => x.profile_id)).not.toContain("q3");
+    });
   });
 });
 

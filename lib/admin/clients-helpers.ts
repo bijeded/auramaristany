@@ -1,6 +1,9 @@
-export type SubStatus = "active" | "past_due" | "canceled" | "unpaid";
+export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid";
 
-export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | null;
+export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Sin actividad" | null;
+
+/** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
+export const INACTIVITY_THRESHOLD_DAYS = 10;
 
 export interface ClientListRow {
   profile_id: string;
@@ -13,11 +16,36 @@ export interface ClientListRow {
   current_period_end: string | null; // ISO
   price_mxn: number;
   status: SubStatus;
+  last_activity_date: string | null; // max progress_logs.log_date (YYYY-MM-DD) o null
+}
+
+/**
+ * Días completos transcurridos entre dos fechas date-only, en UTC (evita desfase
+ * de zona horaria — lección EDGE-3). Ignora la parte de hora si viene un ISO completo.
+ */
+function daysBetween(fromISO: string, toISO: string): number {
+  const from = Date.parse(`${fromISO.slice(0, 10)}T00:00:00Z`);
+  const to = Date.parse(`${toISO.slice(0, 10)}T00:00:00Z`);
+  return Math.floor((to - from) / 86_400_000);
+}
+
+/**
+ * Un cliente está inactivo si su última actividad es de hace ≥ thresholdDays,
+ * o si nunca registró actividad (lastActivityDate === null). `now` lo provee el
+ * servidor (DEV_DATE-aware), nunca el reloj del navegador.
+ */
+export function isInactive(
+  lastActivityDate: string | null,
+  now: string,
+  thresholdDays: number
+): boolean {
+  if (lastActivityDate === null) return true;
+  return daysBetween(lastActivityDate, now) >= thresholdDays;
 }
 
 export function filterClients(
   rows: ClientListRow[],
-  opts: { query: string; program: string; status: StatusFilter }
+  opts: { query: string; program: string; status: StatusFilter; now: string }
 ): ClientListRow[] {
   const q = opts.query.trim().toLowerCase();
   return rows.filter((r) => {
@@ -26,6 +54,10 @@ export function filterClients(
     if (opts.status === "Activas" && r.status !== "active") return false;
     if (opts.status === "Vencidas" && r.status !== "past_due" && r.status !== "unpaid") return false;
     if (opts.status === "Canceladas" && r.status !== "canceled") return false;
+    if (opts.status === "Sin actividad") {
+      const paying = r.status === "active" || r.status === "trialing";
+      if (!paying || !isInactive(r.last_activity_date, opts.now, INACTIVITY_THRESHOLD_DAYS)) return false;
+    }
     return true;
   });
 }
@@ -72,6 +104,7 @@ export function canDeleteClient(
 
 const STATUS_ES: Record<SubStatus, string> = {
   active: "Activa",
+  trialing: "Prueba",
   past_due: "Pago fallido",
   unpaid: "Impaga",
   canceled: "Cancelada",
