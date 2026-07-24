@@ -15,7 +15,11 @@ export function LogoutButton() {
   }
 
   return (
-    <Button variant="outline" className="w-full" onClick={handleLogout}>
+    <Button
+      className="w-full"
+      style={{ background: "var(--lavanda)", color: "#fff" }}
+      onClick={handleLogout}
+    >
       Cerrar sesión
     </Button>
   );
