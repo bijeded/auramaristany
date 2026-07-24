@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cancelSubscription, reactivateSubscription } from "@/lib/portal/settingsActions";
 import {
@@ -81,8 +81,19 @@ function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: (
   const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const showDetail = reason !== null && reasonRequiresDetail(reason);
+
+  // Focus the dialog heading on open and allow Escape to close (unless busy).
+  useEffect(() => {
+    headingRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !busy) onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
 
   async function confirm() {
     setBusy(true);
@@ -103,10 +114,13 @@ function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: (
       onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-modal-title"
         className="bg-white rounded-2xl p-6 w-full max-w-md"
         style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" }}
       >
-        <h2 className="font-head mb-2" style={{ fontSize: 20, fontWeight: 700 }}>
+        <h2 ref={headingRef} tabIndex={-1} id="cancel-modal-title" className="font-head mb-2" style={{ fontSize: 20, fontWeight: 700, outline: "none" }}>
           Cancelar mi plan
         </h2>
         <p className="font-body mb-4" style={{ fontSize: 13, color: "var(--gris-texto)" }}>
@@ -127,6 +141,16 @@ function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: (
               {opt.label}
             </label>
           ))}
+          <label className="flex items-center gap-2.5 cursor-pointer font-body" style={{ fontSize: 14, minHeight: 44, color: "var(--gris-texto)" }}>
+            <input
+              type="radio"
+              name="cancel-reason"
+              checked={reason === null}
+              onChange={() => setReason(null)}
+              className="w-4 h-4"
+            />
+            Prefiero no decir
+          </label>
         </div>
 
         {showDetail && (
@@ -136,6 +160,7 @@ function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: (
               onChange={(e) => setDetail(e.target.value)}
               maxLength={200}
               rows={2}
+              aria-label={reason === "encontre_otra_opcion" ? "¿Cuál otra opción encontraste?" : "Cuéntanos más"}
               placeholder={reason === "encontre_otra_opcion" ? "¿Cuál?" : "Cuéntanos más (opcional)"}
               className="font-body w-full rounded-xl px-3 py-2"
               style={{ fontSize: 14, border: "1.5px solid var(--gris-linea)", resize: "vertical" }}

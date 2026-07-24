@@ -40,6 +40,8 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
   const badge = STATUS_BADGE[subscription.status] ?? STATUS_BADGE.canceled;
   const progress = progressLabel(subscription.months_elapsed, subscription.duration_months);
   const cancelState = deriveCancellationState({
+    // keep: AccountSubscription.status is typed string (join-mapped); DB constrains it
+    // to the SubscriptionStatus union, and deriveCancellationState only reads known values.
     status: subscription.status as SubscriptionStatus,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodEnd: subscription.current_period_end,
