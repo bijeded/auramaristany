@@ -23,19 +23,19 @@
 
 ## 5. Agendar block — editor side
 
-- [ ] 5.1 Add `agendar` to `BLOCK_TYPES` + zod validation in `lib/admin/content-validation.ts` (empty/minimal content). Test the validate path.
-- [ ] 5.2 `components/admin/blocks/AgendarBlockEditor.tsx` (minimal — no config beyond placement) + wire into the block palette.
+- [x] 5.1 Add `agendar` to `BLOCK_TYPES` + zod validation in `lib/admin/content-validation.ts` (empty/minimal content). Test the validate path.
+- [x] 5.2 `components/admin/blocks/AgendarBlockEditor.tsx` (minimal — no config beyond placement) + wire into the block palette.
 
 ## 6. Agendar block — portal render
 
-- [ ] 6.1 `components/portal/blocks/AgendarBlock.tsx`: active CTA → `/portal/booking` when no future call; disabled "Tu llamada es el {fecha}" when a future call exists. Brand tokens, ≥44px tap target, warm MX-Spanish copy.
-- [ ] 6.2 Wire `agendar` into `components/portal/blocks/BlockView.tsx`; pass the client's booking state down (fetched in the portal today page).
+- [x] 6.1 `components/portal/blocks/AgendarBlock.tsx`: active CTA → `/portal/booking` when no future call; disabled "Tu llamada es el {fecha}" when a future call exists. Brand tokens, ≥44px tap target, warm MX-Spanish copy.
+- [x] 6.2 Wire `agendar` into `components/portal/blocks/BlockView.tsx`; pass the client's booking state down (fetched in the portal today page).
 
 ## 7. /portal/booking page
 
-- [ ] 7.1 `app/portal/booking/page.tsx` server component: `getUser()` → `subscriptionGrantsAccess()` → redirect if not eligible.
-- [ ] 7.2 Eligibility gate: today's published plan has an `agendar` block AND no future call → render embed; else show "no disponible ahora" message.
-- [ ] 7.3 Render Calendly embed with prefilled `?email=` (client component; loads `NEXT_PUBLIC_CALENDLY_URL`). Skeleton while loading, no spinner.
+- [x] 7.1 `app/portal/booking/page.tsx` server component: `getUser()` → `subscriptionGrantsAccess()` → redirect if not eligible.
+- [x] 7.2 Eligibility gate: today's published plan has an `agendar` block AND no future call → render embed; else show "no disponible ahora" message.
+- [x] 7.3 Render Calendly embed with prefilled `?email=` (client component; loads `NEXT_PUBLIC_CALENDLY_URL`). Skeleton while loading, no spinner.
 
 ## 8. Verification
 
