@@ -3,6 +3,7 @@ import {
   hasFutureCall,
   nextScheduledDate,
   dayHasAgendarBlock,
+  escapeLikePattern,
 } from "@/lib/content/booking-helpers";
 
 const NOW = new Date("2026-07-24T12:00:00Z");
@@ -67,6 +68,24 @@ describe("nextScheduledDate", () => {
 
   it("devuelve null sin reservas", () => {
     expect(nextScheduledDate([], NOW)).toBeNull();
+  });
+});
+
+describe("escapeLikePattern", () => {
+  it("escapa guion bajo (comodín LIKE y carácter válido de email)", () => {
+    expect(escapeLikePattern("john_doe@example.com")).toBe("john\\_doe@example.com");
+  });
+
+  it("escapa el signo de porcentaje", () => {
+    expect(escapeLikePattern("a%b@example.com")).toBe("a\\%b@example.com");
+  });
+
+  it("escapa el backslash primero para no doble-escapar", () => {
+    expect(escapeLikePattern("a\\b")).toBe("a\\\\b");
+  });
+
+  it("deja intacto un email sin metacaracteres", () => {
+    expect(escapeLikePattern("john.doe@example.com")).toBe("john.doe@example.com");
   });
 });
 
