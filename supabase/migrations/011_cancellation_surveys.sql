@@ -3,7 +3,7 @@
 -- Captures WHY a subscription was cancelled.
 --   voluntary:   inserted by the portal cancel flow (RLS-aware, owner).
 --   involuntary: inserted by the Stripe webhook (service-role) when dunning
---                exhausts retries (cancellation_details.reason = payment_failure/disputed).
+--                exhausts retries (cancellation_details.reason = payment_failed/disputed).
 -- profile_id is kept alongside subscription_id so the analytics survive if the
 -- subscription row is later deleted (subscription_id -> set null on delete).
 -- ============================================================
@@ -41,7 +41,7 @@ create policy "cancellation_surveys_select_own_or_admin"
 drop policy if exists "cancellation_surveys_insert_own" on cancellation_surveys;
 create policy "cancellation_surveys_insert_own"
   on cancellation_surveys for insert
-  with check (profile_id = auth.uid() and source = 'voluntary');
+  with check (profile_id = auth.uid() and source = 'voluntary' and reason <> 'pago_fallido');
 
 drop policy if exists "cancellation_surveys_delete_own_voluntary" on cancellation_surveys;
 create policy "cancellation_surveys_delete_own_voluntary"

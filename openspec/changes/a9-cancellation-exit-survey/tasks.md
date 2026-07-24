@@ -22,7 +22,7 @@
 
 ## 5. Webhook (involuntary)
 
-- [ ] 5.1 In `handleSubscriptionDeleted` (`lib/webhooks/stripe-handlers.ts`): read `subscription.cancellation_details.reason`; on `payment_failure`/`payment_disputed` insert a `pago_fallido` row (`source='involuntary'`) under service-role; `cancellation_requested` → no extra row. Keep existing status→canceled + ended email.
+- [ ] 5.1 In `handleSubscriptionDeleted` (`lib/webhooks/stripe-handlers.ts`): read `subscription.cancellation_details.reason`; on `payment_failed`/`payment_disputed` insert a `pago_fallido` row (`source='involuntary'`) under service-role; `cancellation_requested` → no extra row. Keep existing status→canceled + ended email.
 
 ## 6. UI
 

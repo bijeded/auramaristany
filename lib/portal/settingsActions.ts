@@ -68,19 +68,7 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
   const sub = await getOwnedCancelableSub(supabase, user.id);
   if (!sub) return { ok: false, error: "No tienes una suscripción activa que cancelar." };
 
-  // Record the survey first (source=voluntary). reason omitted → default "otro".
-  const { error: insertError } = await supabase.from("cancellation_surveys").insert({
-    profile_id: user.id,
-    subscription_id: sub.id,
-    reason: reason ?? "otro",
-    detail,
-    source: "voluntary",
-  });
-  if (insertError) {
-    console.error("[cancelSubscription] survey insert", insertError);
-    return { ok: false, error: GENERIC_ERROR };
-  }
-
+  // Cancel in Stripe first — it is the primary action and the source of truth.
   try {
     await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: true });
   } catch (err) {
@@ -90,6 +78,18 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
 
   // Optimistic local mirror; handleSubscriptionUpdated remains the source of truth.
   await supabase.from("subscriptions").update({ cancel_at_period_end: true }).eq("id", sub.id);
+
+  // Record the survey (best-effort telemetry). reason omitted → default "otro".
+  // A failure here must not fail the cancellation, which already succeeded — so no
+  // orphan survey row can exist for a cancellation that didn't happen.
+  const { error: insertError } = await supabase.from("cancellation_surveys").insert({
+    profile_id: user.id,
+    subscription_id: sub.id,
+    reason: reason ?? "otro",
+    detail,
+    source: "voluntary",
+  });
+  if (insertError) console.error("[cancelSubscription] survey insert", insertError);
 
   revalidatePath("/portal/settings");
   return { ok: true };

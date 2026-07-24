@@ -267,13 +267,24 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
   const cancelReason = subscription.cancellation_details?.reason;
   if ((cancelReason === "payment_failed" || cancelReason === "payment_disputed") && subRow) {
     const row = subRow as { id: string; profile_id: string };
-    const { error: surveyError } = await supabase.from("cancellation_surveys").insert({
-      profile_id: row.profile_id,
-      subscription_id: row.id,
-      reason: "pago_fallido",
-      source: "involuntary",
-    });
-    if (surveyError) console.error("[webhook] pago_fallido survey insert error:", surveyError);
+    // Idempotent: Stripe can redeliver customer.subscription.deleted. A subscription
+    // is deleted once, so at most one involuntary row per subscription — skip if it
+    // already exists rather than double-logging churn.
+    const { data: existing } = await supabase
+      .from("cancellation_surveys")
+      .select("id")
+      .eq("subscription_id", row.id)
+      .eq("source", "involuntary")
+      .maybeSingle();
+    if (!existing) {
+      const { error: surveyError } = await supabase.from("cancellation_surveys").insert({
+        profile_id: row.profile_id,
+        subscription_id: row.id,
+        reason: "pago_fallido",
+        source: "involuntary",
+      });
+      if (surveyError) console.error("[webhook] pago_fallido survey insert error:", surveyError);
+    }
   }
 
   const contact = await getContactBySubscription(supabase, subscription.id);

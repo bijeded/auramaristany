@@ -37,7 +37,7 @@ const fakeServer = {
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => fakeServer) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-const stripeUpdate = vi.fn(() => Promise.resolve({}));
+const stripeUpdate = vi.fn((..._a: unknown[]) => Promise.resolve({}));
 vi.mock("@/lib/stripe", () => ({ stripe: { subscriptions: { update: (...a: unknown[]) => stripeUpdate(...a) } } }));
 
 // Cliente stateless para verificar la contraseña actual (lo usa updatePassword en una task posterior)

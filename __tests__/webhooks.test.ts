@@ -10,15 +10,25 @@ const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
 const upsertMock = vi.fn((_payload: Record<string, unknown>, _opts?: Record<string, unknown>) => ({ error: null }));
 // update().eq() is awaited directly ({ error }) by most handlers, and also chained
 // .select().maybeSingle() by handleSubscriptionDeleted (needs the deleted row's ids).
-const deletedRowMaybeSingle = vi.fn(() => ({ data: null, error: null }));
+const deletedRowMaybeSingle = vi.fn((): { data: unknown; error: unknown } => ({ data: null, error: null }));
 const updateEqMock = vi.fn((_col: string, _val: string) => ({
   error: null,
   select: () => ({ maybeSingle: deletedRowMaybeSingle }),
 }));
 const updateMock = vi.fn((_payload: Record<string, unknown>) => ({ eq: updateEqMock }));
 const selectEqSingleMock = vi.fn(() => ({ data: null }));
-const selectEqMock = vi.fn(() => ({ single: selectEqSingleMock }));
-const selectMock = vi.fn(() => ({ eq: selectEqMock, single: selectEqSingleMock }));
+// Chainable select: any number of .eq(), terminating in .single() or .maybeSingle().
+const selectMaybeSingleMock = vi.fn((): { data: unknown } => ({ data: null }));
+const selectChain: {
+  eq: () => typeof selectChain;
+  single: typeof selectEqSingleMock;
+  maybeSingle: typeof selectMaybeSingleMock;
+} = {
+  eq: () => selectChain,
+  single: selectEqSingleMock,
+  maybeSingle: selectMaybeSingleMock,
+};
+const selectMock = vi.fn(() => selectChain);
 const fromMock = vi.fn((_table: string) => ({ insert: insertMock, upsert: upsertMock, update: updateMock, select: selectMock }));
 
 vi.mock("@/lib/email/send", () => ({
@@ -209,7 +219,7 @@ describe("handleInvoicePaid - subscription_create", () => {
 describe("handleSubscriptionUpdated", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    updateEqMock.mockReturnValue({ error: null });
+    updateEqMock.mockReturnValue({ error: null, select: () => ({ maybeSingle: deletedRowMaybeSingle }) });
   });
 
   it("updates current_period_start/end as ISO strings from subscription items", async () => {
@@ -244,6 +254,8 @@ describe("handleSubscriptionDeleted (A9 — involuntary logging)", () => {
       select: () => ({ maybeSingle: deletedRowMaybeSingle }),
     }));
     deletedRowMaybeSingle.mockReturnValue({ data: { id: "db-sub-1", profile_id: "p-1" }, error: null });
+    // No pre-existing involuntary row by default (idempotency guard lookup).
+    selectMaybeSingleMock.mockReturnValue({ data: null });
   });
 
   function deletedEvent(reason: string | null): Stripe.Subscription {
@@ -275,6 +287,12 @@ describe("handleSubscriptionDeleted (A9 — involuntary logging)", () => {
 
   it("does NOT insert when there is no cancellation reason", async () => {
     await handleSubscriptionDeleted(deletedEvent(null));
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent: does NOT insert a second pago_fallido row on redelivery", async () => {
+    selectMaybeSingleMock.mockReturnValue({ data: { id: "existing-row" } });
+    await handleSubscriptionDeleted(deletedEvent("payment_failed"));
     expect(insertMock).not.toHaveBeenCalled();
   });
 });
