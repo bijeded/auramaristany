@@ -2,7 +2,32 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { BookingStatus } from "@/lib/supabase/types";
-import { escapeLikePattern, type BookingLike } from "./booking-helpers";
+import {
+  escapeLikePattern,
+  hasFutureCall,
+  nextScheduledDate,
+  type BookingLike,
+} from "./booking-helpers";
+
+export interface BookingState {
+  hasFutureCall: boolean;
+  nextCallDate: string | null; // ISO — sólo cuando hasFutureCall
+}
+
+/**
+ * Estado de reserva del cliente para el bloque "agendar" y el gate de
+ * /portal/booking (una sola fuente). Deriva `now` respetando DEV_DATE.
+ */
+export async function getBookingState(userId: string): Promise<BookingState> {
+  const now = process.env.DEV_DATE
+    ? new Date(`${process.env.DEV_DATE}T12:00:00`)
+    : new Date();
+  const bookings = await getUserBookings(userId);
+  return {
+    hasFutureCall: hasFutureCall(bookings, now),
+    nextCallDate: nextScheduledDate(bookings, now),
+  };
+}
 
 /**
  * Reservas del usuario autenticado (vía RLS — owner-select). Se usan para

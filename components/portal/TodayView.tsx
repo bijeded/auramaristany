@@ -9,6 +9,7 @@ import { PdfBlock } from "./blocks/PdfBlock";
 import { ImageBlock } from "./blocks/ImageBlock";
 import { ExerciseListBlock } from "./blocks/ExerciseListBlock";
 import { CardioZone2Block } from "./blocks/CardioZone2Block";
+import { AgendarBlock, type AgendarBookingState } from "./blocks/AgendarBlock";
 import { PortalHeader } from "./PortalHeader";
 import { useProgressForm } from "@/hooks/useProgressForm";
 import type { ExerciseSeriesEntry, WeightUnit } from "@/hooks/useProgressForm";
@@ -253,11 +254,13 @@ function BlockRenderer({
   block,
   formState,
   weightUnits,
+  booking,
   onUpdateCompleted,
   onUpdateSeries,
   onSetWeightUnit,
 }: {
   block: DayBlock;
+  booking: AgendarBookingState;
   formState: ReturnType<typeof useProgressForm>["exercises"];
   weightUnits: Record<string, WeightUnit>;
   onUpdateCompleted: (exerciseId: string, completed: boolean) => void;
@@ -308,12 +311,20 @@ function BlockRenderer({
       );
     case "cardio_zone2":
       return <CardioZone2Block />;
+    case "agendar":
+      return <AgendarBlock booking={booking} />;
     default:
       return null;
   }
 }
 
-export function TodayView({ content }: { content: TodayContent | null }) {
+export function TodayView({
+  content,
+  booking = { hasFutureCall: false, nextCallDate: null },
+}: {
+  content: TodayContent | null;
+  booking?: AgendarBookingState;
+}) {
   const exerciseDefs = content?.blocks
     .filter((b) => b.block_type === "exercise_list")
     .flatMap((b) =>
@@ -363,6 +374,7 @@ export function TodayView({ content }: { content: TodayContent | null }) {
                     block={block}
                     formState={exercises}
                     weightUnits={weightUnits}
+                    booking={booking}
                     onUpdateCompleted={updateCompleted}
                     onUpdateSeries={updateSeries}
                     onSetWeightUnit={setWeightUnit}

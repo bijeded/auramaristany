@@ -163,6 +163,7 @@ Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this
 | **D8** | Visually review `trialing` "Prueba" badge | S | From A5. Badge added but unverified — no trialing sub in demo data. Check when one exists. |
 | **D9** | Extract shared `serverToday()` DEV_DATE helper | S | Code-review RULE CANDIDATE from A5. `now = DEV_DATE ? … : new Date()` inlined in ~5 places (`app/admin/clients/page.tsx`, `lib/content/queries.ts` ×3). Promote to a rule + refactor if it recurs. |
 | **D10** | Verify A9 cancellation end-to-end after demo refresh | S | Demo subs use fabricated `sub_seed_*` Stripe IDs → `cancelSubscription`/`reactivateSubscription` 404 in Stripe test mode ("No se pudo guardar. Intenta más tarde."). Not a code bug. After **L6 demo refresh**, cancel a **real test-checkout** sub → grace state → Reactivar → confirm survey row written/deleted. Tie to **L4 smoke**. |
+| **D11** | CSP for external scripts (Calendly `widget.js`) | S | From A6+A7 security review. The portal loads Calendly's `widget.js` into the authenticated same-origin app with **no CSP `script-src`**. Cookies are HttpOnly (not directly stealable), but a compromised CDN script would run in the authenticated origin. The app has **no CSP at all** today; add a scoped policy at launch (fold into **L8 production-checklist**). |
 
 ---
 

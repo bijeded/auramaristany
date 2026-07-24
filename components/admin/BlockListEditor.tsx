@@ -2,25 +2,27 @@
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, X, Type, Video, FileText, Image as ImageIcon, Dumbbell, HeartPulse, type LucideIcon } from "lucide-react";
+import { GripVertical, X, Type, Video, FileText, Image as ImageIcon, Dumbbell, HeartPulse, CalendarClock, type LucideIcon } from "lucide-react";
 import { TextBlockEditor } from "./blocks/TextBlockEditor";
 import { YoutubeBlockEditor } from "./blocks/YoutubeBlockEditor";
 import { PdfBlockEditor } from "./blocks/PdfBlockEditor";
 import { ImageBlockEditor } from "./blocks/ImageBlockEditor";
 import { ExerciseListBlockEditor } from "./blocks/ExerciseListBlockEditor";
 import { CardioZone2BlockEditor } from "./blocks/CardioZone2BlockEditor";
+import { AgendarBlockEditor } from "./blocks/AgendarBlockEditor";
 
-export type BlockType = "text" | "youtube" | "pdf" | "image" | "exercise_list" | "cardio_zone2";
+export type BlockType = "text" | "youtube" | "pdf" | "image" | "exercise_list" | "cardio_zone2" | "agendar";
 export interface EditorBlock { key: string; block_type: BlockType; content: Record<string, unknown>; }
 
 const BLOCK_LABELS: Record<BlockType, string> = {
   text: "Texto", youtube: "Video YouTube", pdf: "PDF", image: "Imagen",
   exercise_list: "Lista de ejercicios", cardio_zone2: "Calculadora Cardio Zona 2",
+  agendar: "Agendar llamada",
 };
 
 const BLOCK_ICONS: Record<BlockType, LucideIcon> = {
   text: Type, youtube: Video, pdf: FileText, image: ImageIcon,
-  exercise_list: Dumbbell, cardio_zone2: HeartPulse,
+  exercise_list: Dumbbell, cardio_zone2: HeartPulse, agendar: CalendarClock,
 };
 
 function SortableBlock({ block, children, onRemove }: {
@@ -75,6 +77,7 @@ export function BlockListEditor({ blocks, setBlocks }: {
       case "image": return <ImageBlockEditor content={b.content} onChange={(c) => updateBlock(b.key, c)} />;
       case "exercise_list": return <ExerciseListBlockEditor content={b.content} onChange={(c) => updateBlock(b.key, c)} />;
       case "cardio_zone2": return <CardioZone2BlockEditor />;
+      case "agendar": return <AgendarBlockEditor />;
     }
   }
 
