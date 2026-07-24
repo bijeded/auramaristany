@@ -8,6 +8,9 @@ import { ProfileHeader } from "@/components/portal/settings/ProfileHeader";
 import { SubscriptionCard } from "@/components/portal/settings/SubscriptionCard";
 import { SecuritySection } from "@/components/portal/settings/SecuritySection";
 import { PaymentHistory } from "@/components/portal/settings/PaymentHistory";
+import { CancelSubscriptionSection } from "@/components/portal/settings/CancelSubscriptionSection";
+import { deriveCancellationState } from "@/lib/portal/cancellation";
+import type { SubscriptionStatus } from "@/lib/supabase/types";
 
 // Etiqueta de fecha para el PortalHeader (respeta DEV_DATE en dev, como /pilares).
 function todayLabel(): string {
@@ -34,6 +37,16 @@ export default async function PortalSettingsPage({
   const data = await getAccountData(user.id);
   const { items, page, totalPages } = paginate(data.invoices, Number(searchParams.page) || 1, 10);
 
+  const cancelState = data.subscription
+    ? deriveCancellationState({
+        // keep: AccountSubscription.status is typed string (join-mapped); the DB constrains
+        // it to the SubscriptionStatus union and deriveCancellationState reads known values.
+        status: data.subscription.status as SubscriptionStatus,
+        cancelAtPeriodEnd: data.subscription.cancel_at_period_end,
+        currentPeriodEnd: data.subscription.current_period_end,
+      })
+    : { kind: "none" as const };
+
   return (
     <>
       <PortalHeader dateLabel={todayLabel()} />
@@ -57,8 +70,9 @@ export default async function PortalSettingsPage({
         <SectionTitle>Historial de pagos</SectionTitle>
         <PaymentHistory invoices={items} page={page} totalPages={totalPages} />
 
-        <div style={{ marginTop: 24 }}>
+        <div style={{ marginTop: 24 }} className="space-y-3">
           <LogoutButton />
+          <CancelSubscriptionSection state={cancelState} />
         </div>
       </div>
     </>

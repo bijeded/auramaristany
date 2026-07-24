@@ -1,9 +1,6 @@
 import type { AccountSubscription } from "@/lib/portal/account-queries";
 import { progressLabel } from "@/lib/portal/account-queries";
 import { longDateLabel } from "@/lib/admin/date-helpers";
-import { deriveCancellationState } from "@/lib/portal/cancellation";
-import type { SubscriptionStatus } from "@/lib/supabase/types";
-import { CancelSubscriptionSection } from "./CancelSubscriptionSection";
 
 const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> = {
   active: { text: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
@@ -39,13 +36,6 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
 
   const badge = STATUS_BADGE[subscription.status] ?? STATUS_BADGE.canceled;
   const progress = progressLabel(subscription.months_elapsed, subscription.duration_months);
-  const cancelState = deriveCancellationState({
-    // keep: AccountSubscription.status is typed string (join-mapped); DB constrains it
-    // to the SubscriptionStatus union, and deriveCancellationState only reads known values.
-    status: subscription.status as SubscriptionStatus,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    currentPeriodEnd: subscription.current_period_end,
-  });
 
   return (
     <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -83,7 +73,6 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
           </div>
         </div>
       )}
-      <CancelSubscriptionSection state={cancelState} />
     </div>
   );
 }

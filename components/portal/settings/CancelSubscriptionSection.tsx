@@ -30,7 +30,7 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
 
   if (state.kind === "grace") {
     return (
-      <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--gris-linea)" }}>
+      <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
         <p className="font-body text-sm" style={{ color: "var(--gris-texto)" }}>
           Tu plan termina el{" "}
           <span style={{ fontWeight: 600, color: "var(--negro)" }}>
@@ -43,9 +43,9 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
           type="button"
           onClick={reactivate}
           disabled={busy}
-          className="font-head rounded-xl mt-3"
+          className="font-head w-full rounded-xl mt-3"
           style={{
-            fontSize: 14, fontWeight: 500, minHeight: 44, padding: "0 18px",
+            fontSize: 15, fontWeight: 500, minHeight: 48,
             background: "var(--lavanda)", color: "#fff", border: "none", opacity: busy ? 0.6 : 1,
           }}
         >
@@ -57,12 +57,12 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
 
   // state.kind === "eligible"
   return (
-    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--gris-linea)" }}>
+    <>
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="font-body text-sm"
-        style={{ color: "var(--gris-texto)", textDecoration: "underline", background: "none", border: "none", minHeight: 44, padding: 0, cursor: "pointer" }}
+        className="font-head w-full rounded-xl"
+        style={{ fontSize: 15, fontWeight: 500, minHeight: 48, background: "var(--error)", color: "#fff", border: "none", cursor: "pointer" }}
       >
         Cancelar mi plan
       </button>
@@ -72,7 +72,7 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
           onDone={() => { setModalOpen(false); router.refresh(); }}
         />
       )}
-    </div>
+    </>
   );
 }
 
