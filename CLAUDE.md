@@ -172,7 +172,7 @@ Execute OpenSpec tasks with the `task-execution` loop. Feature branches (`featur
 
 ## MCPs / tools
 
-- **Codebase-memory:** indexed (see "Codebase memory"). Prefer graph tools (`search_graph`, `trace_path`, `get_architecture`, `detect_changes`) over grep for "who calls X / impact / dead code". Durable architectural decisions → ADR (`manage_adr`).
+- **Codebase-memory:** indexed (see "Codebase memory"). Prefer graph tools (`search_graph`, `trace_path`, `get_architecture`, `detect_changes`) over grep for "who calls X / impact / dead code". (Durable decisions → `docs/adr/*.md`, not the graph's `manage_adr`.)
 - **Playwright MCP:** ask before using (token-heavy).
 - Don't add MCPs/skills/agents beyond those listed unless explicitly requested.
 
@@ -180,9 +180,10 @@ Execute OpenSpec tasks with the `task-execution` loop. Feature branches (`featur
 
 Project indexed in codebase-memory (`Users-franciscovenegas-Desktop-Cowork-Aura`). Re-index after archiving a change so the snapshot doesn't drift; `detect_changes()` reads the live working diff without re-indexing.
 
-⚠ Two gotchas, learned the hard way:
-- **Re-indexing ERASES the stored ADR.** Always re-record it with `manage_adr(mode='update')` *after* `index_repository`, never before — otherwise it is silently lost.
+⚠ Gotcha, learned the hard way:
 - **`fast` mode excludes more than `full`:** it also drops `docs/`, `__tests__/`, `scripts/` and `supabase/migrations/`. Use `full` when you need test or script coverage for impact analysis.
+
+We do **not** use the codebase-memory ADR feature (`manage_adr`). Durable architectural decisions live in `docs/adr/*.md` only.
 
 ---
 
