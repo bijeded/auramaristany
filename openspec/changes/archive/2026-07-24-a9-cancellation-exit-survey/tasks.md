@@ -31,6 +31,6 @@
 
 ## 7. Verification
 
-- [ ] 7.1 `npx tsc --noEmit`, `npm run lint`, `npm run test:run` green.
-- [ ] 7.2 Smoke: cancel (with reason, and skipped) → grace state; reactivate → row deleted + normal state; simulate involuntary delete → `pago_fallido` row.
-- [ ] 7.3 Update `BACKLOG.md` (A9 → Done) after archive; note migration 011 applied.
+- [x] 7.1 `npx tsc --noEmit`, `npm run lint`, `npm run test:run` green.
+- [x] 7.2 Smoke: cancel (with reason, and skipped) → grace state; reactivate → row deleted + normal state; simulate involuntary delete → `pago_fallido` row.
+- [x] 7.3 Update `BACKLOG.md` (A9 → Done) after archive; note migration 011 applied.
