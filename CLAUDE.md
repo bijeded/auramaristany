@@ -118,6 +118,8 @@ Visual source: **`design-handoff-aura/`** — hi-fi prototype (17 screens, build
 - **Portal access** via `lib/content/subscription-access.ts` (`active`/`trialing`/`past_due`); don't duplicate the logic.
 - **Middleware `matcher`** must exclude `api/webhooks` and `api/cron` (inline literal — Next doesn't analyze a referenced constant).
 - Raw Postgres errors → `logAndGeneric` (server-side log + generic message to the client); don't leak details.
+- **Enum/union values mirrored by a DB `CHECK` constraint must be migrated together.** Adding an app-level value (e.g. a new `block_type` in `content-validation.ts`/`BlockListEditor.tsx`) without a matching migration to the `CHECK` constraint (`program_day_blocks_block_type_check`, last set in 004→013) fails the insert; because `saveBlocks`/`savePillarBlocks` delete-then-insert (non-atomic, D2), the delete lands first → **data loss on save**. Ship the migration in the same change (lesson from the `agendar` block).
+- **Never pass third-party/user strings into `ilike`/`like` unescaped.** `%` and `_` are LIKE wildcards (and `_` is a valid email char) → wildcard-injection / cross-account matching. Use `.eq` on a normalized column, or `escapeLikePattern()` (lesson from the Calendly webhook email→profile mapping).
 
 ---
 
