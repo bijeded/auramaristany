@@ -27,7 +27,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A8** | Color and background in the text editor | M | ✅ Done |
 | **A9** | Cancellation + exit survey | M | ✅ Done |
 | **A12** | 7-day calendar in the portal | M | ✅ Done |
-| **A6+A7** | Booking system (Calendly) + "Agendar" block | M | In progress |
+| **A6+A7** | Booking system (Calendly) + "Agendar" block | M | ✅ Done |
 | **A4** | Automated messages | L | Do after A5 |
 | **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
 | **L2** | Extra → recurring monthly billing | L | Pending |
@@ -93,7 +93,8 @@ Cancel from the account + optional exit survey (survey-first, all optional). **e
 `/portal/semana` ("Semana" tab): today (linked to Hoy) + next 7 days, titles only, cut at `current_period_end`; days 29–31 repeat week 4. Nav: 6 tabs — Hoy→`Sun`, "Configuración"→"Perfil" (`User`).
 - **Note:** unpublished days render as "Descanso" — the `program_days` RLS policy (`published = true or is_admin()`) filters them; decided to keep RLS as the boundary (no service-role, no migration).
 
-### A6+A7 · Booking system (Calendly) + "Agendar" block — `M` · in progress
+### A6+A7 · Booking system (Calendly) + "Agendar" block — `M` — ✅ Done (PRs #8 foundation + #9 webhook + #10 UI + #11 diagnostics; migrations 012–013; archived `2026-07-25-calendly-booking-agendar-block`; ADR 0001)
+Verified live end-to-end in production: client books via Calendly embed → `invitee.created` webhook (sig-verified) → `bookings` ledger → the "agendar" block on Hoy flips to disabled "Tu llamada es el {fecha}". **Deploy done:** `NEXT_PUBLIC_CALENDLY_URL` + `CALENDLY_WEBHOOK_SIGNING_KEY` set in Vercel; Calendly webhook registered. See **D11** (CSP for the external Calendly script, folded into L8).
 Biweekly Zoom/Meet calls, booked from the portal. **Merged A6+A7** — the "Agendar" block *is* the booking CTA (idea A). Explored 2026-07-24.
 - **⚠ Deviation from the original plan:** TheBooking (WordPress) is **abandoned/unsupported** → switched to **Calendly** (free tier, embedded widget at `/portal/booking`). Because the embed lives on our **own same-origin route**, the **HMAC signed-link is dropped** — eligibility is re-derived server-side (`getUser()` + `subscriptionGrantsAccess`), the way every other portal gate works. No `BOOKING_SIGNING_SECRET`.
 - **Decided design:**

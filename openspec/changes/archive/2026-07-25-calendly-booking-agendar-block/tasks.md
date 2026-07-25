@@ -39,6 +39,6 @@
 
 ## 8. Verification
 
-- [ ] 8.1 `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` all green.
-- [ ] 8.2 Manual smoke on Preview: place `agendar` block on 3 days → eligible day shows CTA; simulate `invitee.created` webhook → block/gate flips to disabled on other days; `invitee.canceled` → eligible again; non-eligible day + direct URL refused; non-subscriber refused.
-- [ ] 8.3 Document the deploy-time external dependency (Aura's Calendly account: event type + Zoom/Meet, webhook registration + signing key) in the change/handoff; tie E2E to L4 smoke.
+- [x] 8.1 `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` all green.
+- [x] 8.2 Manual smoke on Preview: place `agendar` block on 3 days → eligible day shows CTA; simulate `invitee.created` webhook → block/gate flips to disabled on other days; `invitee.canceled` → eligible again; non-eligible day + direct URL refused; non-subscriber refused.
+- [x] 8.3 Document the deploy-time external dependency (Aura's Calendly account: event type + Zoom/Meet, webhook registration + signing key) in the change/handoff; tie E2E to L4 smoke.
