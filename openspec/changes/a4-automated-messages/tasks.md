@@ -5,23 +5,32 @@ Suggested as **3 PRs** (foundation → rules+cron → admin UI), mirroring the A
 ## PR 1 — Foundation: migration, D9 helper, email body
 
 ### 1. Migration 014
-- [ ] 1.1 Write `supabase/migrations/014_automated_messages.sql`: `automated_notices` (id, profile_id → profiles on delete cascade, rule text + `CHECK (rule in ('booking_reminder','inactivity_nudge'))`, period_key text not null, sent_at timestamptz default now(), `unique (profile_id, rule, period_key)`) + index on `(profile_id, rule)`.
-- [ ] 1.2 Same migration: `automated_messages` (rule text primary key with the **same** `CHECK` values, subject text not null, body text not null, is_active boolean default true, updated_at timestamptz default now() + `set_updated_at` trigger).
-- [ ] 1.3 Same migration: seed both rows with the initial Spanish copy (warm, 1st person, no "bienestar", 'cliente' never 'clienta'); `{nombre}` in each body.
-- [ ] 1.4 Same migration: RLS. `automated_notices` — enable RLS, **no policies** (service-role only; the client never reads its own nudge history). `automated_messages` — enable RLS + admin-only `for all using (is_admin()) with check (is_admin())`.
-- [ ] 1.5 Apply via Supabase Management API — ⚠ send the SQL on **ONE single line** (the pipeline eats newlines → `--` comments out the rest).
-- [ ] 1.6 Add both tables to `lib/supabase/types.ts` **by hand**, including `Relationships: []`. Export the `NoticeRule` union — it mirrors the `CHECK` constraint.
+- [x] 1.1 Write `supabase/migrations/014_automated_messages.sql`: `automated_notices` (id, profile_id → profiles on delete cascade, rule text + `CHECK (rule in ('booking_reminder','inactivity_nudge'))`, period_key text not null, sent_at timestamptz default now(), `unique (profile_id, rule, period_key)`) + index on `(profile_id, rule)`.
+- [x] 1.2 Same migration: `automated_messages` (rule text primary key with the **same** `CHECK` values, subject text not null, body text not null, is_active boolean default true, updated_at timestamptz default now() + `set_updated_at` trigger).
+- [x] 1.3 Same migration: seed both rows with the initial Spanish copy (warm, 1st person, no "bienestar", 'cliente' never 'clienta'); `{nombre}` in each body.
+- [x] 1.4 Same migration: RLS. `automated_notices` — enable RLS, **no policies** (service-role only; the client never reads its own nudge history). `automated_messages` — enable RLS + admin-only `for all using (is_admin()) with check (is_admin())`.
+- [x] 1.5 Apply via Supabase Management API — ⚠ send the SQL on **ONE single line** (the pipeline eats newlines → `--` comments out the rest).
+- [x] 1.6 Add both tables to `lib/supabase/types.ts` **by hand**, including `Relationships: []`. Export the `NoticeRule` union — it mirrors the `CHECK` constraint.
 
 ### 2. D9 — shared `serverToday()`
-- [ ] 2.1 Write tests for `serverToday()`: honors `DEV_DATE` (noon-anchored, avoiding the midnight-UTC → prior-day drift), falls back to `new Date()`.
-- [ ] 2.2 Implement `lib/content/server-today.ts`.
-- [ ] 2.3 Refactor the ~5 inline call sites: `lib/content/queries.ts` (×3), `lib/content/booking-queries.ts` (`getBookingState`), `app/admin/clients/page.tsx`. Behavior must be identical — existing tests stay green with no edits.
-- [ ] 2.4 Mark **D9** done in `BACKLOG.md`.
+- [x] 2.1 Write tests for `serverToday()`: honors `DEV_DATE` (noon-anchored, avoiding the midnight-UTC → prior-day drift), falls back to `new Date()`.
+- [x] 2.2 Implement `lib/content/server-today.ts`.
+- [x] 2.3 Refactor the ~5 inline call sites: `lib/content/queries.ts` (×3), `lib/content/booking-queries.ts` (`getBookingState`), `app/admin/clients/page.tsx`. Behavior must be identical — existing tests stay green with no edits.
+- [x] 2.4 Mark **D9** done in `BACKLOG.md`.
 
 ### 3. Email carries the body
-- [ ] 3.1 `lib/email/templates/NewMessageEmail.tsx`: render the body via `{body}` inside a `<Text>` with `whiteSpace: "pre-line"`. Keep the "Ver mensaje" CTA. **Never** `dangerouslySetInnerHTML`.
-- [ ] 3.2 `lib/email/send.ts`: `sendNewMessageEmail` takes `body`; `sendNewMessageEmailBatch` takes `{ email, subject, body }[]` and renders per recipient while keeping the 100-item `resend.batch.send` chunking.
-- [ ] 3.3 `lib/admin/messageActions.ts`: pass the body through to the batch sender. ⚠ Intentional side-effect — **Aura's manual messages now include their body in the email**. Call it out in the PR description.
+- [x] 3.1 `lib/email/templates/NewMessageEmail.tsx`: render the body via `{body}` inside a `<Text>` with `whiteSpace: "pre-line"`. Keep the "Ver mensaje" CTA. **Never** `dangerouslySetInnerHTML`.
+- [x] 3.2 `lib/email/send.ts`: `sendNewMessageEmail` takes `body`; `sendNewMessageEmailBatch` takes `{ email, subject, body }[]` and renders per recipient while keeping the 100-item `resend.batch.send` chunking.
+- [x] 3.3 `lib/admin/messageActions.ts`: pass the body through to the batch sender. ⚠ Intentional side-effect — **Aura's manual messages now include their body in the email**. Call it out in the PR description.
+
+> **PR 1 shipped — deltas vs. the text above** (PR #13, merged `53c29d1`; migration applied and smoke-verified 2026-07-27):
+> - **1.1** the extra `(profile_id, rule)` index was **dropped** — the `unique (profile_id, rule, period_key)` constraint's implicit index already serves that prefix (code review).
+> - **1.4** `automated_notices` also got `force row level security` + `revoke all from anon, authenticated`, so "service-role only" is explicit rather than inferred from the absence of policies (security review). **Consequence for PR 2/3: admins cannot read the ledger either — any nudge-history view must use the service-role client.**
+> - **2.3** was **8** call sites, not ~5: `lib/content/queries.ts` ×3, `lib/content/booking-queries.ts`, `app/admin/clients/page.tsx`, `app/portal/{messages,messages/[id],settings,pilares}/page.tsx`.
+> - **2.x** `serverToday()` additionally **ignores `DEV_DATE` in production** (`NODE_ENV`/`VERCEL_ENV`) and warns on a malformed value — a prod misconfiguration would otherwise freeze `period_key` and jam the dedupe ledger permanently (security review).
+> - **3.2** `sendNewMessageEmail` (single-recipient) was **deleted**, not widened — zero callers; the cron uses the batch path. `safeSend` stays covered via `sendWelcomeEmail`.
+> - Added `__tests__/notice-rule-constraint.test.ts`: fails CI if `NoticeRule` and the migration's `CHECK` literals drift in either direction.
+> - Migration 014 is **run-once** (plain `create table`); only the seed is idempotent. Do not re-run the file.
 
 ## PR 2 — Rules engine + cron
 
