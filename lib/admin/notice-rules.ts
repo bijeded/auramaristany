@@ -1,0 +1,193 @@
+// Reglas puras de los mensajes automáticos (A4). Sin BD, sin reloj: `now` se
+// inyecta siempre. Ésta es TODA la superficie de riesgo del cron — la ruta sólo
+// autentica, orquesta y reporta.
+//
+// Se reutilizan los helpers ya existentes en lugar de reimplementarlos:
+//   getCurrentDayKey / getCurrentSeriesNumber  → lib/content/access.ts
+//   isInactive / INACTIVITY_THRESHOLD_DAYS     → lib/admin/clients-helpers.ts
+//   subscriptionGrantsAccess                   → lib/content/subscription-access.ts
+import { getCurrentDayKey, type DayOfWeek } from "@/lib/content/access";
+import { INACTIVITY_THRESHOLD_DAYS, isInactive, type SubStatus } from "./clients-helpers";
+import { subscriptionGrantsAccess } from "@/lib/content/subscription-access";
+import type { NoticeRule } from "@/lib/supabase/types";
+
+export interface NoticeCandidate {
+  profile_id: string;
+  email: string;
+  full_name: string | null;
+  status: SubStatus;
+  cancel_at_period_end: boolean;
+  /** timestamptz del inicio del periodo de facturación vigente. */
+  current_period_start: string;
+  /** date (YYYY-MM-DD); centinela de la clave cuando nunca hubo actividad. */
+  enrollment_date: string;
+  /** Serie del mes en curso, ya resuelta por la capa de queries (variante + months_elapsed). */
+  series_id: string | null;
+  /** max(progress_logs.log_date) — la señal que dejó A5. */
+  last_activity_date: string | null;
+  /** ¿tiene una llamada futura no cancelada? — regla de A6. */
+  has_future_call: boolean;
+}
+
+export interface NoticeTemplate {
+  subject: string;
+  body: string;
+  is_active: boolean;
+}
+
+export type NoticeTemplates = Record<NoticeRule, NoticeTemplate>;
+
+export interface NoticeIntent {
+  profile_id: string;
+  email: string;
+  rule: NoticeRule;
+  period_key: string;
+  subject: string;
+  body: string;
+}
+
+// --- Claves ---------------------------------------------------------------
+
+/** Clave de una celda de contenido con bloque "agendar". */
+export function agendarCellKey(seriesId: string, weekNumber: number, dayOfWeek: string): string {
+  return `${seriesId}|W${weekNumber}|${dayOfWeek}`;
+}
+
+/** Clave del ledger de deduplicación. */
+export function sentKey(profileId: string, rule: NoticeRule, periodKey: string): string {
+  return `${profileId}|${rule}|${periodKey}`;
+}
+
+const dateOnly = (value: string): string => value.slice(0, 10);
+
+/**
+ * Clave del recordatorio de agenda: inicio del periodo + la celda del día.
+ *
+ * Como sólo se emite el PRIMER día de la ventana, la celda de hoy es también la
+ * primera celda de la racha. Eso distingue la ventana de W1 de la de W3 dentro
+ * del mismo periodo y, a la vez, absorbe el tope de `week_number` en 4: los días
+ * 29-31 vuelven a caer en una celda de W4 ya visitada y producen la MISMA clave,
+ * de modo que el unique del ledger evita el segundo envío.
+ */
+export function bookingPeriodKey(candidate: NoticeCandidate, now: Date): string {
+  const key = getCurrentDayKey(candidate.current_period_start, now);
+  return `${dateOnly(candidate.current_period_start)}:W${key.week_number}-${key.day_of_week}`;
+}
+
+/**
+ * Clave del aviso de inactividad: anclada a la última actividad, de forma que
+ * se emite un aviso por RACHA de silencio. Si la clienta vuelve a registrar, la
+ * fecha avanza y una recaída posterior genera una clave nueva.
+ */
+export function inactivityPeriodKey(candidate: NoticeCandidate): string {
+  return candidate.last_activity_date ?? `never:${dateOnly(candidate.enrollment_date)}`;
+}
+
+// --- Detección de la ventana ---------------------------------------------
+
+const DAY_MS = 86_400_000;
+
+function hasAgendarBlock(
+  candidate: NoticeCandidate,
+  cells: Set<string>,
+  when: Date
+): boolean {
+  if (!candidate.series_id) return false;
+  const key = getCurrentDayKey(candidate.current_period_start, when);
+  return cells.has(agendarCellKey(candidate.series_id, key.week_number, key.day_of_week as DayOfWeek));
+}
+
+/**
+ * ¿Hoy es el PRIMER día de una ventana de agenda para esta clienta?
+ *
+ * La cadencia la define el contenido: Aura coloca el bloque "agendar" en celdas
+ * (semana, día de la semana). El calendario NO se consulta — no hay "día 14".
+ * Como cada clienta recorre la misma rejilla desde SU `current_period_start`,
+ * la misma celda le cae en un día distinto a cada una, y todas reciben el aviso
+ * el primer día de SU ventana.
+ */
+export function isFirstDayOfAgendarRun(
+  candidate: NoticeCandidate,
+  cells: Set<string>,
+  now: Date
+): boolean {
+  if (!hasAgendarBlock(candidate, cells, now)) return false;
+  const yesterday = new Date(now.getTime() - DAY_MS);
+  return !hasAgendarBlock(candidate, cells, yesterday);
+}
+
+// --- Plantillas -----------------------------------------------------------
+
+/**
+ * Sustituye la lista blanca de placeholders. Un placeholder desconocido se deja
+ * literal a propósito: un cron nunca debe romperse porque alguien escribió
+ * `{nombre2}` en el editor.
+ *
+ * ⚠ La lista blanca es una frontera de seguridad, no una comodidad: el cuerpo
+ * del mensaje sale de la plataforma por correo (Resend), fuera de nuestra
+ * retención de 180 días. Nunca interpolar datos de progreso, salud o cobro.
+ */
+export function renderTemplate(body: string, fullName: string | null): string {
+  const firstName = fullName?.trim().split(/\s+/)[0] ?? "";
+  const rendered = body.replace(/\{nombre\}/g, firstName);
+  if (firstName) return rendered;
+  // Sin nombre, "Hola {nombre}:" quedaría como "Hola :" y se leería como un
+  // error de la plataforma. Se recoge la puntuación que dejó el hueco.
+  return rendered.replace(/ +([:,;.!?])/g, "$1").replace(/ {2,}/g, " ").trim();
+}
+
+// --- Evaluación -----------------------------------------------------------
+
+/**
+ * Decide qué avisos corresponden hoy. Función pura: recibe los datos ya leídos
+ * y devuelve intenciones; no escribe nada. El cron persiste primero la fila del
+ * ledger y sólo envía si el insert entró de verdad (insert-before-send: una
+ * caída cuesta un mensaje perdido, nunca uno duplicado).
+ */
+export function evaluateNotices(
+  candidates: NoticeCandidate[],
+  agendarCells: Set<string>,
+  sentKeys: Set<string>,
+  templates: NoticeTemplates,
+  now: Date
+): NoticeIntent[] {
+  const intents: NoticeIntent[] = [];
+  const todayIso = now.toISOString().split("T")[0];
+
+  for (const c of candidates) {
+    // Sin acceso al portal no hay nada que recordar ni a quién reenganchar.
+    if (!subscriptionGrantsAccess(c.status)) continue;
+    // Quien ya decidió irse no recibe ninguna de las dos reglas: el periodo de
+    // gracia no es una oportunidad de reenganche.
+    if (c.cancel_at_period_end) continue;
+
+    const push = (rule: NoticeRule, periodKey: string) => {
+      const tpl = templates[rule];
+      if (!tpl?.is_active) return;
+      if (sentKeys.has(sentKey(c.profile_id, rule, periodKey))) return;
+      intents.push({
+        profile_id: c.profile_id,
+        email: c.email,
+        rule,
+        period_key: periodKey,
+        subject: tpl.subject,
+        body: renderTemplate(tpl.body, c.full_name),
+      });
+    };
+
+    // Regla A — recordatorio de agenda.
+    // past_due queda fuera: pedirle agendar mientras le falla el cobro es mal
+    // momento, y Stripe ya le está escribiendo por el pago.
+    if (c.status !== "past_due" && !c.has_future_call && isFirstDayOfAgendarRun(c, agendarCells, now)) {
+      push("booking_reminder", bookingPeriodKey(c, now));
+    }
+
+    // Regla B — aviso de inactividad. past_due sí lo recibe: sigue teniendo
+    // acceso al portal y es justo cuando conviene reenganchar.
+    if (isInactive(c.last_activity_date, todayIso, INACTIVITY_THRESHOLD_DAYS)) {
+      push("inactivity_nudge", inactivityPeriodKey(c));
+    }
+  }
+
+  return intents;
+}
