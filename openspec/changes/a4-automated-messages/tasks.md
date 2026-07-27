@@ -35,26 +35,35 @@ Suggested as **3 PRs** (foundation → rules+cron → admin UI), mirroring the A
 ## PR 2 — Rules engine + cron
 
 ### 4. Pure rule layer (TDD — this is the whole risk surface)
-- [ ] 4.1 Tests for `isFirstDayOfAgendarRun(periodStart, today, agendarCells, seriesNumber)`: first day of a run → true; second/third day → false; two clients with different period-start weekdays each get their own first day; run straddling a week boundary; **week-4 clamp** — day 29 resolving to an already-visited W4 cell.
-- [ ] 4.2 Tests for `bookingPeriodKey` (`<period_start>:W<n>-<dow>`, naming the **first cell of the run**) and `inactivityPeriodKey` (`<last_activity_date>` | `never:<enrollment_date>`).
-- [ ] 4.3 Tests for `renderTemplate(body, vars)`: substitutes `{nombre}`; leaves unknown placeholders literal; never throws.
-- [ ] 4.4 Tests for `evaluateNotices(clients, agendarCells, sentKeys, templates, now)` covering the full eligibility matrix from `design.md` §5: `past_due` (nudge ✅ / reminder ❌), `cancel_at_period_end` (neither), `hasFutureCall` (reminder ❌), inactive rule (nothing), already-sent key (nothing).
-- [ ] 4.5 Implement `lib/admin/notice-rules.ts` — pure, no DB, no clock, `now` injected. Reuse `getCurrentDayKey`/`getCurrentSeriesNumber` (`lib/content/access.ts`), `isInactive` + `INACTIVITY_THRESHOLD_DAYS` (`lib/admin/clients-helpers.ts`), `hasFutureCall` (`lib/content/booking-helpers.ts`) — do not reimplement any of them.
+- [x] 4.1 Tests for `isFirstDayOfAgendarRun(periodStart, today, agendarCells, seriesNumber)`: first day of a run → true; second/third day → false; two clients with different period-start weekdays each get their own first day; run straddling a week boundary; **week-4 clamp** — day 29 resolving to an already-visited W4 cell.
+- [x] 4.2 Tests for `bookingPeriodKey` (`<period_start>:W<n>-<dow>`, naming the **first cell of the run**) and `inactivityPeriodKey` (`<last_activity_date>` | `never:<enrollment_date>`).
+- [x] 4.3 Tests for `renderTemplate(body, vars)`: substitutes `{nombre}`; leaves unknown placeholders literal; never throws.
+- [x] 4.4 Tests for `evaluateNotices(clients, agendarCells, sentKeys, templates, now)` covering the full eligibility matrix from `design.md` §5: `past_due` (nudge ✅ / reminder ❌), `cancel_at_period_end` (neither), `hasFutureCall` (reminder ❌), inactive rule (nothing), already-sent key (nothing).
+- [x] 4.5 Implement `lib/admin/notice-rules.ts` — pure, no DB, no clock, `now` injected. Reuse `getCurrentDayKey`/`getCurrentSeriesNumber` (`lib/content/access.ts`), `isInactive` + `INACTIVITY_THRESHOLD_DAYS` (`lib/admin/clients-helpers.ts`), `hasFutureCall` (`lib/content/booking-helpers.ts`) — do not reimplement any of them.
 
 ### 5. Server-only queries
-- [ ] 5.1 `lib/admin/notice-queries.ts` (`import 'server-only'`, service-role — the cron has no session, `purge-messages` pattern).
-- [ ] 5.2 `getAgendarCells()` — **one** query: every `(series_id, week_number, day_of_week)` with an `agendar` block, `published = true`.
-- [ ] 5.3 `getNoticeCandidates()` — **one** query: clients whose subscription grants access, with `current_period_start`, `months_elapsed`, `cancel_at_period_end`, `status`, `program_variant_id`, `email`, `full_name`, `enrollment_date`, `last_activity_date` (max `progress_logs.log_date` — reuse the A5 join shape) and their future non-canceled bookings.
-- [ ] 5.4 `getSentKeys()` / `claimNotice()` — insert into `automated_notices` **on conflict do nothing**, returning whether the row was actually inserted. The insert *is* the dedupe; no read-then-write race.
-- [ ] 5.5 `getActiveTemplates()`.
+- [x] 5.1 `lib/admin/notice-queries.ts` (`import 'server-only'`, service-role — the cron has no session, `purge-messages` pattern).
+- [x] 5.2 `getAgendarCells()` — **one** query: every `(series_id, week_number, day_of_week)` with an `agendar` block, `published = true`.
+- [x] 5.3 `getNoticeCandidates()` — **one** query: clients whose subscription grants access, with `current_period_start`, `months_elapsed`, `cancel_at_period_end`, `status`, `program_variant_id`, `email`, `full_name`, `enrollment_date`, `last_activity_date` (max `progress_logs.log_date` — reuse the A5 join shape) and their future non-canceled bookings.
+- [x] 5.4 `getSentKeys()` / `claimNotice()` — insert into `automated_notices` **on conflict do nothing**, returning whether the row was actually inserted. The insert *is* the dedupe; no read-then-write race.
+- [x] 5.5 `getActiveTemplates()`.
 
 ### 6. Cron route
-- [ ] 6.1 `app/api/cron/automated-messages/route.ts` — Bearer `CRON_SECRET` → 401 otherwise; `export const dynamic = "force-dynamic"`.
-- [ ] 6.2 Orchestrate: 2 queries → `evaluateNotices` → per intent **claim the ledger row first**, and only on a successful claim insert `messages` (+ `sender_id` = Aura's admin profile) and `message_recipients`, then batch the emails.
-- [ ] 6.3 `?dryRun=1` — report matches, write nothing, send nothing.
-- [ ] 6.4 Per-run cap — abort loudly without sending if a run would exceed it.
-- [ ] 6.5 Add the daily entry to `vercel.json` (after `purge-messages`; pick an hour that lands mid-morning in Mexico given the UTC schedule).
-- [ ] 6.6 Verify the middleware `matcher` still excludes `api/cron` as an **inline literal**.
+- [x] 6.1 `app/api/cron/automated-messages/route.ts` — Bearer `CRON_SECRET` → 401 otherwise; `export const dynamic = "force-dynamic"`.
+- [x] 6.2 Orchestrate: 2 queries → `evaluateNotices` → per intent **claim the ledger row first**, and only on a successful claim insert `messages` (+ `sender_id` = Aura's admin profile) and `message_recipients`, then batch the emails.
+- [x] 6.3 `?dryRun=1` — report matches, write nothing, send nothing.
+- [x] 6.4 Per-run cap — abort loudly without sending if a run would exceed it.
+- [x] 6.5 Add the daily entry to `vercel.json` (after `purge-messages`; pick an hour that lands mid-morning in Mexico given the UTC schedule).
+- [x] 6.6 Verify the middleware `matcher` still excludes `api/cron` as an **inline literal**.
+
+> **PR 2 shipped — deltas vs. the text above:**
+> - **Both modules live in `lib/cron/`, not `lib/admin/`** (4.5, 5.1). They use service-role without `requireAdmin()`, and `insertNoticeMessage` writes a message to any `profile_id` it is handed — safe under the cron, where every id is server-derived, but PR 3's admin screen must **never** import them: a form-supplied id would become an arbitrary message write. Placement is the guard; `CLAUDE.md` → Project structure records it.
+> - **4.2 `bookingPeriodKey` is `<period_start>:W<n>`, keyed by grid WEEK, not by cell.** A contiguous weekday run is not contiguous for a client who starts mid-run — they walk it in two stretches — and a cell key sent them two reminders in five days for one window. Week keying collapses the stretches. Residual: a window straddling two grid weeks counts as two, and two windows inside one week count as one; neither matches the biweekly cadence this was designed for.
+> - **BLOCKER fixed — day-1 boundary.** `getCurrentDayKey` clamps `daysElapsed` at 0 but takes `day_of_week` from the calendar, so "yesterday" on day 1 resolved to a cell outside the period. Measured over all 7 start weekdays with the W1 mié-jue-vie window: jueves-starters were reminded on day 7 and viernes-starters on day 6 instead of day 1. Fixed in `hasAgendarBlock`; 5 regression tests.
+> - **5.5** is `getNoticeTemplates()`, not `getActiveTemplates()` — it returns inactive rows too, since `evaluateNotices` owns the `is_active` gate.
+> - **6.4** cap is **200** (not 50) and overridable via `AUTOMATED_MESSAGES_MAX_PER_RUN`; `resolveMaxPerRun` is pure and tested. At 50 the cron would have aborted daily once the client base passed ~26.
+> - Added: `maxDuration = 300`; `releaseNotice` frees a claimed key when the in-app insert fails (otherwise a recoverable error suppressed the notice forever); `getSentKeys` is chunked and scoped by `period_key`; read failures throw `NoticeQueryError` → 500 instead of reporting a healthy empty run.
+> - **Security:** `renderTemplate` uses a function replacer (`$&`/`` $` ``/`$'` in a client-edited `full_name` were being interpreted by the regex engine); `?dryRun=1` returns **aggregates only** — the delta spec was amended to match, since a per-client `period_key` for the inactivity rule *is* that client's last activity date.
 
 ## PR 3 — Admin UI
 

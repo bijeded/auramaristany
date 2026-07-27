@@ -65,17 +65,28 @@ export function sentKey(profileId: string, rule: NoticeRule, periodKey: string):
 const dateOnly = (value: string): string => value.slice(0, 10);
 
 /**
- * Clave del recordatorio de agenda: inicio del periodo + la celda del día.
+ * Clave del recordatorio de agenda: inicio del periodo + la SEMANA de la rejilla.
  *
- * Como sólo se emite el PRIMER día de la ventana, la celda de hoy es también la
- * primera celda de la racha. Eso distingue la ventana de W1 de la de W3 dentro
- * del mismo periodo y, a la vez, absorbe el tope de `week_number` en 4: los días
- * 29-31 vuelven a caer en una celda de W4 ya visitada y producen la MISMA clave,
- * de modo que el unique del ledger evita el segundo envío.
+ * Se agrupa por semana, no por celda, porque una racha contigua de celdas no es
+ * contigua para todas las clientas: quien empieza a mitad de la racha la recorre
+ * en dos tramos separados (p. ej. con la ventana en W1 mié-jue-vie, quien empieza
+ * en viernes la ve el día 1 y otra vez el día 6). Con la clave por celda eso
+ * generaba DOS avisos en cinco días para una sola ventana colocada por Aura, en
+ * contra del objetivo "un aviso por ventana". Con la clave por semana, ambos
+ * tramos comparten clave y sólo se envía el primero.
+ *
+ * Sigue distinguiendo la ventana de W1 de la de W3 (cadencia quincenal, el uso
+ * previsto) y sigue absorbiendo el tope de `week_number` en 4: los días 29-31
+ * vuelven a W4 y producen la misma clave.
+ *
+ * Residuo aceptado: una ventana colocada a caballo entre dos semanas de la
+ * rejilla (p. ej. W1 viernes + W2 lunes) cuenta como dos, y dos ventanas
+ * distintas dentro de la misma semana cuentan como una. Ninguno de los dos casos
+ * corresponde a la cadencia quincenal para la que se diseñó (ver design.md §1).
  */
 export function bookingPeriodKey(candidate: NoticeCandidate, now: Date): string {
   const key = getCurrentDayKey(candidate.current_period_start, now);
-  return `${dateOnly(candidate.current_period_start)}:W${key.week_number}-${key.day_of_week}`;
+  return `${dateOnly(candidate.current_period_start)}:W${key.week_number}`;
 }
 
 /**
@@ -157,8 +168,29 @@ export function renderTemplate(body: string, fullName: string | null): string {
   if (firstName) return rendered;
   // `profiles.full_name` es NOT NULL, así que esta rama no debería alcanzarse;
   // se mantiene porque un nombre vacío dejaría "Hola :" y eso se leería como un
-  // error de la plataforma. Recoge la puntuación que dejó el hueco.
-  return rendered.replace(/ +([:,;.!?])/g, "$1").replace(/ {2,}/g, " ").trim();
+  // error de la plataforma. Recoge la puntuación y los espacios que dejó el
+  // hueco — sin `trim()` global, que se comería los saltos de línea con los que
+  // Aura separa los párrafos.
+  return rendered.replace(/ +([:,;.!?])/g, "$1").replace(/ {2,}/g, " ");
+}
+
+/**
+ * Tope de avisos por corrida. Si una regla se evalúa verdadera para una porción
+ * implausible del padrón (típicamente un error de fechas), la corrida aborta sin
+ * enviar nada.
+ *
+ * Configurable porque el valor correcto depende del tamaño del padrón: con un
+ * tope fijo, crecer lo suficiente hacía que el cron abortara a diario hasta
+ * tocar el código. Cualquier valor no numérico, vacío, cero o negativo cae al
+ * predeterminado en vez de dejar el envío sin tope.
+ */
+export const DEFAULT_MAX_NOTICES_PER_RUN = 200;
+
+export function resolveMaxPerRun(raw: string | undefined): number {
+  const parsed = Number(raw);
+  return raw !== undefined && raw !== "" && Number.isFinite(parsed) && parsed > 0
+    ? Math.floor(parsed)
+    : DEFAULT_MAX_NOTICES_PER_RUN;
 }
 
 /**

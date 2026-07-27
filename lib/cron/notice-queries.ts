@@ -86,7 +86,10 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
        months_elapsed, program_variant_id,
        profiles!inner ( email, full_name, progress_logs ( log_date ), bookings ( scheduled_at, status ) )`
     )
-    .in("status", ACCESS_STATES);
+    .in("status", ACCESS_STATES)
+    // Sólo hace falta saber si hay llamada FUTURA; el histórico de reservas no
+    // aporta nada y crece sin tope.
+    .gt("profiles.bookings.scheduled_at", now.toISOString());
 
   if (error) {
     console.error("[notice-queries] getNoticeCandidates:", error.message);
@@ -159,8 +162,10 @@ async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<st
 
   const map = new Map<string, string>();
   if (error) {
+    // Un mapa vacío dejaría `series_id` nulo para TODAS las candidatas y
+    // apagaría la regla de agenda entera, con la corrida reportando 200 OK.
     console.error("[notice-queries] getSeriesByVariantAndNumber:", error.message);
-    return map;
+    throw new NoticeQueryError("No se pudieron resolver las series del mes");
   }
 
   // keep: variant_series_map JOIN program_series!inner — join shape not inferred.
@@ -190,6 +195,9 @@ async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<st
  * (Aunque llegara incompleto, `claimNotice` sigue impidiendo el duplicado: este
  * pre-filtro sólo evita viajes de ida y vuelta inútiles.)
  */
+/** `.in()` viaja en la URL del GET: se trocea para no rebasar su límite. */
+const IN_CHUNK = 100;
+
 export async function getSentKeys(
   profileIds: string[],
   periodKeys: string[]
@@ -198,21 +206,25 @@ export async function getSentKeys(
   if (profileIds.length === 0 || periodKeys.length === 0) return keys;
 
   const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("automated_notices")
-    .select("profile_id, rule, period_key")
-    .in("profile_id", profileIds)
-    .in("period_key", periodKeys);
 
-  if (error) {
-    console.error("[notice-queries] getSentKeys:", error.message);
-    // Devolver un set vacío haría creer que no se ha enviado nada y dispararía
-    // un reenvío masivo. Se propaga el fallo para que la corrida aborte.
-    throw new NoticeQueryError("No se pudo leer el ledger de avisos");
-  }
+  for (let i = 0; i < profileIds.length; i += IN_CHUNK) {
+    const chunk = profileIds.slice(i, i + IN_CHUNK);
+    const { data, error } = await supabase
+      .from("automated_notices")
+      .select("profile_id, rule, period_key")
+      .in("profile_id", chunk)
+      .in("period_key", periodKeys);
 
-  for (const row of (data ?? []) as { profile_id: string; rule: NoticeRule; period_key: string }[]) {
-    keys.add(sentKey(row.profile_id, row.rule, row.period_key));
+    if (error) {
+      console.error("[notice-queries] getSentKeys:", error.message);
+      // Devolver un set vacío haría creer que no se ha enviado nada y dispararía
+      // un reenvío masivo. Se propaga el fallo para que la corrida aborte.
+      throw new NoticeQueryError("No se pudo leer el ledger de avisos");
+    }
+
+    for (const row of (data ?? []) as { profile_id: string; rule: NoticeRule; period_key: string }[]) {
+      keys.add(sentKey(row.profile_id, row.rule, row.period_key));
+    }
   }
   return keys;
 }
@@ -307,6 +319,29 @@ export async function insertNoticeMessage(params: {
     return false;
   }
   return true;
+}
+
+/**
+ * Libera una clave reclamada cuando el mensaje in-app no se pudo escribir.
+ *
+ * Sin esto, un fallo puntual del insert quemaba la clave para siempre: la
+ * reclamación ya estaba puesta y nada reintenta una clave reclamada, así que la
+ * clienta no recibía ese aviso nunca. Reclamar-antes-de-enviar sigue evitando el
+ * duplicado; esto sólo recupera el caso recuperable.
+ */
+export async function releaseNotice(
+  profileId: string,
+  rule: NoticeRule,
+  periodKey: string
+): Promise<void> {
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("automated_notices")
+    .delete()
+    .eq("profile_id", profileId)
+    .eq("rule", rule)
+    .eq("period_key", periodKey);
+  if (error) console.error("[notice-queries] releaseNotice:", error.message);
 }
 
 /** Perfil admin que figura como remitente de los avisos automáticos. */

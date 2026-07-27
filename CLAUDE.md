@@ -56,7 +56,10 @@ npm run build               # production build
 ```
 app/            App Router routes — (marketing) · auth · onboarding · portal · admin · api
 components/     UI — portal/*, admin/*, auth/*, ui/* (shadcn)
-lib/            Logic — content/ (access, queries, history) · admin/ · portal/ · webhooks/ · email/ · auth/ · supabase/
+lib/            Logic — content/ (access, queries, history) · admin/ · portal/ · webhooks/ · cron/ · email/ · auth/ · supabase/
+                ⚠ cron/ = service-role modules driven by a CRON_SECRET route, NOT by requireAdmin().
+                  They take an id and write on its behalf, so they must never be imported from a
+                  server action or an admin screen (a form-supplied id would become an arbitrary write).
 hooks/          useProgressForm.ts (debounced autosave)
 middleware.ts   Gate by role / subscription / onboarding
 supabase/migrations/  001–010 (applied)

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { serverToday } from "@/lib/content/server-today";
-import { candidatePeriodKeys, evaluateNotices } from "@/lib/cron/notice-rules";
+import { candidatePeriodKeys, evaluateNotices, resolveMaxPerRun } from "@/lib/cron/notice-rules";
 import {
   NoticeQueryError,
   claimNotice,
@@ -11,6 +11,7 @@ import {
   getNoticeTemplates,
   getSentKeys,
   insertNoticeMessage,
+  releaseNotice,
 } from "@/lib/cron/notice-queries";
 import { sendNewMessageEmailBatch } from "@/lib/email/send";
 
@@ -30,21 +31,11 @@ import { sendNewMessageEmailBatch } from "@/lib/email/send";
 export const dynamic = "force-dynamic";
 
 /**
- * Tope de seguridad por corrida: si una regla se evalúa verdadera para una
- * porción implausible del padrón (típicamente un error de fechas), aborta sin
- * enviar nada.
- *
- * Configurable por entorno porque el valor correcto depende del tamaño del
- * padrón: con el tope fijo, crecer lo suficiente hacía que el cron abortara a
- * diario hasta tocar el código. La primera corrida real también es alta por
- * naturaleza (todas las claves son nuevas) — por eso se ejecuta antes con
- * `?dryRun=1`.
+ * Vercel corta la ejecución por defecto muy pronto para un recorrido de todo el
+ * padrón. Un corte a media pasada deja claves reclamadas cuyo mensaje nunca se
+ * escribió, así que conviene margen de sobra.
  */
-const DEFAULT_CAP = 200;
-const cap = (): number => {
-  const raw = Number(process.env.AUTOMATED_MESSAGES_MAX_PER_RUN);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_CAP;
-};
+export const maxDuration = 300;
 
 /** Comparación en tiempo constante para no filtrar el secreto byte a byte. */
 function secretMatches(header: string | null, secret: string): boolean {
@@ -62,7 +53,7 @@ export async function GET(request: Request) {
 
   const dryRun = new URL(request.url).searchParams.get("dryRun") === "1";
   const now = serverToday();
-  const maxPerRun = cap();
+  const maxPerRun = resolveMaxPerRun(process.env.AUTOMATED_MESSAGES_MAX_PER_RUN);
 
   try {
     const templates = await getNoticeTemplates();
@@ -133,8 +124,14 @@ export async function GET(request: Request) {
       });
       // El correo sólo acompaña al mensaje in-app: si el in-app no se pudo
       // escribir, no se manda un correo que apunta a algo inexistente.
-      if (ok) delivered.push({ email: intent.email, subject: intent.subject, body: intent.body });
-      else failed += 1;
+      if (ok) {
+        delivered.push({ email: intent.email, subject: intent.subject, body: intent.body });
+      } else {
+        // Devolver la clave para que la próxima corrida reintente: un fallo
+        // puntual del insert no debe suprimir el aviso para siempre.
+        await releaseNotice(intent.profile_id, intent.rule, intent.period_key);
+        failed += 1;
+      }
     }
 
     await sendNewMessageEmailBatch(delivered);
@@ -142,7 +139,10 @@ export async function GET(request: Request) {
     return NextResponse.json({
       candidates: candidates.length,
       matched: intents.length,
-      sent: delivered.length,
+      // Mensajes in-app escritos. El correo es best-effort y sus fallos se
+      // absorben dentro de sendNewMessageEmailBatch, así que NO es "correos
+      // entregados".
+      inAppSent: delivered.length,
       claimed,
       skippedAlreadySent: alreadySent,
       failed,

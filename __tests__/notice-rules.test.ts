@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_MAX_NOTICES_PER_RUN,
   agendarCellKey,
   bookingPeriodKey,
   candidatePeriodKeys,
@@ -7,6 +8,7 @@ import {
   inactivityPeriodKey,
   isFirstDayOfAgendarRun,
   renderTemplate,
+  resolveMaxPerRun,
   sentKey,
   type NoticeCandidate,
   type NoticeTemplates,
@@ -177,8 +179,30 @@ describe("isFirstDayOfAgendarRun", () => {
 
 // --- period keys ----------------------------------------------------------
 describe("bookingPeriodKey", () => {
+  // La clave agrupa por SEMANA de la rejilla, no por celda: una racha contigua
+  // no es contigua para quien empieza a mitad de ella, y con la clave por celda
+  // esas clientas recibían dos avisos en cinco días por una sola ventana.
+  it("da la MISMA clave a los dos tramos de una racha partida por el inicio del periodo", () => {
+    // Arrange — ventana W1 mié-jue-vie; esta clienta empieza en VIERNES, así que
+    // la recorre en dos tramos: su día 1 (viernes) y su día 6 (miércoles).
+    const viernes = { ...base, current_period_start: "2026-07-03T00:00:00Z" };
+
+    // Act
+    const tramo1 = bookingPeriodKey(viernes, at("2026-07-03")); // día 1
+    const tramo2 = bookingPeriodKey(viernes, at("2026-07-08")); // día 6
+
+    // Assert — una ventana, un aviso: el ledger absorbe el segundo tramo.
+    expect(tramo1).toBe(tramo2);
+    expect(tramo1).toBe("2026-07-03:W1");
+  });
+
+  it("sigue separando la ventana de W1 de la de W3 (cadencia quincenal)", () => {
+    expect(bookingPeriodKey(base, at("2026-07-01"))).toBe("2026-07-01:W1");
+    expect(bookingPeriodKey(base, at("2026-07-15"))).toBe("2026-07-01:W3");
+  });
+
   it("combina el inicio del periodo con la celda del día", () => {
-    expect(bookingPeriodKey(base, at("2026-07-01"))).toBe("2026-07-01:W1-miercoles");
+    expect(bookingPeriodKey(base, at("2026-07-01"))).toBe("2026-07-01:W1");
   });
 
   it("distingue dos ventanas del mismo periodo", () => {
@@ -252,6 +276,23 @@ describe("renderTemplate", () => {
   });
 });
 
+describe("resolveMaxPerRun", () => {
+  it("usa el valor del entorno cuando es un entero positivo", () => {
+    expect(resolveMaxPerRun("350")).toBe(350);
+  });
+
+  it.each([undefined, "", "muchos", "0", "-5", "NaN"])(
+    "cae al predeterminado con %o en vez de dejar el envío sin tope",
+    (raw) => {
+      expect(resolveMaxPerRun(raw)).toBe(DEFAULT_MAX_NOTICES_PER_RUN);
+    }
+  );
+
+  it("trunca un valor decimal", () => {
+    expect(resolveMaxPerRun("12.9")).toBe(12);
+  });
+});
+
 describe("candidatePeriodKeys", () => {
   it("reúne las claves de ambas reglas sin duplicados", () => {
     // Arrange
@@ -261,7 +302,7 @@ describe("candidatePeriodKeys", () => {
     const keys = candidatePeriodKeys([base, otra], at("2026-07-01"));
 
     // Assert
-    expect(keys).toContain("2026-07-01:W1-miercoles");
+    expect(keys).toContain("2026-07-01:W1");
     expect(keys).toContain("2026-07-01"); // last_activity de `base`
     expect(keys).toContain("2026-06-10");
     expect(new Set(keys).size).toBe(keys.length);
@@ -279,14 +320,14 @@ describe("evaluateNotices", () => {
     // Assert
     expect(out).toHaveLength(1);
     expect(out[0].rule).toBe("booking_reminder");
-    expect(out[0].period_key).toBe("2026-07-01:W1-miercoles");
+    expect(out[0].period_key).toBe("2026-07-01:W1");
     expect(out[0].body).toBe("Hola Ana: ya puedes agendar.");
     expect(out[0].email).toBe("ana@x.com");
   });
 
   it("no emite nada si la clave ya está en el ledger", () => {
     // Arrange
-    const sent = new Set([sentKey("p1", "booking_reminder", "2026-07-01:W1-miercoles")]);
+    const sent = new Set([sentKey("p1", "booking_reminder", "2026-07-01:W1")]);
     // Act
     const out = evaluateNotices([base], cells, sent, templates, today);
     // Assert
