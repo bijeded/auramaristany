@@ -16,7 +16,8 @@ The system SHALL evaluate all automated message rules once per day via a schedul
 
 #### Scenario: Dry run
 - **WHEN** the cron route is invoked with the correct secret and `dryRun=1`
-- **THEN** the route reports which clients and rules would have matched, and writes no ledger rows, no messages, and sends no email
+- **THEN** the route reports **aggregate counts** — how many clients were considered and how many notices each rule would send — and writes no ledger rows, no messages, and sends no email
+- **AND** the response contains no per-client identifiers or period keys, because a period key for the inactivity rule is that client's last activity date
 
 #### Scenario: Implausible fan-out
 - **WHEN** a single run would send to more than the configured per-run cap of clients
