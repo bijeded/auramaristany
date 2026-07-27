@@ -8,6 +8,7 @@ import {
   Users,
   BookOpen,
   MessageCircle,
+  Bot,
   Settings,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/admin/clients", label: "Clientes", icon: Users },
   { href: "/admin/content", label: "Contenido", icon: BookOpen },
   { href: "/admin/messages", label: "Mensajes", icon: MessageCircle },
+  { href: "/admin/automated-messages", label: "Automáticos", icon: Bot },
   { href: "/admin/onboarding-settings", label: "Onboarding", icon: Settings },
 ] as const;
 

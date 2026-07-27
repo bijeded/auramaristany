@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeRichText } from "@/lib/admin/sanitize-html";
+import { sanitizeRichText, sanitizePlainTextBody } from "@/lib/admin/sanitize-html";
 
 describe("sanitizeRichText", () => {
   it("elimina <script>", () => {
@@ -67,5 +67,42 @@ describe("sanitizeRichText — data-color restringido (hallazgo security-review)
     expect(out).toContain("background-color:#eddbd8");
     const good = '<p><mark data-color="#eddbd8" style="background-color:#eddbd8">x</mark></p>';
     expect(sanitizeRichText(good)).toContain('data-color="#eddbd8"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A4 — cuerpo de texto plano (mensajes automáticos)
+// ---------------------------------------------------------------------------
+
+describe("sanitizePlainTextBody", () => {
+  it("elimina cualquier tag", () => {
+    expect(sanitizePlainTextBody("<script>alert(1)</script>Hola")).toBe("Hola");
+    expect(sanitizePlainTextBody("<b>Hola</b> Aura")).toBe("Hola Aura");
+  });
+
+  it("NO deja entidades HTML escapadas en el texto guardado", () => {
+    // El cuerpo se guarda y se muestra como texto plano (React lo escapa al
+    // pintarlo), así que un "&amp;" almacenado se vería literal en el portal.
+    expect(sanitizePlainTextBody("Fuerza & salud")).toBe("Fuerza & salud");
+    expect(sanitizePlainTextBody("5 < 10 > 3")).toBe("5 < 10 > 3");
+    expect(sanitizePlainTextBody(`Dice "hola" y 'adiós'`)).toBe(`Dice "hola" y 'adiós'`);
+  });
+
+  it("no decodifica dos veces", () => {
+    expect(sanitizePlainTextBody("&amp;lt;")).toBe("&lt;");
+  });
+
+  it("preserva los saltos de línea y los párrafos en blanco", () => {
+    expect(sanitizePlainTextBody("Hola {nombre},\n\nsegundo párrafo")).toBe(
+      "Hola {nombre},\n\nsegundo párrafo"
+    );
+  });
+
+  it("preserva el placeholder {nombre} intacto", () => {
+    expect(sanitizePlainTextBody("Hola {nombre}")).toBe("Hola {nombre}");
+  });
+
+  it("recorta espacios en los extremos", () => {
+    expect(sanitizePlainTextBody("  Hola  ")).toBe("Hola");
   });
 });
