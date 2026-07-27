@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "./auth";
-import { logAndGeneric } from "./errors";
+import { ADMIN_GENERIC_ERROR, logAndGeneric } from "./errors";
 import { sanitizePlainTextBody } from "./sanitize-html";
 import { validateMessageContent } from "./message-helpers";
 import type { NoticeRule } from "@/lib/supabase/types";
@@ -44,11 +44,17 @@ export async function updateAutomatedMessage(
   const v = validateMessageContent(subject, body);
   if (!v.ok) return { error: v.error };
 
-  const { error } = await auth.supabase
+  // `.select()` para no dar por buena una escritura de 0 filas: PostgREST no
+  // devuelve error si RLS filtra la fila o si la regla no existe, y sin esto la
+  // pantalla diría "Guardado" mientras el cron sigue mandando el texto viejo.
+  const { data, error } = await auth.supabase
     .from("automated_messages")
     .update({ subject, body })
-    .eq("rule", parsed.data.rule);
+    .eq("rule", parsed.data.rule)
+    .select("rule")
+    .maybeSingle();
   if (error) return { error: logAndGeneric("updateAutomatedMessage", error) };
+  if (!data) return { error: ADMIN_GENERIC_ERROR };
 
   revalidate();
   // Se devuelve lo guardado, no lo enviado: el saneado puede haber cambiado el
@@ -68,11 +74,14 @@ export async function toggleAutomatedMessage(
   const parsed = toggleSchema.safeParse({ rule, isActive });
   if (!parsed.success) return { error: "Mensaje automático no válido" };
 
-  const { error } = await auth.supabase
+  const { data, error } = await auth.supabase
     .from("automated_messages")
     .update({ is_active: parsed.data.isActive })
-    .eq("rule", parsed.data.rule);
+    .eq("rule", parsed.data.rule)
+    .select("rule")
+    .maybeSingle();
   if (error) return { error: logAndGeneric("toggleAutomatedMessage", error) };
+  if (!data) return { error: ADMIN_GENERIC_ERROR };
 
   revalidate();
   return {};

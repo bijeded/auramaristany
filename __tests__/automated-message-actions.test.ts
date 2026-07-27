@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const calls: { table: string; op: string; payload?: unknown; eqArgs?: unknown[] }[] = [];
 let adminOk = true;
 let updateError: unknown = null;
+// Fila devuelta por `.select().maybeSingle()`. `null` = la escritura no afectó
+// ninguna fila (RLS la filtró, o la regla no existe).
+let updatedRow: unknown = { rule: "booking_reminder" };
 
 function makeQuery(table: string) {
   const q = {
@@ -11,7 +14,15 @@ function makeQuery(table: string) {
     update: (payload: unknown) => ({
       eq: (_col: string, val: unknown) => {
         calls.push({ table, op: "update", payload, eqArgs: [val] });
-        return Promise.resolve({ error: updateError });
+        return {
+          select: () => ({
+            maybeSingle: () =>
+              Promise.resolve({
+                data: updateError ? null : updatedRow,
+                error: updateError,
+              }),
+          }),
+        };
       },
     }),
   };
@@ -40,6 +51,7 @@ beforeEach(() => {
   calls.length = 0;
   adminOk = true;
   updateError = null;
+  updatedRow = { rule: "booking_reminder" };
   revalidatePath.mockClear();
 });
 
@@ -147,6 +159,20 @@ describe("updateAutomatedMessage", () => {
     expect(res.saved).toEqual({ subject: "Hola Aura", body: "Fuerza & salud" });
   });
 
+  it("falla si la escritura no afectó ninguna fila", async () => {
+    // RLS filtró la fila, o la regla no existe: PostgREST no devuelve error.
+    // Sin este guard la pantalla diría "Guardado" sin haber guardado nada.
+    updatedRow = null;
+    const res = await updateAutomatedMessage({
+      rule: "booking_reminder",
+      subject: "asunto",
+      body: "cuerpo",
+    });
+
+    expect(res.error).toBeTruthy();
+    expect(res.saved).toBeUndefined();
+  });
+
   it("no devuelve `saved` cuando falla", async () => {
     updateError = { code: "42501", message: "rls" };
     const res = await updateAutomatedMessage({
@@ -207,6 +233,13 @@ describe("toggleAutomatedMessage", () => {
 
     expect(res.error).toBeTruthy();
     expect(calls).toHaveLength(0);
+  });
+
+  it("falla si la escritura no afectó ninguna fila", async () => {
+    updatedRow = null;
+    const res = await toggleAutomatedMessage("booking_reminder", false);
+
+    expect(res.error).toBeTruthy();
   });
 
   it("rechaza un is_active que no es booleano", async () => {

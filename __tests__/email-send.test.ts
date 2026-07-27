@@ -126,3 +126,38 @@ describe("sendNewMessageEmailBatch", () => {
     expect(chunk[1].html).toContain("Hola Bea");
   });
 });
+
+// ---------------------------------------------------------------------------
+// A4 — invariante de escape del cuerpo
+// ---------------------------------------------------------------------------
+
+describe("cuerpo del email: escape", () => {
+  it("escapa el HTML del cuerpo en vez de interpretarlo", async () => {
+    // `sanitizePlainTextBody` decodifica entidades al guardar, así que el cuerpo
+    // almacenado PUEDE tener forma de HTML. El único motivo por el que eso es
+    // seguro es que este sink escapa. Si alguien cambia la plantilla a
+    // `dangerouslySetInnerHTML`, esta prueba lo detiene.
+    await sendNewMessageEmailBatch([
+      {
+        email: "c@x.com",
+        subject: "asunto",
+        body: '<img src=x onerror=alert(1)>Fuerza & salud',
+      },
+    ]);
+
+    const html: string = batchMock.mock.calls[0][0][0].html;
+    // El payload llega entero, pero escapado: es texto inerte, no un tag.
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("Fuerza &amp; salud");
+  });
+
+  it("preserva los saltos de línea con white-space: pre-line", async () => {
+    await sendNewMessageEmailBatch([
+      { email: "c@x.com", subject: "asunto", body: "uno\n\ndos" },
+    ]);
+
+    const html: string = batchMock.mock.calls[0][0][0].html;
+    expect(html).toMatch(/white-space:\s*pre-line/);
+  });
+});
