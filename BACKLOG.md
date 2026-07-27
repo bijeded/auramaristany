@@ -28,7 +28,8 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A9** | Cancellation + exit survey | M | ✅ Done |
 | **A12** | 7-day calendar in the portal | M | ✅ Done |
 | **A6+A7** | Booking system (Calendly) + "Agendar" block | M | ✅ Done |
-| **A4** | Automated messages | L | Do after A5 |
+| **A4** | Automated messages | L | 🔨 In progress (`a4-automated-messages`) |
+| **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
 | **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
 | **L2** | Extra → recurring monthly billing | L | Pending |
 | **L3** | Onboarding question set | S | Blocked (Aura defines them) |
@@ -94,7 +95,7 @@ Cancel from the account + optional exit survey (survey-first, all optional). **e
 - **Note:** unpublished days render as "Descanso" — the `program_days` RLS policy (`published = true or is_admin()`) filters them; decided to keep RLS as the boundary (no service-role, no migration).
 
 ### A6+A7 · Booking system (Calendly) + "Agendar" block — `M` — ✅ Done (PRs #8 foundation + #9 webhook + #10 UI + #11 diagnostics; migrations 012–013; archived `2026-07-25-calendly-booking-agendar-block`; ADR 0001)
-Verified live end-to-end in production: client books via Calendly embed → `invitee.created` webhook (sig-verified) → `bookings` ledger → the "agendar" block on Hoy flips to disabled "Tu llamada es el {fecha}". **Deploy done:** `NEXT_PUBLIC_CALENDLY_URL` + `CALENDLY_WEBHOOK_SIGNING_KEY` set in Vercel; Calendly webhook registered. See **D11** (CSP for the external Calendly script, folded into L8).
+Verified live end-to-end in production: client books via Calendly embed → `invitee.created` webhook (sig-verified) → `bookings` ledger → the "agendar" block on Hoy flips to disabled "Tu llamada es el {fecha}". **Deploy done:** `NEXT_PUBLIC_CALENDLY_URL` + `CALENDLY_WEBHOOK_SIGNING_KEY` set in Vercel; Calendly webhook registered. **D11** (CSP for the external Calendly script) ✅ shipped in PR #12.
 Biweekly Zoom/Meet calls, booked from the portal. **Merged A6+A7** — the "Agendar" block *is* the booking CTA (idea A). Explored 2026-07-24.
 - **⚠ Deviation from the original plan:** TheBooking (WordPress) is **abandoned/unsupported** → switched to **Calendly** (free tier, embedded widget at `/portal/booking`). Because the embed lives on our **own same-origin route**, the **HMAC signed-link is dropped** — eligibility is re-derived server-side (`getUser()` + `subscriptionGrantsAccess`), the way every other portal gate works. No `BOOKING_SIGNING_SECRET`.
 - **Decided design:**
@@ -105,11 +106,21 @@ Biweekly Zoom/Meet calls, booked from the portal. **Merged A6+A7** — the "Agen
 - **External dependency (Aura):** Calendly account not needed to *build* (env placeholders + unit tests against the contract); needed at deploy for the event type (Zoom/Meet attached), webhook registration + signing key, and E2E smoke. Track like L1/L3.
 - **Edge to state explicitly:** disable rule is "has a future call" — a call still in the future when the next window opens keeps the block disabled until it passes (one upcoming call at a time; rare at monthly cadence).
 
-### A4 · Automated messages — `L` · after A5
-Automated triggers: day 12 → reminder to schedule a video call; 10 days with no progress → "¿todo bien?".
+### A4 · Automated messages — `L` — 🔨 In progress (change `a4-automated-messages`)
+Two automated rules: **booking reminder** (first day of an `agendar` window) + **inactivity nudge** (10 days with no `progress_logs`). In-app message + email for both. Explored 2026-07-27; all decisions in the change's `design.md`.
 - **Decided:** the **billing reminder is NOT** implemented — Stripe sends it (Phase 4 decision).
-- **Touches:** new cron(s) in `app/api/cron/` following the pattern of `purge-messages/route.ts` (Bearer `CRON_SECRET`) + `crons` in `vercel.json` · sending via `lib/admin/messageActions.ts` / `message_recipients` + `lib/email/send.ts`.
-- **Watch out:** needs **dedupe** (don't resend the same notice) → persistent flag per client+rule. Reuses the last-activity signal from **A5**. The video-call notice depends on **A6**.
+- **Decided — cadence is content-driven, grid-relative.** The content grid is `(week_number, day_of_week)`, **not** day numbers: each client walks it from *their own* `current_period_start`, so "day 1" differs per client and Aura cannot target it. Rule: fire when the client's current cell has an `agendar` block and **yesterday's cell did not** (= first day of a run). Aura authors runs in **W1 and W3** for a biweekly rhythm.
+- **Decided — dedupe via a dedicated `automated_notices` ledger**, never by querying `messages` (the `purge-messages` cron deletes >180d → history-based dedupe silently re-sends). `unique(profile_id, rule, period_key)`; booking key = `<period_start>:W<n>-<dow>` (also absorbs the week-4 clamp repeat on days 29–31), inactivity key = `<last_activity_date>` (streak-anchored).
+- **Decided:** `past_due` gets the nudge but **not** the booking reminder; `cancel_at_period_end` gets neither; unpublished cells are filtered out.
+- **Decided:** copy lives in an `automated_messages` table (2 seeded rows) editable at `/admin/automated-messages` with an `is_active` **kill switch** — no create/delete (see **A13**).
+- **Side-effect (intentional):** `NewMessageEmail` now carries the message **body**, so Aura's **manual** messages include it too.
+- **Folds in D9** (`serverToday()` DEV_DATE helper). Reuses the last-activity signal from **A5** and `hasFutureCall` from **A6**.
+
+### A13 · Automated-message builder (own triggers) — `L` · nice-to-have, does NOT block launch
+Let Aura **create** automated messages, not just edit the two shipped ones.
+- **Why it's a separate change:** in A4 the DB row is only the *copy* — the **trigger is code** (`lib/admin/notice-rules.ts`). A newly created row would have no rule to fire it and would silently never send. Real create/delete requires Aura to author the **trigger** (window opens / N days inactive / N days before renewal / day N of the period) + a per-trigger dedupe strategy + preview & test-send.
+- **Blast radius:** this hands Aura the ability to schedule mail to every client with no code review — needs its own guardrails.
+- **Signal to build it:** wait until the two hardcoded A4 rules have run in production and Aura asks for a third. Her requests will show which triggers are actually worth offering.
 
 ---
 
@@ -141,6 +152,7 @@ UI tweaks found during browser verification; never itemized. **First step: list 
 
 ### L8 · production-checklist — `M`
 Run the `production-checklist` skill before opening to real clients (includes the `npm audit` vulnerability gate).
+- **Carried over from D11:** tighten the baseline CSP to a **nonce-based** `script-src`/`style-src` (today both keep `'unsafe-inline'`).
 
 ### L9 · Admin UI for plans/prices? — `L` · decision pending
 Decide whether to build a UI to manage variants/prices or keep the script + SQL approach.
@@ -162,9 +174,10 @@ Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this
 | **D6** | Typo in `.env.example` | S | `noreply@auramristany.com` → `no-reply@auramaristany.com`. |
 | **D7** | Verify CI + gitleaks on the 1st PR | S | ✅ Done — exercised on PR #1 (2026-07-22). |
 | **D8** | Visually review `trialing` "Prueba" badge | S | From A5. Badge added but unverified — no trialing sub in demo data. Check when one exists. |
-| **D9** | Extract shared `serverToday()` DEV_DATE helper | S | Code-review RULE CANDIDATE from A5. `now = DEV_DATE ? … : new Date()` inlined in ~5 places (`app/admin/clients/page.tsx`, `lib/content/queries.ts` ×3). Promote to a rule + refactor if it recurs. |
+| **D9** | Extract shared `serverToday()` DEV_DATE helper | S | ✅ Done (folded into **A4** PR1). Was inlined in **8** places, not the ~5 estimated (`lib/content/queries.ts` ×3, `lib/content/booking-queries.ts`, `app/admin/clients/page.tsx`, `app/portal/{messages,messages/[id],settings,pilares}/page.tsx`) → `lib/content/server-today.ts`. Also hardens against an empty/malformed `DEV_DATE` (previously propagated `Invalid Date`). |
+| **D12** | `todayLabel()` duplicated in 3 portal pages | S | Found during the D9 refactor (A4 PR1), left alone per the scope rule. Byte-identical in `app/portal/messages/page.tsx`, `app/portal/messages/[id]/page.tsx`, `app/portal/settings/page.tsx` (`/pilares` builds the same label inline via `weekdayLabel`). Extract to a shared portal helper next time one of them is touched. |
 | **D10** | Verify A9 cancellation end-to-end after demo refresh | S | Demo subs use fabricated `sub_seed_*` Stripe IDs → `cancelSubscription`/`reactivateSubscription` 404 in Stripe test mode ("No se pudo guardar. Intenta más tarde."). Not a code bug. After **L6 demo refresh**, cancel a **real test-checkout** sub → grace state → Reactivar → confirm survey row written/deleted. Tie to **L4 smoke**. |
-| **D11** | CSP for external scripts (Calendly `widget.js`) | S | From A6+A7 security review. The portal loads Calendly's `widget.js` into the authenticated same-origin app with **no CSP `script-src`**. Cookies are HttpOnly (not directly stealable), but a compromised CDN script would run in the authenticated origin. The app has **no CSP at all** today; add a scoped policy at launch (fold into **L8 production-checklist**). |
+| **D11** | CSP for external scripts (Calendly `widget.js`) | S | ✅ Done (PR #12, `b915e1e`). Baseline CSP + hardening headers in `next.config.mjs` `headers()`: whitelists the app's external origins (Calendly, Google Fonts, YouTube, Supabase Storage, Stripe), blocks the rest, `frame-ancestors 'none'`. **Residual:** `script-src`/`style-src` keep `'unsafe-inline'` (App Router inline hydration + inline style props) → **nonce-based CSP deferred to L8**. |
 
 ---
 

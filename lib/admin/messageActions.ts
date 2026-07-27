@@ -61,10 +61,13 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
   const { error: rErr } = await supabase.from("message_recipients").insert(recipRows);
   if (rErr) return { ok: false, error: logAndGeneric("sendMessage.recipients", rErr) };
 
-  // Emails best-effort — un fallo no revierte el mensaje in-app.
+  // Emails best-effort — un fallo no revierte el mensaje in-app. El correo
+  // incluye el cuerpo del mensaje, no sólo el asunto.
   const idSet = new Set(recipientIds);
   const emails = Array.from(new Set(rows.filter((r) => idSet.has(r.profile_id)).map((r) => r.email).filter(Boolean)));
-  await sendNewMessageEmailBatch(emails, input.subject.trim());
+  await sendNewMessageEmailBatch(
+    emails.map((email) => ({ email, subject: input.subject.trim(), body: input.body.trim() }))
+  );
 
   revalidatePath("/admin/messages");
   return { ok: true, count: recipientIds.length };

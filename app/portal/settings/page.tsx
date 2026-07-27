@@ -11,10 +11,11 @@ import { PaymentHistory } from "@/components/portal/settings/PaymentHistory";
 import { CancelSubscriptionSection } from "@/components/portal/settings/CancelSubscriptionSection";
 import { deriveCancellationState } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
+import { serverToday } from "@/lib/content/server-today";
 
 // Etiqueta de fecha para el PortalHeader (respeta DEV_DATE en dev, como /pilares).
 function todayLabel(): string {
-  const base = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
+  const base = serverToday();
   const s = base.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
   return s.charAt(0).toUpperCase() + s.slice(1); // "Martes, 16 de junio" (capitalizado como el resto)
 }

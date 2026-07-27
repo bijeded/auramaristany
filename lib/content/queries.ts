@@ -6,6 +6,7 @@ import {
   getUpcomingDayKeys,
 } from "./access";
 import { ACCESS_STATES } from "./subscription-access";
+import { serverToday } from "./server-today";
 import type { DayKey, UpcomingDayKey } from "./access";
 import type { Json } from "@/lib/supabase/types";
 
@@ -102,8 +103,7 @@ export async function getTodayContent(
   userId: string
 ): Promise<TodayContent | null> {
   const supabase = await createClient();
-  // T12:00:00 avoids midnight-UTC → prior-day in negative-offset timezones
-  const today = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
+  const today = serverToday();
 
   // 1. Active subscription with program slug
   const { data: rawSub } = await supabase
@@ -223,8 +223,7 @@ export async function getWeekCalendar(
   userId: string
 ): Promise<WeekCalendarRow[] | null> {
   const supabase = await createClient();
-  // T12:00:00 avoids midnight-UTC → prior-day in negative-offset timezones
-  const today = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
+  const today = serverToday();
 
   const { data: rawSub } = await supabase
     .from("subscriptions")
@@ -322,12 +321,9 @@ export async function upsertProgressLog(params: {
   completed: boolean;
 }): Promise<{ id: string } | null> {
   const supabase = await createClient();
-  // Respeta DEV_DATE (igual que getTodayContent) para que el día simulado y el
-  // log_date sean coherentes en desarrollo. En producción DEV_DATE no existe.
-  const today = process.env.DEV_DATE
-    ? new Date(`${process.env.DEV_DATE}T12:00:00`)
-    : new Date();
-  const logDate = today.toISOString().split("T")[0];
+  // Mismo "hoy" que getTodayContent, para que el día simulado y el log_date
+  // sean coherentes en desarrollo.
+  const logDate = serverToday().toISOString().split("T")[0];
 
   const { data, error } = await supabase
     .from("progress_logs")

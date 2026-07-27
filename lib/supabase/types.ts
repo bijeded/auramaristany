@@ -11,6 +11,12 @@ export type CancellationReason =
   | "pago_fallido";
 export type CancellationSource = "voluntary" | "involuntary";
 export type BookingStatus = "active" | "canceled";
+/**
+ * ⚠ Mirrored by a DB CHECK constraint on automated_notices.rule AND
+ * automated_messages.rule (migration 014). Adding a value here without a
+ * migration that widens both constraints fails the insert at runtime.
+ */
+export type NoticeRule = "booking_reminder" | "inactivity_nudge";
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type Database = {
@@ -119,6 +125,39 @@ export type Database = {
           status?: BookingStatus;
         };
         Update: Partial<Database["public"]["Tables"]["bookings"]["Insert"]>;
+        Relationships: [];
+      };
+      automated_notices: {
+        Row: {
+          id: string;
+          profile_id: string;
+          rule: NoticeRule;
+          period_key: string;
+          sent_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          rule: NoticeRule;
+          period_key: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["automated_notices"]["Insert"]>;
+        Relationships: [];
+      };
+      automated_messages: {
+        Row: {
+          rule: NoticeRule;
+          subject: string;
+          body: string;
+          is_active: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          rule: NoticeRule;
+          subject: string;
+          body: string;
+          is_active?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["automated_messages"]["Insert"]>;
         Relationships: [];
       };
       programs: {
