@@ -30,9 +30,9 @@ const portalMessagesUrl = () => `${appUrl()}/portal/messages`;
 const portalSettingsUrl = () => `${appUrl()}/portal/settings`;
 const portalHomeUrl = () => `${appUrl()}/portal/today`;
 
-export function sendNewMessageEmail({ to, subject }: { to: string; subject: string }): Promise<SendResult> {
+export function sendNewMessageEmail({ to, subject, body }: { to: string; subject: string; body: string }): Promise<SendResult> {
   return safeSend(to, "Tienes un nuevo mensaje de Aura",
-    React.createElement(NewMessageEmail, { subject, portalUrl: portalMessagesUrl() }));
+    React.createElement(NewMessageEmail, { subject, body, portalUrl: portalMessagesUrl() }));
 }
 
 export function sendWelcomeEmail({ to, name }: { to: string; name: string }): Promise<SendResult> {
@@ -50,14 +50,36 @@ export function sendSubscriptionEndedEmail({ to, name }: { to: string; name: str
     React.createElement(SubscriptionEndedEmail, { name, portalUrl: portalHomeUrl() }));
 }
 
-/** Broadcast best-effort: trocea en lotes de 100 (límite del batch endpoint de Resend). */
-export async function sendNewMessageEmailBatch(recipients: string[], subject: string): Promise<void> {
+export interface MessageEmailRecipient {
+  email: string;
+  subject: string;
+  /** Texto plano ya personalizado (A4 sustituye {nombre} antes de llegar aquí). */
+  body: string;
+}
+
+/**
+ * Broadcast best-effort: trocea en lotes de 100 (límite del batch endpoint de
+ * Resend).
+ *
+ * El HTML se renderiza **por destinataria** en lugar de una sola vez: los
+ * mensajes automáticos (A4) llevan el cuerpo personalizado, así que no hay un
+ * HTML común que reutilizar. `resend.batch.send` acepta un `html` por objeto,
+ * de modo que el troceado en 100 se conserva intacto.
+ */
+export async function sendNewMessageEmailBatch(recipients: MessageEmailRecipient[]): Promise<void> {
   const resend = getResend();
   if (!resend || recipients.length === 0) return;
-  const html = await render(React.createElement(NewMessageEmail, { subject, portalUrl: portalMessagesUrl() }));
   const emailSubject = "Tienes un nuevo mensaje de Aura";
+  const portalUrl = portalMessagesUrl();
   for (let i = 0; i < recipients.length; i += 100) {
-    const chunk = recipients.slice(i, i + 100).map((to) => ({ from: fromAddress(), to, subject: emailSubject, html }));
+    const chunk = await Promise.all(
+      recipients.slice(i, i + 100).map(async (r) => ({
+        from: fromAddress(),
+        to: r.email,
+        subject: emailSubject,
+        html: await render(React.createElement(NewMessageEmail, { subject: r.subject, body: r.body, portalUrl })),
+      }))
+    );
     try {
       await resend.batch.send(chunk);
     } catch (e) {
