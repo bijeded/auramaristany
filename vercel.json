@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/purge-messages",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/automated-messages",
+      "schedule": "0 15 * * *"
     }
   ]
 }

@@ -26,6 +26,11 @@ describe("middleware matcher", () => {
   it("excluye api/cron (Vercel Cron)", () => {
     expect(matches("/api/cron/purge-messages")).toBe(false);
   });
+  it("excluye api/cron/automated-messages (A4)", () => {
+    // Sin sesión de usuario: si el middleware lo cubriera, el cron recibiría un
+    // redirect a /auth/login en vez de ejecutarse.
+    expect(matches("/api/cron/automated-messages")).toBe(false);
+  });
   it("sigue cubriendo otras rutas api (p.ej. portal/progress)", () => {
     expect(matches("/api/portal/progress")).toBe(true);
   });
