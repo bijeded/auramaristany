@@ -148,6 +148,12 @@ Including the body with `{nombre}` personalization means per-recipient HTML — 
 
 **Intentional side-effect:** `NewMessageEmail` is shared with Aura's manual messages, which will now include their body too. Accepted deliberately rather than forked into a near-duplicate template — the inconsistency ("why does the automated one show the text and mine doesn't?") would be the worse outcome.
 
+**Data-exposure constraint carried into PR 2** (raised by the PR 1 security review). Message content now leaves the platform: Resend holds a copy, and that copy sits outside the 180-day `purge-messages` retention we control. Coaching copy is acceptable there — but it sets a hard rule for the rule engine: **placeholder substitution stays limited to `{nombre}`.** Progress data, health information and billing fields must never be interpolated into an automated body. `renderTemplate`'s whitelist is the enforcement point, and widening it is a decision to be taken deliberately, never incidentally.
+
+**`sendNewMessageEmail` (single-recipient) was deleted** in PR 1 rather than carried forward: it had zero callers and the cron uses the batch path. `safeSend`'s error handling stays covered through `sendWelcomeEmail`, which is live.
+
+**`DEV_DATE` is gated on non-production** in `serverToday()`, not merely excluded by convention. It is an ordinary env var; set by mistake in Vercel it would freeze "today" platform-wide — wrong day content, frozen `log_date`, and in PR 2 `period_key`s that never advance, which would poison the dedupe ledger into permanently suppressing or permanently re-firing nudges.
+
 ## Decision 8 — D9 folded in
 
 `now = DEV_DATE ? new Date(\`${DEV_DATE}T12:00:00\`) : new Date()` is inlined in ~5 places (`lib/content/queries.ts` ×3, `lib/content/booking-queries.ts`, `app/admin/clients/page.tsx`). A cron whose entire behavior is date-driven is the natural moment to extract `serverToday()` and refactor the call sites — D9's "promote to a rule if it recurs" condition is met, and it removes a whole class of bug from the code most sensitive to it.

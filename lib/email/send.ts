@@ -30,11 +30,6 @@ const portalMessagesUrl = () => `${appUrl()}/portal/messages`;
 const portalSettingsUrl = () => `${appUrl()}/portal/settings`;
 const portalHomeUrl = () => `${appUrl()}/portal/today`;
 
-export function sendNewMessageEmail({ to, subject, body }: { to: string; subject: string; body: string }): Promise<SendResult> {
-  return safeSend(to, "Tienes un nuevo mensaje de Aura",
-    React.createElement(NewMessageEmail, { subject, body, portalUrl: portalMessagesUrl() }));
-}
-
 export function sendWelcomeEmail({ to, name }: { to: string; name: string }): Promise<SendResult> {
   return safeSend(to, `¡Bienvenida a Aura, ${name}!`,
     React.createElement(WelcomeEmail, { name, portalUrl: portalHomeUrl() }));

@@ -2,10 +2,14 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { serverToday } from "@/lib/content/server-today";
 
 const ORIGINAL = process.env.DEV_DATE;
+const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
 
 afterEach(() => {
   if (ORIGINAL === undefined) delete process.env.DEV_DATE;
   else process.env.DEV_DATE = ORIGINAL;
+  if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
+  else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -78,6 +82,36 @@ describe("serverToday", () => {
     // cálculos de día/semana de todo el portal.
     expect(Number.isNaN(today.getTime())).toBe(false);
     expect(today.getTime()).toBe(real.getTime());
+  });
+
+  it("IGNORA DEV_DATE en producción aunque esté definida", () => {
+    // Arrange — DEV_DATE es una env var normal: nada impide ponerla por error en
+    // Vercel. Ahí congelaría el "hoy" de toda la plataforma (contenido del día
+    // equivocado, log_date congelado y, con A4, period_keys que nunca avanzan).
+    process.env.DEV_DATE = "2020-01-01";
+    process.env.VERCEL_ENV = "production";
+    vi.useFakeTimers();
+    const real = new Date("2026-07-27T09:30:00Z");
+    vi.setSystemTime(real);
+
+    // Act
+    const today = serverToday();
+
+    // Assert
+    expect(today.getTime()).toBe(real.getTime());
+    expect(today.getFullYear()).not.toBe(2020);
+  });
+
+  it("avisa por consola cuando descarta una DEV_DATE malformada", () => {
+    // Arrange — degradar es correcto, pero en silencio una errata no da señal.
+    process.env.DEV_DATE = "15-03-2026"; // formato invertido, error típico
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Act
+    serverToday();
+
+    // Assert
+    expect(warn).toHaveBeenCalled();
   });
 
   it("devuelve una instancia nueva en cada llamada", () => {

@@ -10,7 +10,7 @@ vi.mock("@/lib/email/client", () => ({
   appUrl: () => "https://app.test",
 }));
 
-import { sendNewMessageEmail, sendNewMessageEmailBatch } from "@/lib/email/send";
+import { sendWelcomeEmail, sendNewMessageEmailBatch } from "@/lib/email/send";
 
 beforeEach(() => {
   sendMock.mockReset();
@@ -18,64 +18,21 @@ beforeEach(() => {
   resendStub = { emails: { send: sendMock }, batch: { send: batchMock } };
 });
 
-describe("sendNewMessageEmail", () => {
+// safeSend es el envoltorio común de todos los envíos individuales; se ejercita
+// a través de sendWelcomeEmail, que sí tiene llamadores reales.
+describe("safeSend (vía sendWelcomeEmail)", () => {
   it("devuelve ok:false sin lanzar cuando no hay cliente", async () => {
     resendStub = null;
-    await expect(sendNewMessageEmail({ to: "a@x.com", subject: "Hola", body: "Cuerpo" })).resolves.toEqual({ ok: false, error: "email disabled" });
+    await expect(sendWelcomeEmail({ to: "a@x.com", name: "Ana" })).resolves.toEqual({
+      ok: false,
+      error: "email disabled",
+    });
   });
 
   it("devuelve ok:false sin lanzar cuando el cliente arroja", async () => {
     sendMock.mockRejectedValueOnce(new Error("boom"));
-    const res = await sendNewMessageEmail({ to: "a@x.com", subject: "Hola", body: "Cuerpo" });
+    const res = await sendWelcomeEmail({ to: "a@x.com", name: "Ana" });
     expect(res.ok).toBe(false);
-  });
-
-  it("envía y devuelve ok:true con HTML que contiene el asunto", async () => {
-    sendMock.mockResolvedValueOnce({ data: { id: "e1" }, error: null });
-    const res = await sendNewMessageEmail({ to: "a@x.com", subject: "Mi Asunto", body: "Hola" });
-    expect(res.ok).toBe(true);
-    const payload = sendMock.mock.calls[0][0];
-    expect(payload.to).toBe("a@x.com");
-    expect(payload.html).toContain("Mi Asunto");
-  });
-
-  it("incluye el cuerpo del mensaje en el HTML", async () => {
-    // Arrange
-    sendMock.mockResolvedValueOnce({ data: { id: "e1" }, error: null });
-
-    // Act
-    await sendNewMessageEmail({ to: "a@x.com", subject: "Asunto", body: "Nos vemos el martes" });
-
-    // Assert
-    expect(sendMock.mock.calls[0][0].html).toContain("Nos vemos el martes");
-  });
-
-  it("preserva los saltos de línea del cuerpo (pre-line, como el portal)", async () => {
-    // Arrange
-    sendMock.mockResolvedValueOnce({ data: { id: "e1" }, error: null });
-
-    // Act
-    await sendNewMessageEmail({ to: "a@x.com", subject: "Asunto", body: "Línea 1\n\nLínea 2" });
-
-    // Assert — sin pre-line el email colapsa los párrafos que Aura escribió.
-    expect(sendMock.mock.calls[0][0].html).toMatch(/pre-line/);
-  });
-
-  it("escapa el HTML del cuerpo en lugar de interpretarlo", async () => {
-    // Arrange
-    sendMock.mockResolvedValueOnce({ data: { id: "e1" }, error: null });
-
-    // Act
-    await sendNewMessageEmail({
-      to: "a@x.com",
-      subject: "Asunto",
-      body: "<script>alert(1)</script>",
-    });
-
-    // Assert — el cuerpo es texto plano; nunca debe pasar por dangerouslySetInnerHTML.
-    const html = sendMock.mock.calls[0][0].html;
-    expect(html).not.toContain("<script>alert(1)</script>");
-    expect(html).toContain("&lt;script&gt;");
   });
 });
 
@@ -91,6 +48,8 @@ describe("sendNewMessageEmailBatch", () => {
     const recipients = Array.from({ length: 150 }, (_, i) => recipient(i));
     await expect(sendNewMessageEmailBatch(recipients)).resolves.toBeUndefined();
     expect(batchMock).toHaveBeenCalledTimes(2);
+    expect(batchMock.mock.calls[0][0]).toHaveLength(100);
+    expect(batchMock.mock.calls[1][0]).toHaveLength(50);
   });
 
   it("no hace nada si no hay cliente", async () => {
@@ -102,6 +61,49 @@ describe("sendNewMessageEmailBatch", () => {
   it("no hace nada con una lista vacía", async () => {
     await expect(sendNewMessageEmailBatch([])).resolves.toBeUndefined();
     expect(batchMock).not.toHaveBeenCalled();
+  });
+
+  it("incluye el asunto y el cuerpo del mensaje en el HTML", async () => {
+    // Arrange
+    batchMock.mockResolvedValue({ data: null, error: null });
+
+    // Act
+    await sendNewMessageEmailBatch([
+      { email: "a@x.com", subject: "Mi Asunto", body: "Nos vemos el martes" },
+    ]);
+
+    // Assert
+    const html = batchMock.mock.calls[0][0][0].html;
+    expect(html).toContain("Mi Asunto");
+    expect(html).toContain("Nos vemos el martes");
+  });
+
+  it("preserva los saltos de línea del cuerpo (pre-line, como el portal)", async () => {
+    // Arrange
+    batchMock.mockResolvedValue({ data: null, error: null });
+
+    // Act
+    await sendNewMessageEmailBatch([
+      { email: "a@x.com", subject: "Asunto", body: "Línea 1\n\nLínea 2" },
+    ]);
+
+    // Assert — sin pre-line el email colapsa los párrafos que Aura escribió.
+    expect(batchMock.mock.calls[0][0][0].html).toMatch(/pre-line/);
+  });
+
+  it("escapa el HTML del cuerpo en lugar de interpretarlo", async () => {
+    // Arrange
+    batchMock.mockResolvedValue({ data: null, error: null });
+
+    // Act
+    await sendNewMessageEmailBatch([
+      { email: "a@x.com", subject: "Asunto", body: "<script>alert(1)</script>" },
+    ]);
+
+    // Assert — el cuerpo es texto plano; nunca debe pasar por dangerouslySetInnerHTML.
+    const html = batchMock.mock.calls[0][0][0].html;
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
   });
 
   it("renderiza un HTML propio por destinataria (permite personalizar el cuerpo)", async () => {

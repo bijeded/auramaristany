@@ -39,12 +39,19 @@ create table automated_notices (
   unique (profile_id, rule, period_key)
 );
 
-create index automated_notices_profile_rule_idx on automated_notices(profile_id, rule);
+-- No extra index: the unique(profile_id, rule, period_key) constraint's implicit
+-- index already serves lookups on the (profile_id, rule) prefix.
 
--- RLS enabled with NO policies on purpose: only the cron (service-role, which
--- bypasses RLS) reads and writes this ledger. Clients must not be able to read
--- their own nudge history, and nothing in the app needs it.
+-- RLS with NO policies on purpose: only the cron (service-role, which bypasses
+-- RLS) reads and writes this ledger. Clients must not be able to read their own
+-- nudge history, and nothing in the app needs it — including admins, so any
+-- future nudge-history view must go through the service-role client.
+-- `force` + `revoke` make the deny explicit instead of merely implied by the
+-- absence of policies: without `force`, a future `security definer` function
+-- owned by postgres would bypass RLS silently.
 alter table automated_notices enable row level security;
+alter table automated_notices force row level security;
+revoke all on automated_notices from anon, authenticated;
 
 -- ---------- 2) Editable copy per rule ----------
 create table automated_messages (
@@ -89,4 +96,9 @@ insert into automated_messages (rule, subject, body) values
     'Si quieres retomar, empieza por el día de hoy sin pensar en los que quedaron atrás. Y si algo no te está funcionando, escríbeme y lo ajustamos.' || chr(10) || chr(10) ||
     'Aquí sigo,' || chr(10) ||
     'Aura'
-  );
+  )
+-- Idempotente: esta migración se aplica a mano por la Management API, donde una
+-- aplicación parcial o repetida es un modo de fallo normal. Sin esto, un
+-- segundo intento falla por PK y deja la migración a medias. Tampoco debe
+-- pisar la copia que Aura haya editado desde /admin/automated-messages.
+on conflict (rule) do nothing;
