@@ -4,10 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getMessageDetail } from "@/lib/content/messages";
 import { MarkReadOnView } from "@/components/portal/MarkReadOnView";
 import { PortalHeader } from "@/components/portal/PortalHeader";
+import { serverToday } from "@/lib/content/server-today";
 
 // Etiqueta de fecha para el PortalHeader (respeta DEV_DATE en dev, como /pilares).
 function todayLabel(): string {
-  const base = process.env.DEV_DATE ? new Date(`${process.env.DEV_DATE}T12:00:00`) : new Date();
+  const base = serverToday();
   const s = base.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

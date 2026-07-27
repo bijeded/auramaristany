@@ -8,6 +8,7 @@ import {
   nextScheduledDate,
   type BookingLike,
 } from "./booking-helpers";
+import { serverToday } from "./server-today";
 
 export interface BookingState {
   hasFutureCall: boolean;
@@ -19,9 +20,7 @@ export interface BookingState {
  * /portal/booking (una sola fuente). Deriva `now` respetando DEV_DATE.
  */
 export async function getBookingState(userId: string): Promise<BookingState> {
-  const now = process.env.DEV_DATE
-    ? new Date(`${process.env.DEV_DATE}T12:00:00`)
-    : new Date();
+  const now = serverToday();
   const bookings = await getUserBookings(userId);
   return {
     hasFutureCall: hasFutureCall(bookings, now),
