@@ -174,6 +174,10 @@ All day arithmetic is whole-day **UTC** (the `getUTCDay`/EDGE-3 convention, alre
 
 Migration 014, applied once, additive, no backfill: `automated_notices` (empty) + `automated_messages` (2 seeded rows). On first run every eligible client is a fresh key, so the first cron execution may send to a batch of clients at once — **run it with `?dryRun=1` first in production** and confirm the count is plausible before the schedule goes live.
 
+**Both rules ship switched off.** The 2026-07-27 dry run against the live database returned `{candidates: 18, wouldSend: 17, byRule: {inactivity_nudge: 17}}`, and every demo address is `@test.aura.mx` — a domain that does not resolve. Deploying with the rules active would fire ~17 hard bounces in one batch from a sender domain verified days earlier, which is a fast route to being throttled by the provider. Since `vercel.json` arms the schedule on deploy, `update automated_messages set is_active = false;` is a **pre-merge** step, not a post-merge one.
+
+This is the `is_active` switch doing the job it was added for (§6): whether a rule is live is a **data** decision Aura or the operator can take and reverse without a deploy, so "the code is ready" and "the rule is on" are deliberately separate events. Each rule is then enabled on its own trigger — `inactivity_nudge` after **L6** demo cleanup, `booking_reminder` once Aura has placed her W1/W3 runs.
+
 ## Open Questions
 
 None blocking. Copy is drafted by us and edited by Aura after it lands.
