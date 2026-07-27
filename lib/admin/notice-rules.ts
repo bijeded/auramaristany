@@ -131,8 +131,9 @@ export function renderTemplate(body: string, fullName: string | null): string {
   const firstName = fullName?.trim().split(/\s+/)[0] ?? "";
   const rendered = body.replace(/\{nombre\}/g, firstName);
   if (firstName) return rendered;
-  // Sin nombre, "Hola {nombre}:" quedaría como "Hola :" y se leería como un
-  // error de la plataforma. Se recoge la puntuación que dejó el hueco.
+  // `profiles.full_name` es NOT NULL, así que esta rama no debería alcanzarse;
+  // se mantiene porque un nombre vacío dejaría "Hola :" y eso se leería como un
+  // error de la plataforma. Recoge la puntuación que dejó el hueco.
   return rendered.replace(/ +([:,;.!?])/g, "$1").replace(/ {2,}/g, " ").trim();
 }
 
