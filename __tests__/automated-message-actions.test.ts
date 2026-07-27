@@ -134,6 +134,30 @@ describe("updateAutomatedMessage", () => {
     });
   });
 
+  it("devuelve el texto SANEADO, no el enviado", async () => {
+    // Sin esto el formulario se queda desincronizado: muestra lo que escribió
+    // el admin, no lo que quedó guardado.
+    const res = await updateAutomatedMessage({
+      rule: "booking_reminder",
+      subject: "  Hola <b>Aura</b>  ",
+      body: "Fuerza & salud",
+    });
+
+    expect(res.error).toBeUndefined();
+    expect(res.saved).toEqual({ subject: "Hola Aura", body: "Fuerza & salud" });
+  });
+
+  it("no devuelve `saved` cuando falla", async () => {
+    updateError = { code: "42501", message: "rls" };
+    const res = await updateAutomatedMessage({
+      rule: "booking_reminder",
+      subject: "asunto",
+      body: "cuerpo",
+    });
+
+    expect(res.saved).toBeUndefined();
+  });
+
   it("no escribe si quien llama no es admin", async () => {
     adminOk = false;
     const res = await updateAutomatedMessage({
@@ -180,6 +204,15 @@ describe("toggleAutomatedMessage", () => {
   it("rechaza una regla fuera de la lista blanca", async () => {
     // @ts-expect-error entrada inválida a propósito
     const res = await toggleAutomatedMessage("drop_table", true);
+
+    expect(res.error).toBeTruthy();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("rechaza un is_active que no es booleano", async () => {
+    // Los argumentos de una server action los controla el cliente.
+    // @ts-expect-error entrada inválida a propósito
+    const res = await toggleAutomatedMessage("booking_reminder", "sí");
 
     expect(res.error).toBeTruthy();
     expect(calls).toHaveLength(0);

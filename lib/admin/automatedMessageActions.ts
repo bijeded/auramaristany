@@ -30,7 +30,7 @@ function revalidate() {
 
 export async function updateAutomatedMessage(
   input: AutomatedMessageInput
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; saved?: { subject: string; body: string } }> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
 
@@ -51,8 +51,12 @@ export async function updateAutomatedMessage(
   if (error) return { error: logAndGeneric("updateAutomatedMessage", error) };
 
   revalidate();
-  return {};
+  // Se devuelve lo guardado, no lo enviado: el saneado puede haber cambiado el
+  // texto y el formulario tiene que reflejar la versión que quedó en la base.
+  return { saved: { subject, body } };
 }
+
+const toggleSchema = z.object({ rule: ruleSchema, isActive: z.boolean() });
 
 export async function toggleAutomatedMessage(
   rule: NoticeRule,
@@ -61,13 +65,13 @@ export async function toggleAutomatedMessage(
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
 
-  const parsed = ruleSchema.safeParse(rule);
+  const parsed = toggleSchema.safeParse({ rule, isActive });
   if (!parsed.success) return { error: "Mensaje automático no válido" };
 
   const { error } = await auth.supabase
     .from("automated_messages")
-    .update({ is_active: isActive })
-    .eq("rule", parsed.data);
+    .update({ is_active: parsed.data.isActive })
+    .eq("rule", parsed.data.rule);
   if (error) return { error: logAndGeneric("toggleAutomatedMessage", error) };
 
   revalidate();

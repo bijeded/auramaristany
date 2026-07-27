@@ -9,12 +9,14 @@ export default async function AdminAutomatedMessagesPage() {
   await requireAdminPage();
   // Cliente con RLS: la política de `automated_messages` ya es sólo-admin.
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("automated_messages")
     .select("rule, subject, body, is_active")
     .order("rule");
+  // Sin filas la pantalla cae al estado vacío; el motivo real sólo aparece aquí.
+  if (error) console.error("[AdminAutomatedMessagesPage]", error);
 
-  // Tipado por el SDK desde la Row de automated_messages.
+  // keep: el select parcial no estrecha `rule` de string a NoticeRule.
   const rows = (data ?? []) as AutomatedMessageRow[];
   return <AutomatedMessagesEditor rows={rows} />;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import {
@@ -70,7 +70,13 @@ function RuleCard({ row }: { row: AutomatedMessageRow }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const dirty = subject !== row.subject || body !== row.body;
+  // Lo guardado, según el servidor. Arranca en las props y se actualiza con la
+  // respuesta de la acción: el saneado puede devolver un texto distinto al que
+  // se envió, y sin esto el formulario se quedaría "sucio" para siempre.
+  const [persisted, setPersisted] = useState({ subject: row.subject, body: row.body });
+  useEffect(() => setPersisted({ subject: row.subject, body: row.body }), [row.subject, row.body]);
+
+  const dirty = subject !== persisted.subject || body !== persisted.body;
 
   async function save() {
     setSaving(true);
@@ -78,10 +84,14 @@ function RuleCard({ row }: { row: AutomatedMessageRow }) {
     setSaved(false);
     const res = await updateAutomatedMessage({ rule: row.rule, subject, body });
     setSaving(false);
-    if (res.error) {
-      setError(res.error);
+    if (res.error || !res.saved) {
+      setError(res.error ?? "No se pudo guardar. Intenta más tarde.");
       return;
     }
+    // El texto saneado es el que quedó en la base: se refleja en el formulario.
+    setSubject(res.saved.subject);
+    setBody(res.saved.body);
+    setPersisted(res.saved);
     setSaved(true);
     router.refresh();
   }
@@ -215,7 +225,11 @@ function RuleCard({ row }: { row: AutomatedMessageRow }) {
       </div>
 
       {error && (
-        <p className="font-body" style={{ color: "var(--error)", fontSize: 13, marginTop: 12 }}>
+        <p
+          role="alert"
+          className="font-body"
+          style={{ color: "var(--error)", fontSize: 13, marginTop: 12 }}
+        >
           {error}
         </p>
       )}
@@ -242,6 +256,7 @@ function RuleCard({ row }: { row: AutomatedMessageRow }) {
         </button>
         {saved && !dirty && (
           <span
+            aria-live="polite"
             className="font-body flex items-center gap-1"
             style={{ color: "var(--lavanda-dark)", fontSize: 13, fontWeight: 600 }}
           >
