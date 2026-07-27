@@ -7,7 +7,11 @@
 //   isInactive / INACTIVITY_THRESHOLD_DAYS     → lib/admin/clients-helpers.ts
 //   subscriptionGrantsAccess                   → lib/content/subscription-access.ts
 import { getCurrentDayKey, type DayOfWeek } from "@/lib/content/access";
-import { INACTIVITY_THRESHOLD_DAYS, isInactive, type SubStatus } from "./clients-helpers";
+import {
+  INACTIVITY_THRESHOLD_DAYS,
+  isInactive,
+  type SubStatus,
+} from "@/lib/admin/clients-helpers";
 import { subscriptionGrantsAccess } from "@/lib/content/subscription-access";
 import type { NoticeRule } from "@/lib/supabase/types";
 
@@ -87,12 +91,28 @@ export function inactivityPeriodKey(candidate: NoticeCandidate): string {
 
 const DAY_MS = 86_400_000;
 
+const utcDay = (d: Date): number => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+
+/**
+ * ¿La celda que ocupa la clienta en `when` expone un bloque "agendar"?
+ *
+ * ⚠ Trampa del modelo, corregida aquí: `getCurrentDayKey` topa `daysElapsed` en
+ * 0 pero toma `day_of_week` del calendario, así que para una fecha ANTERIOR al
+ * inicio del periodo devuelve `(W1, día de esa fecha)` — una celda que la
+ * clienta aún no ha recorrido (le caerá al final de su semana 1). Preguntar por
+ * "ayer" el día 1 devolvía entonces una celda ajena al periodo.
+ *
+ * Consecuencia real medida: con la ventana recomendada en W1 mié-jue-vie, quien
+ * empezaba en jueves o viernes recibía el aviso hasta su día 7 o 6 en vez del
+ * día 1. Cualquier fecha previa al inicio del periodo cuenta como "sin bloque".
+ */
 function hasAgendarBlock(
   candidate: NoticeCandidate,
   cells: Set<string>,
   when: Date
 ): boolean {
   if (!candidate.series_id) return false;
+  if (utcDay(when) < utcDay(new Date(candidate.current_period_start))) return false;
   const key = getCurrentDayKey(candidate.current_period_start, when);
   return cells.has(agendarCellKey(candidate.series_id, key.week_number, key.day_of_week as DayOfWeek));
 }
@@ -129,12 +149,30 @@ export function isFirstDayOfAgendarRun(
  */
 export function renderTemplate(body: string, fullName: string | null): string {
   const firstName = fullName?.trim().split(/\s+/)[0] ?? "";
-  const rendered = body.replace(/\{nombre\}/g, firstName);
+  // Reemplazo por FUNCIÓN, no por cadena: `full_name` lo edita la clienta en
+  // /portal/settings, y en la forma de cadena `$&`, `$'`, "$`" o `$1` los
+  // interpreta el motor de regex. Un nombre como "$`" corrompería el cuerpo que
+  // luego se guarda en messages.body y se envía por correo.
+  const rendered = body.replace(/\{nombre\}/g, () => firstName);
   if (firstName) return rendered;
   // `profiles.full_name` es NOT NULL, así que esta rama no debería alcanzarse;
   // se mantiene porque un nombre vacío dejaría "Hola :" y eso se leería como un
   // error de la plataforma. Recoge la puntuación que dejó el hueco.
   return rendered.replace(/ +([:,;.!?])/g, "$1").replace(/ {2,}/g, " ").trim();
+}
+
+/**
+ * Todas las `period_key` que hoy podrían generarse, para acotar la lectura del
+ * ledger a lo que de verdad está en evaluación (ver getSentKeys). Es una
+ * sobre-aproximación barata: incluye claves de reglas que quizá no se disparen.
+ */
+export function candidatePeriodKeys(candidates: NoticeCandidate[], now: Date): string[] {
+  const keys = new Set<string>();
+  for (const c of candidates) {
+    keys.add(bookingPeriodKey(c, now));
+    keys.add(inactivityPeriodKey(c));
+  }
+  return Array.from(keys);
 }
 
 // --- Evaluación -----------------------------------------------------------
@@ -171,7 +209,9 @@ export function evaluateNotices(
         email: c.email,
         rule,
         period_key: periodKey,
-        subject: tpl.subject,
+        // El asunto también admite {nombre}: si Aura lo escribe ahí, debe
+        // sustituirse igual que en el cuerpo y no llegar literal a la clienta.
+        subject: renderTemplate(tpl.subject, c.full_name),
         body: renderTemplate(tpl.body, c.full_name),
       });
     };

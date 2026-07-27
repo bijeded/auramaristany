@@ -78,7 +78,9 @@ export async function sendNewMessageEmailBatch(recipients: MessageEmailRecipient
     try {
       await resend.batch.send(chunk);
     } catch (e) {
-      console.error("[email] batch send failed", e);
+      // Sólo el mensaje: el objeto de error de Resend puede traer las
+      // direcciones del lote y acabaría en los logs del servidor.
+      console.error("[email] batch send failed", e instanceof Error ? e.message : String(e));
     }
   }
 }

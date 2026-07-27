@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   agendarCellKey,
   bookingPeriodKey,
+  candidatePeriodKeys,
   evaluateNotices,
   inactivityPeriodKey,
   isFirstDayOfAgendarRun,
@@ -9,7 +10,7 @@ import {
   sentKey,
   type NoticeCandidate,
   type NoticeTemplates,
-} from "@/lib/admin/notice-rules";
+} from "@/lib/cron/notice-rules";
 
 // --- Fixtures -------------------------------------------------------------
 // Periodo que arranca en MIÉRCOLES 2026-07-01. Para esta clienta:
@@ -108,6 +109,54 @@ describe("isFirstDayOfAgendarRun", () => {
     expect(isFirstDayOfAgendarRun(base, crossing, at("2026-07-08"))).toBe(false);
   });
 
+  // REGRESIÓN — el día 1 no tiene "ayer" dentro del periodo.
+  // `getCurrentDayKey` topa daysElapsed en 0 pero toma el día de la semana del
+  // calendario, así que la víspera del inicio devolvía (W1, ese día) — una celda
+  // que la clienta recorrerá al final de su semana 1. Si la ventana la incluía,
+  // el aviso del día 1 se suprimía y llegaba hasta el día 6 o 7.
+  describe("frontera del día 1 (regresión)", () => {
+    // Ventana recomendada: W1 miércoles/jueves/viernes. Con ella, quien empezaba
+    // en jueves o viernes recibía el aviso hasta su día 7 o 6.
+    const win = new Set([
+      agendarCellKey(SERIES, 1, "miercoles"),
+      agendarCellKey(SERIES, 1, "jueves"),
+      agendarCellKey(SERIES, 1, "viernes"),
+    ]);
+
+    it("dispara el día 1 cuando la ventana ya está abierta ese mismo día", () => {
+      // Arrange — periodo que arranca en MIÉRCOLES: su día 1 cae dentro de la
+      // ventana, y la víspera (martes) también está en la ventana.
+      const cand = { ...base, current_period_start: "2026-07-01T00:00:00Z" };
+
+      // Act
+      const result = isFirstDayOfAgendarRun(cand, win, at("2026-07-01"));
+
+      // Assert
+      expect(result).toBe(true);
+    });
+
+    it("dispara el día 1 para quien empieza en jueves (antes se retrasaba al día 7)", () => {
+      const cand = { ...base, current_period_start: "2026-07-02T00:00:00Z" }; // jueves
+      expect(isFirstDayOfAgendarRun(cand, win, at("2026-07-02"))).toBe(true);
+    });
+
+    it("dispara el día 1 para quien empieza en viernes (antes se retrasaba al día 6)", () => {
+      const cand = { ...base, current_period_start: "2026-07-03T00:00:00Z" }; // viernes
+      expect(isFirstDayOfAgendarRun(cand, win, at("2026-07-03"))).toBe(true);
+    });
+
+    it("no dispara el día 1 si ese día no hay ventana abierta", () => {
+      const cand = { ...base, current_period_start: "2026-07-04T00:00:00Z" }; // sábado
+      expect(isFirstDayOfAgendarRun(cand, win, at("2026-07-04"))).toBe(false);
+    });
+
+    it("sigue sin disparar el segundo día de la ventana", () => {
+      const cand = { ...base, current_period_start: "2026-07-02T00:00:00Z" }; // jueves
+      // Día 2 = viernes, aún dentro de la ventana → no es el primer día.
+      expect(isFirstDayOfAgendarRun(cand, win, at("2026-07-03"))).toBe(false);
+    });
+  });
+
   it("NO vuelve a disparar cuando el día 29 recae en una celda de W4 ya visitada", () => {
     // Arrange — week_number va topado a 4, así que el día 29 vuelve a (W4, mismo dow)
     // que el día 22. Con la ventana en W4 miércoles, el día 22 es el primer día.
@@ -184,6 +233,38 @@ describe("renderTemplate", () => {
 
   it("no lanza con un cuerpo vacío", () => {
     expect(renderTemplate("", "Ana")).toBe("");
+  });
+
+  // SEGURIDAD — `full_name` lo edita la clienta en /portal/settings. Con
+  // reemplazo por cadena, `$&`, "$`", `$'` o `$1` los interpreta el motor de
+  // regex y corrompen el cuerpo que se guarda y se envía por correo.
+  it.each([
+    ["$`", "Hola $`:"],
+    ["$&", "Hola $&:"],
+    ["$'", "Hola $':"],
+    ["$1", "Hola $1:"],
+  ])("trata %s en el nombre como texto literal", (name, expected) => {
+    expect(renderTemplate("Hola {nombre}:", name)).toBe(expected);
+  });
+
+  it("no interpreta patrones de reemplazo dentro de un nombre completo", () => {
+    expect(renderTemplate("Hola {nombre}.", "Ana$'López Ruiz")).toBe("Hola Ana$'López.");
+  });
+});
+
+describe("candidatePeriodKeys", () => {
+  it("reúne las claves de ambas reglas sin duplicados", () => {
+    // Arrange
+    const otra = { ...base, profile_id: "p2", last_activity_date: "2026-06-10" };
+
+    // Act — acota la lectura del ledger a lo que hoy está en evaluación.
+    const keys = candidatePeriodKeys([base, otra], at("2026-07-01"));
+
+    // Assert
+    expect(keys).toContain("2026-07-01:W1-miercoles");
+    expect(keys).toContain("2026-07-01"); // last_activity de `base`
+    expect(keys).toContain("2026-06-10");
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 

@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentSeriesNumber } from "@/lib/content/access";
 import { ACCESS_STATES } from "@/lib/content/subscription-access";
+import { hasFutureCall, type BookingLike } from "@/lib/content/booking-helpers";
 import { agendarCellKey, sentKey, type NoticeCandidate, type NoticeTemplates } from "./notice-rules";
 import type { NoticeRule } from "@/lib/supabase/types";
 
@@ -16,7 +17,19 @@ import type { NoticeRule } from "@/lib/supabase/types";
  * Sólo dos consultas para todo el padrón: el conjunto de celdas con bloque
  * "agendar" es diminuto y compartido, así que se lee una vez y las candidatas
  * se resuelven en memoria contra un Set.
+ *
+ * ⚠ SÓLO PARA EL CRON. Estas funciones escriben con service-role y NO verifican
+ * quién llama: `insertNoticeMessage` escribe un mensaje a cualquier profile_id
+ * que reciba. El único guardián es el Bearer CRON_SECRET de
+ * app/api/cron/automated-messages. No importar desde server actions ni desde la
+ * pantalla de admin (PR3): un profile_id venido de un formulario convertiría
+ * esto en escritura arbitraria de mensajes. Por eso el módulo vive en
+ * `lib/cron/` y no en `lib/admin/`, donde la regla del proyecto es que
+ * service-role va detrás de requireAdmin().
  */
+
+/** Fallo de lectura que debe abortar la corrida en vez de fingir "nada que enviar". */
+export class NoticeQueryError extends Error {}
 
 // --- 1) Celdas con ventana de agenda -------------------------------------
 
@@ -34,8 +47,10 @@ export async function getAgendarCells(): Promise<Set<string>> {
     .eq("program_days.published", true);
 
   if (error) {
+    // Se propaga en lugar de devolver vacío: un Set vacío se confundiría con
+    // "hoy no hay ninguna ventana abierta" y la corrida se reportaría sana.
     console.error("[notice-queries] getAgendarCells:", error.message);
-    return new Set();
+    throw new NoticeQueryError("No se pudieron leer las ventanas de agenda");
   }
 
   // keep: program_day_blocks JOIN program_days!inner — join shape not inferred by the SDK.
@@ -75,7 +90,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
 
   if (error) {
     console.error("[notice-queries] getNoticeCandidates:", error.message);
-    return [];
+    throw new NoticeQueryError("No se pudo leer el padrón de clientes");
   }
 
   // keep: subscriptions JOIN profiles!inner (+ progress_logs, bookings) — nested join
@@ -105,8 +120,6 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
     Array.from(new Set(rows.map((r) => r.program_variant_id)))
   );
 
-  const nowMs = now.getTime();
-
   return rows.map((r) => {
     const logs = r.profiles!.progress_logs ?? [];
     const lastActivity = logs.reduce<string | null>(
@@ -114,10 +127,9 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
       null
     );
 
-    const bookings = r.profiles!.bookings ?? [];
-    const hasFutureCall = bookings.some(
-      (b) => b.status === "active" && new Date(b.scheduled_at).getTime() > nowMs
-    );
+    // Regla "una llamada futura no cancelada a la vez": la dueña es
+    // booking-helpers (A6). No se reimplementa aquí para que no puedan divergir.
+    const bookings = (r.profiles!.bookings ?? []) as BookingLike[];
 
     const seriesNumber = getCurrentSeriesNumber(r.months_elapsed);
     const seriesId = seriesByVariant.get(`${r.program_variant_id}|${seriesNumber}`) ?? null;
@@ -132,7 +144,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
       enrollment_date: r.enrollment_date,
       series_id: seriesId,
       last_activity_date: lastActivity,
-      has_future_call: hasFutureCall,
+      has_future_call: hasFutureCall(bookings, now),
     } satisfies NoticeCandidate;
   });
 }
@@ -168,22 +180,35 @@ async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<st
 
 // --- 3) Ledger de deduplicación ------------------------------------------
 
-/** Claves ya enviadas para estas clientas, en el formato de `sentKey`. */
-export async function getSentKeys(profileIds: string[]): Promise<Set<string>> {
+/**
+ * Claves ya enviadas para estas clientas, en el formato de `sentKey`.
+ *
+ * Acotado por `period_key`: el ledger crece ~2 filas por clienta y mes para
+ * siempre, y PostgREST corta en 1000 filas. Sin el filtro, pasado ese punto el
+ * conjunto volvería parcial en silencio. Se piden sólo las claves que hoy están
+ * en evaluación, así que el tamaño depende del padrón, no del histórico.
+ * (Aunque llegara incompleto, `claimNotice` sigue impidiendo el duplicado: este
+ * pre-filtro sólo evita viajes de ida y vuelta inútiles.)
+ */
+export async function getSentKeys(
+  profileIds: string[],
+  periodKeys: string[]
+): Promise<Set<string>> {
   const keys = new Set<string>();
-  if (profileIds.length === 0) return keys;
+  if (profileIds.length === 0 || periodKeys.length === 0) return keys;
 
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("automated_notices")
     .select("profile_id, rule, period_key")
-    .in("profile_id", profileIds);
+    .in("profile_id", profileIds)
+    .in("period_key", periodKeys);
 
   if (error) {
     console.error("[notice-queries] getSentKeys:", error.message);
     // Devolver un set vacío haría creer que no se ha enviado nada y dispararía
     // un reenvío masivo. Se propaga el fallo para que la corrida aborte.
-    throw new Error("No se pudo leer el ledger de avisos");
+    throw new NoticeQueryError("No se pudo leer el ledger de avisos");
   }
 
   for (const row of (data ?? []) as { profile_id: string; rule: NoticeRule; period_key: string }[]) {
@@ -201,11 +226,13 @@ export async function getSentKeys(profileIds: string[]): Promise<Set<string>> {
  * registrar, la siguiente corrida reenviaría. Así una caída cuesta un mensaje
  * perdido, nunca uno duplicado.
  */
+export type ClaimResult = "claimed" | "already_sent" | "error";
+
 export async function claimNotice(
   profileId: string,
   rule: NoticeRule,
   periodKey: string
-): Promise<boolean> {
+): Promise<ClaimResult> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("automated_notices")
@@ -216,11 +243,13 @@ export async function claimNotice(
     .select("id");
 
   if (error) {
+    // Se distingue de "ya estaba enviado": un fallo de escritura contado como
+    // dedupe le reportaría a Aura un envío fallido como si fuera correcto.
     console.error("[notice-queries] claimNotice:", error.message);
-    return false;
+    return "error";
   }
   // ignoreDuplicates: sin filas devueltas significa que la clave ya existía.
-  return (data ?? []).length > 0;
+  return (data ?? []).length > 0 ? "claimed" : "already_sent";
 }
 
 // --- 4) Plantillas --------------------------------------------------------
@@ -283,12 +312,18 @@ export async function insertNoticeMessage(params: {
 /** Perfil admin que figura como remitente de los avisos automáticos. */
 export async function getAdminSenderId(): Promise<string | null> {
   const supabase = createServiceClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("id")
     .eq("role", "admin")
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
+  if (error) {
+    // Sin esto, un fallo de lectura era indistinguible de "no hay admin" y
+    // todos los avisos quedaban sin remitente, en silencio.
+    console.error("[notice-queries] getAdminSenderId:", error.message);
+    return null;
+  }
   return (data as { id: string } | null)?.id ?? null;
 }
