@@ -1,7 +1,8 @@
 # automated-messages Specification
 
-## ADDED Requirements
-
+## Purpose
+Rules that send a message to a client without Aura acting: what triggers each one, who is excluded, how repeat sends are prevented, and how the copy is resolved. Delivery is an in-app portal message plus an email, evaluated once a day by a cron route.
+## Requirements
 ### Requirement: Daily evaluation of automated rules
 
 The system SHALL evaluate all automated message rules once per day via a scheduled cron route. The route MUST authenticate with `Authorization: Bearer <CRON_SECRET>` and MUST reject any request without the correct secret. The middleware `matcher` MUST continue to exclude `api/cron` so the route is reachable without a session. All date arithmetic SHALL use whole-day UTC comparisons and SHALL derive "today" from the shared `serverToday()` helper so `DEV_DATE` is honored in development.
@@ -38,6 +39,10 @@ The system SHALL send the booking reminder when the client's current content cel
 #### Scenario: Two clients with different period start weekdays
 - **WHEN** Aura places an `agendar` run on the same cells and two clients have different `current_period_start` weekdays
 - **THEN** each client receives the reminder on their own first day of that run, which may be a different calendar date and a different day-number of their period
+
+#### Scenario: Window opens on the first day of the period
+- **WHEN** a client's very first day of a billing period already carries an `agendar` block, so there is no previous day within that period to compare against
+- **THEN** the reminder is sent that day, because a date before `current_period_start` is treated as having no `agendar` block rather than being resolved against the grid
 
 #### Scenario: Window on an unpublished day
 - **WHEN** the client's current cell carries an `agendar` block but the program day is not published
@@ -92,20 +97,24 @@ The system SHALL send the inactivity nudge when the client has recorded no `prog
 The system SHALL record every automated send in a dedicated `automated_notices` ledger with a uniqueness constraint over `(profile_id, rule, period_key)`, and SHALL treat that constraint as the sole dedupe mechanism. Dedupe MUST NOT be derived from message history, because retained messages are purged after 180 days. The ledger row SHALL be written before the message and email are sent, so that an interrupted run costs a missed message rather than a duplicate.
 
 The `period_key` SHALL be:
-- for the booking reminder, the client's `current_period_start` combined with the first cell of the run (week number and day of week);
+- for the booking reminder, the client's `current_period_start` combined with the **week number** of the cell that opened the window — week-scoped, not cell-scoped, so a run the client enters in two disjoint stretches within one grid week still counts as one window;
 - for the inactivity nudge, the client's last activity date, or a sentinel derived from their enrollment date when they have never logged progress.
 
 #### Scenario: Second run on the same day
 - **WHEN** the cron runs twice on the same day
 - **THEN** each client receives each message at most once, because the second insert collides with the existing ledger row
 
-#### Scenario: Two booking windows in one period
-- **WHEN** a client passes through two separate `agendar` runs within one billing period
+#### Scenario: Two booking windows in different weeks of one period
+- **WHEN** a client passes through two separate `agendar` runs that fall in different grid weeks within one billing period
 - **THEN** two reminders are sent, because the runs produce different period keys
+
+#### Scenario: Two booking windows in the same grid week
+- **WHEN** two separate `agendar` runs fall within the same grid week for a client
+- **THEN** only one reminder is sent, because the period key is week-scoped — an accepted limitation, since it is what prevents a client whose period starts mid-week from being reminded twice for a single window split across the period boundary
 
 #### Scenario: Week-four cell revisited on days 29 to 31
 - **WHEN** a booking window sits on a week-4 cell and the billing period runs longer than 28 days, causing the client to resolve to that same cell a second time
-- **THEN** no second reminder is sent, because the period key names the cell and collides with the existing row
+- **THEN** no second reminder is sent, because the period key names the period start and the week, and collides with the existing row
 
 #### Scenario: Client stays inactive for weeks
 - **WHEN** a client remains inactive for many consecutive days
@@ -150,3 +159,4 @@ Each rule SHALL render its subject and body from the corresponding row in the au
 #### Scenario: Rule deactivated
 - **WHEN** a rule's template is marked inactive
 - **THEN** that rule sends nothing on any run, while the other rule continues to operate
+

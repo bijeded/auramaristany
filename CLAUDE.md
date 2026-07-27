@@ -47,7 +47,7 @@ npm run build               # production build
 > `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 > (the signing secret it prints must match `STRIPE_WEBHOOK_SECRET` in `.env.local`). Without this, `checkout.session.completed` never arrives and `/portal/activando` times out — not a bug.
 
-**Green baseline (2026-07-18):** tsc PASS · lint clean · **252/252 tests** · build OK.
+**Green baseline (2026-07-27):** tsc PASS · lint clean · **450/450 tests** · build OK.
 
 ---
 
@@ -62,7 +62,7 @@ lib/            Logic — content/ (access, queries, history) · admin/ · porta
                   server action or an admin screen (a form-supplied id would become an arbitrary write).
 hooks/          useProgressForm.ts (debounced autosave)
 middleware.ts   Gate by role / subscription / onboarding
-supabase/migrations/  001–010 (applied)
+supabase/migrations/  001–014 (applied)
 scripts/        seed-stripe.ts, seed-demo.ts, backfill-first-invoices.ts (tsx)
 __tests__/      Vitest (AAA)
 docs/superpowers/  Historical specs/plans/audits/context (reference)
@@ -125,6 +125,8 @@ Visual source: **`design-handoff-aura/`** — hi-fi prototype (17 screens, build
 - Raw Postgres errors → `logAndGeneric` (server-side log + generic message to the client); don't leak details.
 - **Enum/union values mirrored by a DB `CHECK` constraint must be migrated together.** Adding an app-level value (e.g. a new `block_type` in `content-validation.ts`/`BlockListEditor.tsx`) without a matching migration to the `CHECK` constraint (`program_day_blocks_block_type_check`, last set in 004→013) fails the insert; because `saveBlocks`/`savePillarBlocks` delete-then-insert (non-atomic, D2), the delete lands first → **data loss on save**. Ship the migration in the same change (lesson from the `agendar` block).
 - **Never pass third-party/user strings into `ilike`/`like` unescaped.** `%` and `_` are LIKE wildcards (and `_` is a valid email char) → wildcard-injection / cross-account matching. Use `.eq` on a normalized column, or `escapeLikePattern()` (lesson from the Calendly webhook email→profile mapping).
+- **Grid-relative day math must special-case the first day of a period.** `getCurrentDayKey` resolves a `(week, weekday)` cell from `current_period_start`, so any rule comparing today's cell against *yesterday's* has to treat a date before `current_period_start` as "no cell" — resolving it against the grid wraps to a week-4 cell from the previous period and produces a wrong answer at exactly the boundary. Same family as the EDGE-3 `getUTCDay` lesson: the bug is invisible for 5 of 7 start weekdays and only appears for the other 2 (lesson from the A4 booking reminder, PR #14).
+- **Plain-text columns rendered by React need `sanitizePlainTextBody`, not `sanitizePlainText`.** `sanitizePlainText` escapes `&`, `<`, `>`, `"`, `'` into entities; if the value is later rendered as a React text child (`white-space: pre-line`) React escapes it *again*, so a stored `&amp;` reaches the user as literal `&amp;`. `sanitizePlainTextBody` decodes once (with `&amp;` last, so `&amp;lt;` stays `&lt;`). **Invariant:** a column sanitized that way can hold HTML-shaped text, so it must never reach `dangerouslySetInnerHTML` or a raw HTML email body — only escaping sinks (React text, React Email `<Text>`). Pinned by a test in `__tests__/email-send.test.ts` (lesson from A4 PR #15).
 
 ---
 

@@ -28,7 +28,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A9** | Cancellation + exit survey | M | ✅ Done |
 | **A12** | 7-day calendar in the portal | M | ✅ Done |
 | **A6+A7** | Booking system (Calendly) + "Agendar" block | M | ✅ Done |
-| **A4** | Automated messages | L | 🔨 In progress (`a4-automated-messages`) |
+| **A4** | Automated messages | L | ✅ Done (rules ship **switched off** — see **L11**) |
 | **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
 | **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
 | **L2** | Extra → recurring monthly billing | L | Pending |
@@ -40,6 +40,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **L8** | production-checklist | M | At the end |
 | **L9** | Admin UI for plans/prices? | L | Decision pending |
 | **L10** | Preview env vars in Vercel | S | ✅ Done |
+| **L11** | Turn the A4 automated rules on | S | Blocked (L6 + Aura's content) |
 | **D1–D10** | Deferred / technical debt | — | See below |
 
 ---
@@ -106,8 +107,9 @@ Biweekly Zoom/Meet calls, booked from the portal. **Merged A6+A7** — the "Agen
 - **External dependency (Aura):** Calendly account not needed to *build* (env placeholders + unit tests against the contract); needed at deploy for the event type (Zoom/Meet attached), webhook registration + signing key, and E2E smoke. Track like L1/L3.
 - **Edge to state explicitly:** disable rule is "has a future call" — a call still in the future when the next window opens keeps the block disabled until it passes (one upcoming call at a time; rare at monthly cadence).
 
-### A4 · Automated messages — `L` — 🔨 In progress (change `a4-automated-messages`)
-Two automated rules: **booking reminder** (first day of an `agendar` window) + **inactivity nudge** (10 days with no `progress_logs`). In-app message + email for both. Explored 2026-07-27; all decisions in the change's `design.md`.
+### A4 · Automated messages — `L` — ✅ Done (PRs #13 foundation + #14 rules/cron + #15 admin UI; migration 014; ADR 0002)
+Two automated rules: **booking reminder** (first day of an `agendar` window) + **inactivity nudge** (10 days with no `progress_logs`). In-app message + email for both. Explored and shipped 2026-07-27; all decisions in the change's `design.md` and in ADR 0002.
+- ⚠ **Both rules are `is_active = false` in production.** The code is live and the cron is armed (daily 15:00 UTC), but nothing sends until **L11**.
 - **Decided:** the **billing reminder is NOT** implemented — Stripe sends it (Phase 4 decision).
 - **Decided — cadence is content-driven, grid-relative.** The content grid is `(week_number, day_of_week)`, **not** day numbers: each client walks it from *their own* `current_period_start`, so "day 1" differs per client and Aura cannot target it. Rule: fire when the client's current cell has an `agendar` block and **yesterday's cell did not** (= first day of a run). Aura authors runs in **W1 and W3** for a biweekly rhythm.
 - **Decided — dedupe via a dedicated `automated_notices` ledger**, never by querying `messages` (the `purge-messages` cron deletes >180d → history-based dedupe silently re-sends). `unique(profile_id, rule, period_key)`; booking key = `<period_start>:W<n>-<dow>` (also absorbs the week-4 clamp repeat on days 29–31), inactivity key = `<last_activity_date>` (streak-anchored).
@@ -159,6 +161,14 @@ Decide whether to build a UI to manage variants/prices or keep the script + SQL 
 
 ### L10 · Preview env vars in Vercel — `S`
 Set the 11 vars for Preview (the CLI prompts for a branch interactively; do this when creating the 1st dev branch).
+
+### L11 · Turn the A4 automated rules on — `S` · blocked
+A4 shipped with both rules `is_active = false`. Enabling them is a deliberate, one-at-a-time step, **not** a leftover chore — each one starts mailing every matching client the next morning.
+- **`inactivity_nudge`** — blocked on **L6**. A dry run on 2026-07-27 matched **17 of 18** demo clients, and every demo address is `@test.aura.mx`, a domain that does not resolve. Enabling before the cleanup means ~17 hard bounces in one batch from the freshly-verified sender.
+- **`booking_reminder`** — blocked on Aura placing `agendar` runs in **W1 and W3**. With no runs in the grid it simply never fires, so this one is safe but pointless until she does.
+- **How:** re-run `GET /api/cron/automated-messages?dryRun=1` with the `CRON_SECRET` bearer token first and read the counts, then
+  `update automated_messages set is_active = true where rule = '<rule>';` (or the Activar button in `/admin/automated-messages`).
+- **Carries A4's task 9.3**, the one smoke that could not run pre-launch: the send path is unit-tested and dry-run-verified but has never delivered a real message. On the first enabled rule, confirm a client receives the in-app message **and** the email, then re-run the cron the next day and confirm **nothing** is re-sent (the `automated_notices` dedupe).
 
 ---
 

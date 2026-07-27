@@ -78,16 +78,19 @@ Suggested as **3 PRs** (foundation → rules+cron → admin UI), mirroring the A
 
 ## Close-out
 
-- [ ] 9.1 `npx tsc --noEmit` · `npm run lint` · `npm run test:run` · `npm run build` all green.
-- [ ] 9.2 `code-review` subagent; `security-review` as well — this change adds a service-role cron that mails every client and a new admin write surface.
+- [x] 9.1 `npx tsc --noEmit` · `npm run lint` · `npm run test:run` · `npm run build` all green. **450 tests on `main` at `f65710f`.**
+- [x] 9.2 `code-review` subagent; `security-review` as well — this change adds a service-role cron that mails every client and a new admin write surface. **Run per PR (3 code reviews, 2 security reviews). PR2 was BLOCKED once on the day-1 boundary and re-reviewed; PR3 approved with warnings, all fixed.**
 - [ ] 9.3 Smoke on the Preview URL with `DEV_DATE` to land on a window's first day; verify the reminder, then re-run and verify **nothing** is re-sent.
-- [ ] 9.4 **Both rules ship SWITCHED OFF.** Before PR 2 merges, run in production (one line, no `--`):
+      **PARTIAL — deliberately deferred to 9.4b.** What ran: `?dryRun=1` against the live DB (auth fail-closed, no-header and wrong-secret paths exercised for real; `CRON_SECRET` empty in `.env.local`), and the PR3 admin-screen smoke. What did **not** run: an end-to-end send, because both rules are switched off and every demo recipient is an unroutable `@test.aura.mx` address — driving it would mean sending the exact batch 9.4 exists to prevent. The send path stays runtime-unverified until the first rule is enabled; do this smoke **as part of** 9.4b, on real recipients, one rule at a time.
+- [x] 9.4 **Both rules ship SWITCHED OFF.** Before PR 2 merges, run in production (one line, no `--`):
       `update automated_messages set is_active = false;`
+      **Confirmed applied on 2026-07-27; both rules read `Inactivo` in the admin screen.**
       Verified by dry run on 2026-07-27 against the live DB: **17 of 18 demo clients** match `inactivity_nudge`, and every demo address is `@test.aura.mx`, a domain that does not resolve — ~17 hard bounces in one batch from the freshly-verified `auramaristany.com` sender, which is how a sending domain gets throttled. `vercel.json` arms the schedule on deploy, so merging without this sends that batch with no further human action.
 - [ ] 9.4b Turn each rule on **deliberately and separately**, re-running `?dryRun=1` first each time:
       · `inactivity_nudge` — only after **L6** (demo data cleanup), so the recipients are real people.
       · `booking_reminder` — once Aura has placed her `agendar` runs in **W1 and W3**.
       `update automated_messages set is_active = true where rule = '<rule>';`
+      **Not part of this change's delivery — it is a launch step gated on L6 and on Aura's content. Tracked as `L11` in `BACKLOG.md`; carry 9.3's end-to-end smoke with it.**
 - [ ] 9.5 `/opsx:sync` + `openspec validate` → `/opsx:archive`; mark **A4** ✅ in `BACKLOG.md`; re-index codebase-memory (`fast`).
 
 ## Parallelization
