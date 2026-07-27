@@ -68,13 +68,13 @@ Suggested as **3 PRs** (foundation → rules+cron → admin UI), mirroring the A
 ## PR 3 — Admin UI
 
 ### 7. Server actions
-- [ ] 7.1 `lib/admin/automatedMessageActions.ts`: `updateAutomatedMessage` (subject/body) + `toggleAutomatedMessage`. `requireAdmin()`, zod, reuse `MESSAGE_SUBJECT_MAX`/`MESSAGE_BODY_MAX` + `sanitizePlainText`, `logAndGeneric` on raw Postgres errors, `revalidatePath`.
+- [x] 7.1 `lib/admin/automatedMessageActions.ts`: `updateAutomatedMessage` (subject/body) + `toggleAutomatedMessage`. `requireAdmin()`, zod, reuse `MESSAGE_SUBJECT_MAX`/`MESSAGE_BODY_MAX` + `sanitizePlainText`, `logAndGeneric` on raw Postgres errors, `revalidatePath`.
 
 ### 8. Screen
-- [ ] 8.1 `app/admin/automated-messages/page.tsx` — Server Component behind `requireAdminPage()`, listing both rules.
-- [ ] 8.2 Client form component: subject input + **plain textarea** (bodies are plain text — no Tiptap, no `sanitize-html`), activo/inactivo toggle, per-row save with inline error.
-- [ ] 8.3 Show the available placeholders (`{nombre}`) under the textarea, plus help text telling Aura to place `agendar` runs in **week 1 and week 3** — *not* "day 1 and day 15", which is not a thing the editor can express.
-- [ ] 8.4 Add the entry to the admin sidebar nav.
+- [x] 8.1 `app/admin/automated-messages/page.tsx` — Server Component behind `requireAdminPage()`, listing both rules.
+- [x] 8.2 Client form component: subject input + **plain textarea** (bodies are plain text — no Tiptap, no `sanitize-html`), activo/inactivo toggle, per-row save with inline error.
+- [x] 8.3 Show the available placeholders (`{nombre}`) under the textarea, plus help text telling Aura to place `agendar` runs in **week 1 and week 3** — *not* "day 1 and day 15", which is not a thing the editor can express.
+- [x] 8.4 Add the entry to the admin sidebar nav.
 
 ## Close-out
 

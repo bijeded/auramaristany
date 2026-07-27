@@ -18,6 +18,27 @@ export function sanitizePlainText(input: string): string {
   return sanitizeHtml(input, { allowedTags: [], allowedAttributes: {} }).trim();
 }
 
+// Texto plano que se GUARDA y se vuelve a mostrar como texto plano (A4: los
+// cuerpos de los mensajes automáticos). `sanitizePlainText` escapa `&`, `<`,
+// `>`, `"` y `'` a entidades; como el portal y el email pintan el cuerpo con
+// React (que ya escapa), un `&amp;` almacenado se vería literal en pantalla.
+// Aquí se deshace ese escape una sola vez: `&amp;` va al final para que
+// `&amp;lt;` quede en `&lt;` y no en `<`.
+//
+// ⚠ INVARIANTE: al decodificar, el valor guardado puede volver a tener forma de
+// HTML (un `<script>` escrito a mano queda como texto literal `<script>`). Una
+// columna saneada con esta función NUNCA debe llegar a `dangerouslySetInnerHTML`
+// ni al cuerpo HTML crudo de un email — sólo a sinks que escapan: texto en React
+// (`white-space: pre-line`) y `<Text>{body}</Text>` de React Email.
+export function sanitizePlainTextBody(input: string): string {
+  return sanitizePlainText(input)
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 // Whitelist conservadora para el output de Tiptap (starter-kit + enlaces + color A8).
 export function sanitizeRichText(html: string): string {
   return sanitizeHtml(html, {
