@@ -16,9 +16,9 @@
 
 ## 3. Curriculum resolution (pure, TDD)
 
-- [ ] 3.1 Write failing tests for successor resolution: contiguous ordinals, a gap in the middle (successor is the next existing ordinal, not `n + 1`), the highest ordinal (curriculum ended), and an empty curriculum.
-- [ ] 3.2 Implement the pure successor/position helper until the tests pass. No DB access.
-- [ ] 3.3 Add a test that a series mapped to two variants at different ordinals resolves independently in each.
+- [x] 3.1 Write failing tests for successor resolution: contiguous ordinals, a gap in the middle (successor is the next existing ordinal, not `n + 1`), the highest ordinal (curriculum ended), and an empty curriculum.
+- [x] 3.2 Implement the pure successor/position helper until the tests pass. No DB access.
+- [x] 3.3 Add a test that a series mapped to two variants at different ordinals resolves independently in each.
 
 ## 4. Readers switch to the mapping
 
