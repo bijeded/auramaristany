@@ -93,10 +93,15 @@ async function positionTakenMessage(
       ? `Ya existe un Mes ${months[0]} en alguna de las variantes elegidas.`
       : `Alguna de las variantes elegidas ya tiene ocupado uno de esos meses.`;
 
+  // Acotado a los meses en juego: sin el `.in(ordinal)` esto lee el currículo
+  // entero de cada variante, y pasada la página por defecto de PostgREST (1000
+  // filas) la fila que chocó puede quedar fuera — el mensaje concreto
+  // degradaría al genérico justo cuando el currículo es grande.
   const { data } = await supabase
     .from("variant_series_map")
     .select("program_variant_id, series_id, ordinal, program_variants(name)")
-    .in("program_variant_id", mappings.map((m) => m.variantId));
+    .in("program_variant_id", mappings.map((m) => m.variantId))
+    .in("ordinal", months);
 
   // keep: variant_series_map JOIN program_variants — forma del join no inferida.
   const rows = (data ?? []) as unknown as {
@@ -145,6 +150,31 @@ function validationFailure(error: z.ZodError): SeriesActionResult {
   return { error: "Revisa los datos de la serie." };
 }
 
+/**
+ * Comprueba que TODAS las variantes elegidas pertenecen a `programId`.
+ *
+ * No es una frontera de privilegio — `is_admin()` puede escribir en cualquier
+ * programa —, es integridad: el índice único es por variante, así que nada en
+ * la BD impide mapear una serie del programa A a una variante del programa B.
+ * Si eso ocurre, las clientes de B reciben contenido de A por la vía normal de
+ * lectura. Un post de formulario viejo o manipulado basta para provocarlo.
+ */
+async function variantsBelongToProgram(
+  supabase: SupabaseLike,
+  programId: string,
+  mappings: SeriesMappingInput[]
+): Promise<boolean> {
+  const variantIds = Array.from(new Set(mappings.map((m) => m.variantId)));
+  const { data, error } = await supabase
+    .from("program_variants")
+    .select("id")
+    .eq("program_id", programId)
+    .in("id", variantIds);
+
+  if (error) return false;
+  return ((data ?? []) as { id: string }[]).length === variantIds.length;
+}
+
 function toRows(seriesId: string, mappings: SeriesMappingInput[]) {
   return mappings.map((m) => ({
     program_variant_id: m.variantId,
@@ -168,6 +198,13 @@ export async function createSeries(
   }
   const input = parsed.data;
   const supabase = auth.supabase;
+
+  if (!z.string().uuid().safeParse(programId).success) {
+    return { error: "Programa no válido." };
+  }
+  if (!(await variantsBelongToProgram(supabase, programId, input.mappings))) {
+    return { error: "Variante no válida." };
+  }
 
   const { data: newSeries, error: seriesError } = await supabase
     .from("program_series")
@@ -225,6 +262,23 @@ export async function updateSeries(
   }
   const input = parsed.data;
   const supabase = auth.supabase;
+
+  if (!idSchema.safeParse({ seriesId, programId }).success) {
+    return { error: "Serie no válida." };
+  }
+  // Acotado al programa antes de tocar nada: esta acción BORRA los mapeos
+  // actuales, así que un `seriesId` de otro programa no puede llegar al delete.
+  const { data: owned } = await supabase
+    .from("program_series")
+    .select("id")
+    .eq("id", seriesId)
+    .eq("program_id", programId)
+    .maybeSingle();
+  if (!owned) return { error: "Serie no válida." };
+
+  if (!(await variantsBelongToProgram(supabase, programId, input.mappings))) {
+    return { error: "Variante no válida." };
+  }
 
   // Reconciliación borrar-e-insertar: NO es atómica. Se leen los mapeos actuales
   // antes de borrar para poder restaurarlos si la inserción falla — sin eso, un

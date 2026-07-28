@@ -9,6 +9,8 @@ let previousMappings: MapRow[] = [];
 let seriesDays: { id: string }[] = [];
 // Filas que devuelve la consulta que nombra la variante en conflicto (23505).
 let seriesOwned = true;
+// Variantes que la BD confirma como pertenecientes al programa consultado.
+let ownedVariants: { id: string }[] = [];
 let conflictRows: {
   program_variant_id: string;
   series_id: string;
@@ -21,31 +23,40 @@ const fakeSupabase = {
     // Encadenable como el builder de Supabase: .eq().eq().maybeSingle(),
     // .in(...) y también await directo sobre la cadena.
     select: (_cols: string) => {
-      const rowsFor = (mode: "eq" | "in"): unknown[] => {
-        if (mode === "in") return conflictRows;
+      const rowsFor = (mode: "eq" | "in", inIds: string[] | null): unknown[] => {
+        // Las variantes se leen con .eq(program_id).in(id) para comprobar que
+        // pertenecen al programa. El fake FILTRA de verdad por esos ids: si
+        // devolviera siempre la lista entera, una variante ajena al programa
+        // pasaría el chequeo y el test no distinguiría "pertenece" de "existe".
+        if (table === "program_variants") {
+          return ownedVariants.filter((v) => !inIds || inIds.includes(v.id));
+        }
         if (table === "program_days") return seriesDays;
         if (table === "program_series") return seriesOwned ? [{ id: SERIES_ID }] : [];
+        if (mode === "in") return conflictRows;
         return previousMappings;
       };
       type Chain = {
         eq: () => Chain;
-        in: () => Chain;
+        in: (col: string, vals: string[]) => Chain;
         maybeSingle: () => Promise<{ data: unknown; error: null }>;
         single: () => Promise<{ data: unknown; error: null }>;
         then: (
           onFulfilled: (v: { data: unknown[]; error: null }) => unknown
         ) => Promise<unknown>;
       };
-      const make = (mode: "eq" | "in"): Chain => ({
-        eq: () => make(mode),
-        in: () => make("in"),
+      const make = (mode: "eq" | "in", inIds: string[] | null): Chain => ({
+        eq: () => make(mode, inIds),
+        in: (col: string, vals: string[]) =>
+          make("in", col === "id" ? vals : inIds),
         maybeSingle: () =>
-          Promise.resolve({ data: rowsFor(mode)[0] ?? null, error: null }),
-        single: () => Promise.resolve({ data: rowsFor(mode)[0] ?? null, error: null }),
+          Promise.resolve({ data: rowsFor(mode, inIds)[0] ?? null, error: null }),
+        single: () =>
+          Promise.resolve({ data: rowsFor(mode, inIds)[0] ?? null, error: null }),
         then: (onFulfilled) =>
-          Promise.resolve({ data: rowsFor(mode), error: null }).then(onFulfilled),
+          Promise.resolve({ data: rowsFor(mode, inIds), error: null }).then(onFulfilled),
       });
-      return make("eq");
+      return make("eq", null);
     },
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
@@ -112,6 +123,12 @@ beforeEach(() => {
   seriesDays = [];
   conflictRows = [];
   seriesOwned = true;
+  ownedVariants = [
+    { id: V1 },
+    { id: "22222222-2222-4222-8222-222222222222" },
+    { id: V3 },
+    { id: V4 },
+  ];
 });
 
 // ─── createSeries ───────────────────────────────────────────────────
@@ -204,6 +221,24 @@ describe("createSeries", () => {
     expect(
       calls.find((c) => c.table === "program_series" && c.op === "delete")
     ).toBeTruthy();
+  });
+
+  it("rechaza una variante que no pertenece al programa, sin escribir nada", async () => {
+    // La variante existe, pero es de OTRO programa: nada en la BD lo impide
+    // (el índice único es por variante), así que el chequeo tiene que estar
+    // aquí. Si se colara, las clientes de ese programa verían contenido ajeno.
+    const AJENA = "99999999-9999-4999-8999-999999999999";
+
+    const result = await createSeries(PROG_ID, {
+      title: "Cruzada",
+      description: null,
+      mappings: [{ variantId: V1, ordinal: 1 }, { variantId: AJENA, ordinal: 1 }],
+    });
+
+    expect(result.error).toBe("Variante no válida.");
+    // Ni la serie ni el mapeo: se rechaza ANTES de tocar la BD, así que no hay
+    // nada que revertir.
+    expect(calls.filter((c) => c.op === "insert")).toHaveLength(0);
   });
 });
 
