@@ -14,6 +14,9 @@
 -- nada escrito por Aura (verificado). Si esto se ejecuta cuando ya exista
 -- currículo real, DESTRUYE SU TRABAJO.
 --
+-- ⚠ Borra también `progress_logs` (4 filas demo, ver punto 1): son datos de la
+-- cliente, no catálogo. Quedarían apuntando a días inexistentes.
+--
 -- ⚠ Al aplicarla, la app desplegada queda rota (lee `series_number`) hasta que
 -- se despliegue el código de este mismo cambio. Decisión tomada: se acepta.
 --
@@ -23,10 +26,18 @@
 begin;
 
 -- ── 1. Borrado del contenido demo ────────────────────────────────────────────
--- Orden por FKs: `program_days.series_id` NO tiene cascade (001:99), así que hay
--- que borrarlo a mano. Sí caen por cascade: `program_day_blocks` desde
--- `program_days`, y `program_series_pillars` → `program_pillar_blocks` desde
--- `program_series`.
+-- Orden por FKs. Auditadas TODAS las referencias entrantes:
+--   → program_days:   program_day_blocks (cascade) · progress_logs (SIN cascade)
+--   → program_series: program_days (sin cascade) · variant_series_map (sin cascade)
+--                     · program_series_pillars (cascade) → program_pillar_blocks
+--
+-- `progress_logs` es lo que hace falta borrar a mano y es fácil de pasar por
+-- alto: apunta a `program_days` desde los datos de la CLIENTE, no desde el
+-- catálogo. Son registros de entrenamiento; al reconstruir el contenido quedan
+-- huérfanos y su `exercises_done` referencia ids de ejercicios que dejan de
+-- existir, así que no hay nada que conservar. A 2026-07-27 son 4 filas de un
+-- solo perfil demo, ninguna completada.
+delete from progress_logs where program_day_id is not null;
 delete from variant_series_map;
 delete from program_days;
 delete from program_series;
