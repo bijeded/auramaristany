@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getCurrentSeriesNumber } from "@/lib/content/access";
 import { ACCESS_STATES } from "@/lib/content/subscription-access";
+import { resolveContentPosition } from "@/lib/content/ladder";
 import { hasFutureCall, type BookingLike } from "@/lib/content/booking-helpers";
 import { agendarCellKey, sentKey, type NoticeCandidate, type NoticeTemplates } from "./notice-rules";
 import type { NoticeRule } from "@/lib/supabase/types";
@@ -73,7 +73,7 @@ export async function getAgendarCells(): Promise<Set<string>> {
  * necesitan: periodo vigente, serie del mes ya resuelta, última actividad y si
  * tienen una llamada futura.
  *
- * `series_id` se resuelve aquí (variante + months_elapsed → variant_series_map)
+ * `series_id` se resuelve aquí (puntero de contenido → variant_series_map)
  * para que la capa de reglas siga siendo pura: allí sólo se consultan Sets.
  */
 export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]> {
@@ -83,7 +83,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
     .from("subscriptions")
     .select(
       `profile_id, status, cancel_at_period_end, current_period_start, enrollment_date,
-       months_elapsed, program_variant_id,
+       content_variant_id, content_ordinal, program_variant_id,
        profiles!inner ( email, full_name, progress_logs ( log_date ), bookings ( scheduled_at, status ) )`
     )
     .in("status", ACCESS_STATES)
@@ -104,7 +104,8 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
     cancel_at_period_end: boolean | null;
     current_period_start: string | null;
     enrollment_date: string;
-    months_elapsed: number;
+    content_variant_id: string | null;
+    content_ordinal: number;
     program_variant_id: string;
     profiles: {
       email: string;
@@ -119,8 +120,19 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
   );
   if (rows.length === 0) return [];
 
+  // Las variantes a consultar son los PELDAÑOS en los que están las clientes,
+  // no los que compraron: en cuanto una sube de nivel dejan de coincidir.
+  const positions = new Map(
+    rows.map((r) => [r.profile_id, resolveContentPosition(r)])
+  );
   const seriesByVariant = await getSeriesByVariantAndNumber(
-    Array.from(new Set(rows.map((r) => r.program_variant_id)))
+    Array.from(
+      new Set(
+        Array.from(positions.values())
+          .filter((p): p is { variantId: string; ordinal: number } => p !== null)
+          .map((p) => p.variantId)
+      )
+    )
   );
 
   return rows.map((r) => {
@@ -134,8 +146,10 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
     // booking-helpers (A6). No se reimplementa aquí para que no puedan divergir.
     const bookings = (r.profiles!.bookings ?? []) as BookingLike[];
 
-    const seriesNumber = getCurrentSeriesNumber(r.months_elapsed);
-    const seriesId = seriesByVariant.get(`${r.program_variant_id}|${seriesNumber}`) ?? null;
+    const position = positions.get(r.profile_id) ?? null;
+    const seriesId = position
+      ? seriesByVariant.get(`${position.variantId}|${position.ordinal}`) ?? null
+      : null;
 
     return {
       profile_id: r.profile_id,

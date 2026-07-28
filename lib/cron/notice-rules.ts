@@ -3,7 +3,7 @@
 // autentica, orquesta y reporta.
 //
 // Se reutilizan los helpers ya existentes en lugar de reimplementarlos:
-//   getCurrentDayKey / getCurrentSeriesNumber  → lib/content/access.ts
+//   getCurrentDayKey  → lib/content/access.ts
 //   isInactive / INACTIVITY_THRESHOLD_DAYS     → lib/admin/clients-helpers.ts
 //   subscriptionGrantsAccess                   → lib/content/subscription-access.ts
 import { getCurrentDayKey, type DayOfWeek } from "@/lib/content/access";

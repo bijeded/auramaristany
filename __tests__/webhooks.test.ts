@@ -7,7 +7,17 @@ const insertSingleMock = vi.fn(() => ({ data: { id: "db-sub-new" }, error: null 
 const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
   select: () => ({ single: insertSingleMock }),
 }));
-const upsertMock = vi.fn((_payload: Record<string, unknown>, _opts?: Record<string, unknown>) => ({ error: null }));
+// upsert(...).select("id") devuelve las filas REALMENTE insertadas: con
+// ignoreDuplicates, un conflicto devuelve []. Es lo que distingue una factura
+// nueva de una redelivery de Stripe, y lo que decide si se avanza o no.
+const upsertInsertedRows = vi.fn((): { data: unknown[]; error: unknown } => ({
+  data: [{ id: "inv-new" }],
+  error: null,
+}));
+const upsertMock = vi.fn((_payload: Record<string, unknown>, _opts?: Record<string, unknown>) => ({
+  error: null,
+  select: () => upsertInsertedRows(),
+}));
 // update().eq() is awaited directly ({ error }) by most handlers, and also chained
 // .select().maybeSingle() by handleSubscriptionDeleted (needs the deleted row's ids).
 const deletedRowMaybeSingle = vi.fn((): { data: unknown; error: unknown } => ({ data: null, error: null }));
@@ -29,7 +39,45 @@ const selectChain: {
   maybeSingle: selectMaybeSingleMock,
 };
 const selectMock = vi.fn(() => selectChain);
-const fromMock = vi.fn((_table: string) => ({ insert: insertMock, upsert: upsertMock, update: updateMock, select: selectMock }));
+
+// Currículo y escalera: los lee el avance del puntero de contenido. Se sirven
+// por tabla porque el avance necesita el mapeo de DOS variantes (el peldaño
+// actual y el siguiente) y el `ladder_next_variant_id` del actual.
+const curriculumRows = vi.fn((): { data: unknown[]; error: unknown } => ({
+  data: [
+    { program_variant_id: "variant-1", series_id: "s1", ordinal: 1 },
+    { program_variant_id: "variant-1", series_id: "s2", ordinal: 2 },
+    { program_variant_id: "variant-1", series_id: "s3", ordinal: 3 },
+  ],
+  error: null,
+}));
+const ladderRow = vi.fn((): { data: unknown; error: unknown } => ({
+  data: { id: "variant-1", ladder_next_variant_id: null },
+  error: null,
+}));
+
+const fromMock = vi.fn((table: string) => {
+  if (table === "variant_series_map") {
+    return {
+      insert: insertMock,
+      upsert: upsertMock,
+      update: updateMock,
+      select: () => ({
+        in: () => curriculumRows(),
+        eq: () => curriculumRows(),
+      }),
+    };
+  }
+  if (table === "program_variants") {
+    return {
+      insert: insertMock,
+      upsert: upsertMock,
+      update: updateMock,
+      select: () => ({ eq: () => ({ single: () => ladderRow() }) }),
+    };
+  }
+  return { insert: insertMock, upsert: upsertMock, update: updateMock, select: selectMock };
+});
 
 vi.mock("@/lib/email/send", () => ({
   sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
@@ -213,6 +261,187 @@ describe("handleInvoicePaid - subscription_create", () => {
       onConflict: "stripe_invoice_id",
       ignoreDuplicates: true,
     });
+  });
+});
+
+describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
+  function renewalInvoice(id = "in_renewal_1"): Stripe.Invoice {
+    return {
+      id,
+      billing_reason: "subscription_cycle",
+      amount_paid: 99000,
+      currency: "mxn",
+      status: "paid",
+      created: 1749340800,
+      parent: {
+        type: "subscription_details",
+        subscription_details: { subscription: "sub_123" },
+      },
+    } as unknown as Stripe.Invoice;
+  }
+
+  /** La fila de la suscripción tal como la lee el handler, con su puntero. */
+  function subRow(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        id: "db-sub-1",
+        months_elapsed: 2,
+        content_variant_id: "variant-1",
+        content_ordinal: 2,
+        content_loops: 0,
+        program_variant_id: "variant-1",
+        program_variants: {
+          programs: { billing_model: "rolling_monthly", duration_months: null },
+        },
+        ...overrides,
+      },
+      error: null,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateEqMock.mockImplementation((_col: string, _val: string) => ({
+      error: null,
+      select: () => ({ maybeSingle: deletedRowMaybeSingle }),
+    }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue(subRow() as any);
+    upsertInsertedRows.mockReturnValue({ data: [{ id: "inv-new" }], error: null });
+    curriculumRows.mockReturnValue({
+      data: [
+        { program_variant_id: "variant-1", series_id: "s1", ordinal: 1 },
+        { program_variant_id: "variant-1", series_id: "s2", ordinal: 2 },
+        { program_variant_id: "variant-1", series_id: "s3", ordinal: 3 },
+      ],
+      error: null,
+    });
+    ladderRow.mockReturnValue({
+      data: { id: "variant-1", ladder_next_variant_id: null },
+      error: null,
+    });
+  });
+
+  it("una factura nueva avanza el mes Y el puntero, en una sola escritura", async () => {
+    await handleInvoicePaid(renewalInvoice());
+
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    const payload = updateMock.mock.calls[0][0];
+    expect(payload.months_elapsed).toBe(3);
+    expect(payload.content_variant_id).toBe("variant-1");
+    expect(payload.content_ordinal).toBe(3);
+    expect(payload.content_loops).toBe(0);
+  });
+
+  it("una redelivery NO avanza nada", async () => {
+    // Stripe reentrega invoice.paid en reintentos y replays. Con el upsert
+    // idempotente el invoice no se duplica, pero hasta ahora el incremento de
+    // `months_elapsed` no estaba protegido: la cliente sumaba dos meses. Con el
+    // puntero encima, una redelivery le SALTARÍA un mes de entrenamiento sin
+    // dejar rastro.
+    upsertInsertedRows.mockReturnValue({ data: [], error: null });
+
+    await handleInvoicePaid(renewalInvoice());
+
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("al agotar el peldaño pasa al siguiente en su primera posición", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue(subRow({ content_ordinal: 3 }) as any);
+    ladderRow.mockReturnValue({
+      data: { id: "variant-1", ladder_next_variant_id: "variant-2" },
+      error: null,
+    });
+    curriculumRows.mockReturnValue({
+      data: [
+        { program_variant_id: "variant-1", series_id: "s3", ordinal: 3 },
+        { program_variant_id: "variant-2", series_id: "t1", ordinal: 1 },
+        { program_variant_id: "variant-2", series_id: "t2", ordinal: 2 },
+      ],
+      error: null,
+    });
+
+    await handleInvoicePaid(renewalInvoice());
+
+    const payload = updateMock.mock.calls[0][0];
+    expect(payload.content_variant_id).toBe("variant-2");
+    expect(payload.content_ordinal).toBe(1);
+  });
+
+  it("en el último peldaño da la vuelta y cuenta la vuelta", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue(subRow({ content_ordinal: 3 }) as any);
+
+    await handleInvoicePaid(renewalInvoice());
+
+    const payload = updateMock.mock.calls[0][0];
+    expect(payload.content_ordinal).toBe(1);
+    expect(payload.content_loops).toBe(1);
+  });
+
+  it("una suscripción de plazo fijo cumplida congela el puntero", async () => {
+    selectEqSingleMock.mockReturnValue(
+      subRow({
+        months_elapsed: 6,
+        content_ordinal: 3,
+        program_variants: {
+          programs: { billing_model: "fixed_term_monthly", duration_months: 6 },
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any
+    );
+
+    await handleInvoicePaid(renewalInvoice());
+
+    const payload = updateMock.mock.calls[0][0];
+    expect(payload.content_ordinal).toBe(3);
+    expect(payload.content_loops).toBe(0);
+    expect(payload.content_variant_id).toBe("variant-1");
+  });
+
+  it("no escribe `program_variant_id`: lo que compró no se reescribe nunca", async () => {
+    await handleInvoicePaid(renewalInvoice());
+
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    expect(updateMock.mock.calls[0][0]).not.toHaveProperty("program_variant_id");
+  });
+});
+
+describe("handleCheckoutCompleted — inicialización del puntero", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    retrieveMock.mockResolvedValue({
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+    });
+    curriculumRows.mockReturnValue({
+      data: [
+        { program_variant_id: "variant-1", series_id: "s4", ordinal: 4 },
+        { program_variant_id: "variant-1", series_id: "s5", ordinal: 5 },
+      ],
+      error: null,
+    });
+  });
+
+  function session(): Stripe.Checkout.Session {
+    return {
+      id: "cs_ptr",
+      metadata: { supabase_user_id: "user-p", variant_id: "variant-1" },
+      subscription: "sub_ptr",
+      customer: "cus_ptr",
+    } as unknown as Stripe.Checkout.Session;
+  }
+
+  it("arranca en la variante comprada y en su primera posición EXISTENTE", async () => {
+    // Entrar directo a cualquier nivel es el caso normal: Aura evalúa fuera de
+    // la plataforma y manda a la cliente al peldaño que le toca. Y la primera
+    // posición no es un 1 fijo: es la más baja que existe en el currículo.
+    await handleCheckoutCompleted(session());
+
+    const payload = insertMock.mock.calls[0][0];
+    expect(payload.content_variant_id).toBe("variant-1");
+    expect(payload.content_ordinal).toBe(4);
+    expect(payload.content_loops).toBe(0);
   });
 });
 

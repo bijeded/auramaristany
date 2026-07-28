@@ -12,11 +12,6 @@ export interface DayKey {
   day_of_week: DayOfWeek;
 }
 
-export interface AccessibleSeries {
-  series_number: number;
-  fully_accessible: boolean; // false = restricted to current week/day
-}
-
 const DAY_ORDER: Record<DayOfWeek, number> = {
   lunes: 1,
   martes: 2,
@@ -86,29 +81,6 @@ export function isDayAccessible(
   return DAY_ORDER[dayDayOfWeek] <= DAY_ORDER[current.day_of_week];
 }
 
-/**
- * Returns which series are visible and whether each is fully accessible.
- *
- * CuarentaMás / CuarentaMás Extra: only the current month's series,
- *   restricted to the current week and day.
- *
- * Strong & Fit: cumulative — series 1…(months_elapsed-1) are fully
- *   accessible; series months_elapsed is restricted to the current week/day.
- */
-export function getAccessibleSeries(
-  programSlug: string,
-  monthsElapsed: number
-): AccessibleSeries[] {
-  if (programSlug === "strong-fit") {
-    return Array.from({ length: monthsElapsed }, (_, i) => ({
-      series_number: i + 1,
-      fully_accessible: i + 1 < monthsElapsed,
-    }));
-  }
-  // cuarenta-mas and cuarenta-mas-extra: current series only
-  return [{ series_number: monthsElapsed, fully_accessible: false }];
-}
-
 export interface UpcomingDayKey {
   date: string; // "YYYY-MM-DD" (UTC)
   week_number: number; // 1–4 (clamped, same as getCurrentDayKey)
@@ -165,11 +137,3 @@ export function getUpcomingDayKeys(
   return keys;
 }
 
-/**
- * La posición del currículo a pedir para /portal/today. Hoy es months_elapsed;
- * el puntero por suscripción llega en l2-level-ladder-progression.
- * (`series_number` ya no existe: la posición vive en variant_series_map.ordinal.)
- */
-export function getCurrentSeriesNumber(monthsElapsed: number): number {
-  return monthsElapsed;
-}

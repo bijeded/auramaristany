@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { ACCESS_STATES } from "./subscription-access";
 import { seriesAtOrdinal, type CurriculumEntry } from "./curriculum";
+import { resolveContentPosition } from "./ladder";
 
 export interface PillarWithBlocks {
   id: string;
@@ -37,7 +38,7 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
 
   const { data: rawSub } = await supabase
     .from("subscriptions")
-    .select(`months_elapsed, program_variant_id,
+    .select(`content_variant_id, content_ordinal, program_variant_id,
       program_variants!inner ( program_id, programs!inner ( slug ) )`)
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
@@ -45,12 +46,17 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
 
   // keep: subscriptions JOIN program_variants!inner JOIN programs!inner — nested join not inferred.
   const sub = rawSub as {
-    months_elapsed: number;
+    content_variant_id: string | null;
+    content_ordinal: number;
     program_variant_id: string;
     program_variants: { program_id: string; programs: { slug: string } };
   } | null;
   if (!sub) return [];
   if (!ALLOWED.has(sub.program_variants.programs.slug)) return [];
+
+  // Mismo puntero que /portal/today: los pilares son del mes que ENTRENA.
+  const position = resolveContentPosition(sub);
+  if (!position) return [];
 
   // Filtro explícito por serie publicada — ver el comentario largo en
   // lib/content/queries.ts: el join `program_series!inner` lo hacía antes de
@@ -58,11 +64,11 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
   const { data: rawMap } = await supabase
     .from("variant_series_map")
     .select("series_id, ordinal, program_series!inner ( published )")
-    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_variant_id", position.variantId)
     .eq("program_series.published", true);
   // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
   const map = (rawMap ?? []) as unknown as CurriculumEntry[];
-  const seriesId = seriesAtOrdinal(map, sub.months_elapsed);
+  const seriesId = seriesAtOrdinal(map, position.ordinal);
   if (!seriesId) return [];
 
   const { data: rawPillars } = await supabase

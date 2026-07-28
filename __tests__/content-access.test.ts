@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   getCurrentDayKey,
   isDayAccessible,
-  getAccessibleSeries,
-  getCurrentSeriesNumber,
   toDayOfWeek,
 } from "@/lib/content/access";
 
@@ -122,54 +120,5 @@ describe("isDayAccessible", () => {
   it("allows sabado when current day is domingo", () => {
     const sundayCurrent = { week_number: 1, day_of_week: "domingo" as const };
     expect(isDayAccessible(1, "sabado", sundayCurrent)).toBe(true);
-  });
-});
-
-describe("getAccessibleSeries — CuarentaMás", () => {
-  it("returns only the current series (month 1)", () => {
-    const result = getAccessibleSeries("cuarenta-mas", 1);
-    expect(result).toEqual([{ series_number: 1, fully_accessible: false }]);
-  });
-
-  it("returns only the current series (month 4)", () => {
-    const result = getAccessibleSeries("cuarenta-mas", 4);
-    expect(result).toEqual([{ series_number: 4, fully_accessible: false }]);
-  });
-});
-
-describe("getAccessibleSeries — CuarentaMás Extra", () => {
-  it("returns only series matching months_elapsed", () => {
-    const result = getAccessibleSeries("cuarenta-mas-extra", 3);
-    expect(result).toEqual([{ series_number: 3, fully_accessible: false }]);
-  });
-});
-
-describe("getAccessibleSeries — Strong & Fit", () => {
-  it("returns only series 1 on month 1 (not fully accessible)", () => {
-    const result = getAccessibleSeries("strong-fit", 1);
-    expect(result).toEqual([{ series_number: 1, fully_accessible: false }]);
-  });
-
-  it("returns series 1 (full) and series 2 (restricted) on month 2", () => {
-    const result = getAccessibleSeries("strong-fit", 2);
-    expect(result).toEqual([
-      { series_number: 1, fully_accessible: true },
-      { series_number: 2, fully_accessible: false },
-    ]);
-  });
-
-  it("returns 3 series on month 3 — first two fully accessible", () => {
-    const result = getAccessibleSeries("strong-fit", 3);
-    expect(result).toHaveLength(3);
-    expect(result[0]).toEqual({ series_number: 1, fully_accessible: true });
-    expect(result[1]).toEqual({ series_number: 2, fully_accessible: true });
-    expect(result[2]).toEqual({ series_number: 3, fully_accessible: false });
-  });
-});
-
-describe("getCurrentSeriesNumber", () => {
-  it("returns months_elapsed as the current series number", () => {
-    expect(getCurrentSeriesNumber(1)).toBe(1);
-    expect(getCurrentSeriesNumber(5)).toBe(5);
   });
 });
