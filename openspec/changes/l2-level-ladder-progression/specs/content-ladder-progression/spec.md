@@ -25,7 +25,10 @@ On each newly recorded paid invoice, the system SHALL advance the subscription's
 1. If the subscription's program is `fixed_term_monthly` and `months_elapsed` has reached `duration_months`, the position SHALL NOT advance.
 2. Otherwise, if the current variant has a mapped ordinal greater than `content_ordinal`, `content_ordinal` SHALL become the **smallest** such ordinal.
 3. Otherwise, if the current variant declares a `ladder_next_variant_id`, `content_variant_id` SHALL become that variant and `content_ordinal` SHALL become that variant's smallest mapped ordinal.
-4. Otherwise, `content_ordinal` SHALL become the current variant's smallest mapped ordinal and `content_loops` SHALL be incremented.
+4. Otherwise, if the current variant declares **no** `ladder_next_variant_id`, `content_ordinal` SHALL become the current variant's smallest mapped ordinal and `content_loops` SHALL be incremented.
+5. Otherwise — a next rung is declared but has no series mapped to it — the position SHALL NOT advance.
+
+Branch 5 exists because wrapping is not recoverable and freezing is. A Principiante finishing month 6 with no Intermedio series authored would otherwise wrap to Principiante 1 with a loop counted: a wrong state that persists, reads to the client as a bug, and does not correct itself once Aura publishes. Frozen, she moves into Intermedio on her next paid invoice as soon as the first series exists. The admin content-runway signal exists so Aura sees this coming before any client reaches it.
 
 Successor SHALL be the next **existing** ordinal and SHALL NOT be computed as `content_ordinal + 1`, because ordinals may contain gaps; treating a gap as the end of a rung would advance a client into the next level early. The first position of a rung SHALL likewise be its smallest mapped ordinal rather than a hardcoded 1.
 
@@ -46,6 +49,10 @@ Rung length SHALL be determined by the series actually mapped to the variant at 
 #### Scenario: Wrap at the top rung
 - **WHEN** a paid invoice is recorded for a client at the last ordinal of Avanzado, which declares no next rung
 - **THEN** `content_ordinal` becomes 1 and `content_loops` is incremented
+
+#### Scenario: The next rung has no content authored yet
+- **WHEN** a paid invoice is recorded for a client at the last ordinal of Principiante, which declares Intermedio as its next rung, and no series is mapped to Intermedio
+- **THEN** `content_variant_id`, `content_ordinal`, and `content_loops` are all unchanged, and the client does NOT wrap to Principiante 1
 
 #### Scenario: New content is reached instead of wrapping
 - **WHEN** a client sits at ordinal 6 of Avanzado, Aura publishes a 7th Avanzado series, and the client's next paid invoice is recorded

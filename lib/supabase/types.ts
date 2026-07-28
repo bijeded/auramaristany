@@ -361,6 +361,9 @@ export type Database = {
           current_period_end: string | null;
           cancel_at_period_end: boolean;
           months_elapsed: number;
+          content_variant_id: string | null;
+          content_ordinal: number;
+          content_loops: number;
           enrollment_date: string;
           completed_at: string | null;
           created_at: string;
@@ -376,6 +379,9 @@ export type Database = {
           current_period_end?: string | null;
           cancel_at_period_end?: boolean;
           months_elapsed?: number;
+          content_variant_id?: string | null;
+          content_ordinal?: number;
+          content_loops?: number;
           enrollment_date?: string;
           completed_at?: string | null;
         };
