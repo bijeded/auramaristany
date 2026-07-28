@@ -1,0 +1,43 @@
+## ADDED Requirements
+
+### Requirement: A client who finished a program keeps a graduated portal
+
+A client whose subscription status is `completed` SHALL retain access to the portal shell and to her own data, and SHALL NOT receive any training content. She SHALL be shown a clear way to continue with the program that follows.
+
+Reachable: her account, her payment history, her progress history, and her progress photos, plus a call to action to continue with CuarentaMás Extra. Not reachable: the day view, the week view, the pillars, and any series content.
+
+The distinction encoded is that she keeps what she earned and loses what she was paying for. Locking her out entirely would take her own data from her at the moment she is most likely to continue.
+
+#### Scenario: Completed client reaches her own data
+- **WHEN** a client with a `completed` subscription opens the portal
+- **THEN** she can reach her account, payment history, progress history and progress photos
+
+#### Scenario: Completed client is offered the next program
+- **WHEN** a client with a `completed` subscription opens the portal
+- **THEN** a call to action to continue with CuarentaMás Extra is presented
+
+#### Scenario: Completed client cannot reach training content
+- **WHEN** a client with a `completed` subscription requests the day view, the week view, or the pillars
+- **THEN** access is refused and she is directed to the graduated view
+
+#### Scenario: Cancelled client is not graduated
+- **WHEN** a client whose subscription is `canceled` opens the portal
+- **THEN** she does not receive graduated access
+
+### Requirement: Graduated access is distinct from paying access
+
+The predicate that decides whether a client may receive training content SHALL keep its current meaning and SHALL NOT be widened to include `completed`. A separate, separately named predicate SHALL decide whether a client may reach the portal shell and her own data.
+
+Every content-serving path SHALL use the strict predicate. Widening the existing one would serve training content to clients who are no longer paying, through every call site at once.
+
+#### Scenario: Content paths use the strict check
+- **WHEN** any path that serves training content evaluates access for a `completed` client
+- **THEN** access is refused
+
+#### Scenario: Shell access uses the graduated check
+- **WHEN** the portal shell evaluates access for a `completed` client
+- **THEN** access is granted
+
+#### Scenario: Paying clients are unaffected
+- **WHEN** a client whose subscription is `active`, `trialing`, or `past_due` is evaluated by either predicate
+- **THEN** access is granted exactly as before this change
