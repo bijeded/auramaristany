@@ -74,6 +74,14 @@ describe("advanceLadderPosition — dentro del peldaño", () => {
 
     expect(next).toEqual(position(PRINCIPIANTE, 4, 0));
   });
+
+  it("desde una posición anterior a todo el peldaño, entra en la primera que existe", () => {
+    const next = advanceLadderPosition(
+      rolling({ position: position(AVANZADO, 2, 0), currentRung: entries(5, 6) })
+    );
+
+    expect(next).toEqual(position(AVANZADO, 5, 0));
+  });
 });
 
 // ── Rama 3: cambio de peldaño ────────────────────────────────────────────────
@@ -225,6 +233,26 @@ describe("advanceLadderPosition — plazo fijo", () => {
     );
 
     expect(next).toEqual(position(INTERMEDIO, 6, 0));
+  });
+
+  it("`monthsElapsed` es el valor ANTERIOR a contar esta factura", () => {
+    // Convención de la frontera, invisible para un test que elija a la vez
+    // posición y mes: con el valor ya incrementado, una CuarentaMás de 6 meses
+    // se congelaría en la posición 5 al pagar su sexto mes y no vería nunca el
+    // último mes de su programa. Recorrido completo de las seis facturas:
+    let pos = position(PRINCIPIANTE, 1, 0);
+    for (let previousMonths = 1; previousMonths <= 5; previousMonths++) {
+      pos = advanceLadderPosition(
+        fixedTerm({ position: pos, monthsElapsed: previousMonths })
+      );
+    }
+
+    // Las cinco facturas posteriores a la inicial la dejan en el mes 6...
+    expect(pos).toEqual(position(PRINCIPIANTE, 6, 0));
+    // ...y una séptima factura ya no la mueve.
+    expect(
+      advanceLadderPosition(fixedTerm({ position: pos, monthsElapsed: 6 }))
+    ).toEqual(position(PRINCIPIANTE, 6, 0));
   });
 
   it("sin duración declarada no se congela nunca", () => {

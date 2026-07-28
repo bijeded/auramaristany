@@ -51,6 +51,17 @@ export interface AdvanceInput {
   nextRung: NextRung | null;
   billingModel: "fixed_term_monthly" | "rolling_monthly";
   durationMonths: number | null;
+  /**
+   * ⚠ El `months_elapsed` guardado ANTES de contar la factura que dispara este
+   * avance, no después. La convención es load-bearing y no la fija ningún test
+   * que elija a la vez posición y mes: con el valor ya incrementado, una
+   * CuarentaMás de 6 meses se congelaría en la posición 5 al pagar su sexto mes
+   * y no vería nunca el último mes de su programa.
+   *
+   * Dicho de otro modo: al llegar la sexta factura este valor es 5 —la cliente
+   * lleva cinco meses— y avanza a la posición 6; al llegar una séptima es 6 y
+   * se congela.
+   */
   monthsElapsed: number;
 }
 
