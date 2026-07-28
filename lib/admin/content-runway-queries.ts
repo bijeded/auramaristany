@@ -48,7 +48,7 @@ export async function getContentRunway(
   const { data: rawSubs } = await supabase
     .from("subscriptions")
     .select(
-      "id, profile_id, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variant_id, profiles(full_name), program_variants(programs(name, billing_model, duration_months))"
+      "id, profile_id, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variant_id, profiles(full_name), program_variants!program_variant_id(programs(name, billing_model, duration_months))"
     )
     .in("status", ACCESS_STATES);
 

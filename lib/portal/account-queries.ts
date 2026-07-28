@@ -115,14 +115,14 @@ export async function getAccountData(userId: string): Promise<AccountData> {
 
   const { data: subRows } = await supabase
     .from("subscriptions")
-    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants(name, price_mxn, programs(name, duration_months, billing_model))")
+    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, duration_months, billing_model))")
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .order("enrollment_date", { ascending: false });
 
   const { data: invoiceRows } = await supabase
     .from("invoices")
-    .select("amount_paid, invoice_date, status, subscriptions(program_variants(programs(name)))")
+    .select("amount_paid, invoice_date, status, subscriptions(program_variants!program_variant_id(programs(name)))")
     .order("invoice_date", { ascending: false });
 
   // keep: subscriptions JOIN program_variants JOIN programs — nested join shape not inferred.
