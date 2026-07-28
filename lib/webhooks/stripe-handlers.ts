@@ -198,7 +198,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { data: rawSub, error } = await supabase
     .from("subscriptions")
     .select(
-      "id, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variant_id, program_variants(programs(billing_model, duration_months))"
+      "id, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variant_id, program_variants!program_variant_id(programs(billing_model, duration_months))"
     )
     .eq("stripe_subscription_id", subscriptionId)
     .single();

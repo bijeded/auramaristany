@@ -123,11 +123,18 @@ export async function getTodayContent(
   const today = serverToday();
 
   // 1. Active subscription with program slug
+  //
+  // ⚠ `program_variants!program_variant_id` no es adorno: desde la migración 016
+  // la suscripción tiene DOS claves foráneas a `program_variants`
+  // (`program_variant_id` y `content_variant_id`) y PostgREST resuelve el embed
+  // por relación, no por columna. Sin la pista devuelve un error en vez de
+  // filas, y como aquí sólo se mira `!sub`, el portal enseñaba día de descanso
+  // a todo el mundo sin que nada fallara a gritos.
   const { data: rawSub } = await supabase
     .from("subscriptions")
     .select(
       `id, months_elapsed, content_variant_id, content_ordinal, content_loops, current_period_start, program_variant_id,
-       program_variants!inner ( program_id,
+       program_variants!program_variant_id!inner ( program_id,
          programs!inner ( slug, billing_model, duration_months )
        )`
     )

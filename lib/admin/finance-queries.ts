@@ -11,7 +11,7 @@ export async function getActiveSubscriptions(): Promise<FinanceSubRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
-    .select("current_period_end, program_variants(name, price_mxn)")
+    .select("current_period_end, program_variants!program_variant_id(name, price_mxn)")
     .eq("status", "active");
 
   // keep: subscriptions JOIN program_variants — nested join shape not inferred by SDK.
@@ -34,7 +34,7 @@ export async function getPaidInvoices(monthsBack = 12): Promise<FinanceInvoiceRo
   cutoff.setMonth(cutoff.getMonth() - monthsBack);
   const { data } = await supabase
     .from("invoices")
-    .select("amount_paid, invoice_date, subscriptions(program_variants(programs(name)))")
+    .select("amount_paid, invoice_date, subscriptions(program_variants!program_variant_id(programs(name)))")
     .eq("status", "paid")
     .gte("invoice_date", cutoff.toISOString());
 
@@ -64,7 +64,7 @@ export async function getRecentPayments(limit = 10): Promise<RecentPaymentRow[]>
   const supabase = await createClient();
   const { data } = await supabase
     .from("invoices")
-    .select("amount_paid, invoice_date, status, subscriptions(profiles(full_name), program_variants(programs(name)))")
+    .select("amount_paid, invoice_date, status, subscriptions(profiles(full_name), program_variants!program_variant_id(programs(name)))")
     .order("invoice_date", { ascending: false })
     .limit(limit);
 
@@ -92,7 +92,7 @@ export async function getAllPayments(): Promise<PaymentRow[]> {
   const { data } = await supabase
     .from("invoices")
     .select(
-      "amount_paid, invoice_date, status, subscriptions(profile_id, profiles(full_name), program_variants(name, programs(name)))"
+      "amount_paid, invoice_date, status, subscriptions(profile_id, profiles(full_name), program_variants!program_variant_id(name, programs(name)))"
     )
     .order("invoice_date", { ascending: false });
 

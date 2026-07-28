@@ -23,7 +23,7 @@ export async function hasPillarsAccess(userId: string): Promise<boolean> {
 
   const { data: rawSub } = await supabase
     .from("subscriptions")
-    .select("program_variants!inner ( programs!inner ( slug ) )")
+    .select("program_variants!program_variant_id!inner ( programs!inner ( slug ) )")
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .single();
@@ -39,7 +39,7 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
   const { data: rawSub } = await supabase
     .from("subscriptions")
     .select(`content_variant_id, content_ordinal, program_variant_id,
-      program_variants!inner ( program_id, programs!inner ( slug ) )`)
+      program_variants!program_variant_id!inner ( program_id, programs!inner ( slug ) )`)
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .single();

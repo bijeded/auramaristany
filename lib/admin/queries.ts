@@ -292,7 +292,7 @@ export async function getActiveSubscriberRows(): Promise<ActiveSubRow[]> {
   const { data } = await supabase
     .from("subscriptions")
     .select(
-      "profile_id, program_variant_id, profiles(full_name, email, phone), program_variants(name, program_id, programs(name))"
+      "profile_id, program_variant_id, profiles(full_name, email, phone), program_variants!program_variant_id(name, program_id, programs(name))"
     )
     .eq("status", "active");
 

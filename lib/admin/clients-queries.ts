@@ -34,7 +34,7 @@ export async function getClientsList(): Promise<ClientListRow[]> {
   const { data } = await supabase
     .from("subscriptions")
     .select(
-      "profile_id, status, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone, progress_logs(log_date)), program_variants(name, price_mxn, programs(name))"
+      "profile_id, status, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone, progress_logs(log_date)), program_variants!program_variant_id(name, price_mxn, programs(name))"
     );
 
   // keep: subscriptions JOIN profiles (+ progress_logs) JOIN program_variants JOIN programs — nested join not inferred.
@@ -135,7 +135,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   const { data: rawSubs } = await supabase
     .from("subscriptions")
     .select(
-      "id, status, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants(name, price_mxn, programs(name, billing_model, duration_months))"
+      "id, status, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, billing_model, duration_months))"
     )
     .eq("profile_id", clientId)
     .order("enrollment_date", { ascending: false });

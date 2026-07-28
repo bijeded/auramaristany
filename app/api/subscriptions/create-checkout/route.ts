@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   if (prereqRows && prereqRows.length > 0) {
     const { data: clientSubs } = await supabase
       .from("subscriptions")
-      .select("status, program_variants(level, programs(slug))")
+      .select("status, program_variants!program_variant_id(level, programs(slug))")
       .eq("profile_id", user.id)
       .in("status", ["active", "completed"]);
 

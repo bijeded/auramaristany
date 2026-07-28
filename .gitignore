@@ -52,3 +52,6 @@ supabase/.temp/
 # playwright MCP artifacts
 .playwright-mcp/
 evaluation.md
+
+# scratch scripts de smoke (no versionados)
+.tmp-*
