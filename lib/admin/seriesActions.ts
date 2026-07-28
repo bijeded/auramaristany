@@ -74,7 +74,11 @@ const mappingSchema = z.object({
 const baseSchema = {
   title: z.string().trim().min(1).max(TITLE_MAX),
   description: z.string().trim().max(DESCRIPTION_MAX).nullable().optional(),
-  mappings: z.array(mappingSchema).min(1),
+  // Tope alto pero finito: el programa más grande tiene 3 variantes, así que
+  // 50 no estorba a Aura y evita construir una query enorme desde un post
+  // inflado. Sin tope, un `.in()` gigante se trunca por paginación y el
+  // chequeo de pertenencia falla cerrado — correcto, pero después del trabajo.
+  mappings: z.array(mappingSchema).min(1).max(50),
 };
 
 const idSchema = z.object({
