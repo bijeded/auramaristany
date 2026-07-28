@@ -52,11 +52,16 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
   if (!sub) return [];
   if (!ALLOWED.has(sub.program_variants.programs.slug)) return [];
 
+  // Filtro explícito por serie publicada — ver el comentario largo en
+  // lib/content/queries.ts: el join `program_series!inner` lo hacía antes de
+  // rebote vía RLS y se perdió al resolver por `ordinal`.
   const { data: rawMap } = await supabase
     .from("variant_series_map")
-    .select("series_id, ordinal")
-    .eq("program_variant_id", sub.program_variant_id);
-  const map = (rawMap ?? []) as CurriculumEntry[];
+    .select("series_id, ordinal, program_series!inner ( published )")
+    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_series.published", true);
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  const map = (rawMap ?? []) as unknown as CurriculumEntry[];
   const seriesId = seriesAtOrdinal(map, sub.months_elapsed);
   if (!seriesId) return [];
 

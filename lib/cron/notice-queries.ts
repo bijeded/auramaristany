@@ -59,7 +59,7 @@ export async function getAgendarCells(): Promise<Set<string>> {
   };
 
   const cells = new Set<string>();
-  for (const row of (data ?? []) as Row[]) {
+  for (const row of (data ?? []) as unknown as Row[]) {
     const d = row.program_days;
     if (d?.series_id) cells.add(agendarCellKey(d.series_id, d.week_number, d.day_of_week));
   }
@@ -152,13 +152,21 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
   });
 }
 
-/** Mapa "<variant_id>|<ordinal>" → series_id. */
+/**
+ * Mapa "<variant_id>|<ordinal>" → series_id, sólo de series PUBLICADAS.
+ *
+ * El filtro es explícito porque aquí no hay red: este módulo usa service-role,
+ * que se salta RLS, así que la policy `program_series_read_published` no aplica.
+ * Sin él se avisaría de una ventana de agenda que vive en una serie en
+ * borrador — la cliente recibe el correo, entra y no ve nada.
+ */
 async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<string, string>> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("variant_series_map")
-    .select("program_variant_id, series_id, ordinal")
-    .in("program_variant_id", variantIds);
+    .select("program_variant_id, series_id, ordinal, program_series!inner ( published )")
+    .in("program_variant_id", variantIds)
+    .eq("program_series.published", true);
 
   const map = new Map<string, string>();
   if (error) {
@@ -174,7 +182,8 @@ async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<st
     ordinal: number;
   };
 
-  for (const row of (data ?? []) as Row[]) {
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  for (const row of (data ?? []) as unknown as Row[]) {
     map.set(`${row.program_variant_id}|${row.ordinal}`, row.series_id);
   }
   return map;

@@ -24,10 +24,17 @@ function mockSub(slug: string, monthsElapsed = 1, ordinals: number[] = [1]) {
           } }) }) }) }) };
       }
       if (table === "variant_series_map") {
-        // La posición vive en el mapeo: ya no se une con program_series.
-        return { select: () => ({ eq: () => Promise.resolve({ data:
-          ordinals.map((ordinal) => ({ series_id: `s${ordinal}`, ordinal })),
-        }) }) };
+        // La posición vive en el mapeo, pero la consulta SIGUE uniendo con
+        // program_series para exigir `published`. El fake exige las DOS
+        // llamadas .eq() encadenadas: si el filtro de publicación desaparece,
+        // la segunda no llega y el test falla.
+        return { select: () => ({ eq: () => ({ eq: (col: string, val: unknown) => {
+          expect(col).toBe("program_series.published");
+          expect(val).toBe(true);
+          return Promise.resolve({ data:
+            ordinals.map((ordinal) => ({ series_id: `s${ordinal}`, ordinal })),
+          });
+        } }) }) };
       }
       if (table === "program_series_pillars") {
         return { select: () => ({ eq: (_c: string, seriesId: string) => ({ eq: () => ({ order: () =>

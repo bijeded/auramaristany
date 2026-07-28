@@ -63,6 +63,11 @@ const baseSchema = {
   mappings: z.array(mappingSchema).min(1),
 };
 
+const idSchema = z.object({
+  seriesId: z.string().uuid(),
+  programId: z.string().uuid(),
+});
+
 const createSchema = z.object(baseSchema);
 const updateSchema = z.object({ ...baseSchema, published: z.boolean() });
 
@@ -305,7 +310,22 @@ export async function deleteSeries(
 ): Promise<SeriesActionResult> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
+  // Los ids vienen del cliente. No es una frontera de privilegio (el admin
+  // puede borrar cualquier serie), pero es la única acción que no validaba lo
+  // que las otras dos sí — y la que borra datos de las clientes.
+  if (!idSchema.safeParse({ seriesId, programId }).success) {
+    return { error: "Serie no válida." };
+  }
   const supabase = auth.supabase;
+
+  // Acotado al programa: una serie de otro programa no se borra desde aquí.
+  const { data: owned } = await supabase
+    .from("program_series")
+    .select("id")
+    .eq("id", seriesId)
+    .eq("program_id", programId)
+    .maybeSingle();
+  if (!owned) return { error: "Serie no válida." };
 
   const { data: rawDays, error: daysReadError } = await supabase
     .from("program_days")

@@ -127,13 +127,24 @@ export async function getTodayContent(
   const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
   const dayKey = getCurrentDayKey(sub.current_period_start, today);
 
-  // 2. Qué serie ocupa esa posición en el currículo de ESTA variante
+  // 2. Qué serie PUBLICADA ocupa esa posición en el currículo de ESTA variante.
+  //
+  // El filtro por `program_series.published` es explícito a propósito. Antes lo
+  // hacía de rebote el join `program_series!inner`: la policy
+  // `program_series_read_published` (001:352) oculta las series sin publicar a
+  // las clientes, así que PostgREST descartaba la fila entera del mapeo. Al
+  // resolver por `ordinal` ese join dejó de hacer falta — y con él se perdía la
+  // única barrera que impedía servir una serie en borrador. Depender de un
+  // efecto colateral de RLS para una regla de negocio es justo lo que lo hizo
+  // invisible; aquí se dice en voz alta.
   const { data: rawVariantSeries } = await supabase
     .from("variant_series_map")
-    .select("series_id, ordinal")
-    .eq("program_variant_id", sub.program_variant_id);
+    .select("series_id, ordinal, program_series!inner ( published )")
+    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_series.published", true);
 
-  const variantSeries = (rawVariantSeries ?? []) as VariantSeriesRow[];
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  const variantSeries = (rawVariantSeries ?? []) as unknown as VariantSeriesRow[];
   const seriesId = seriesAtOrdinal(variantSeries, seriesNumber);
 
   if (!seriesId) return null;
@@ -246,12 +257,17 @@ export async function getWeekCalendar(
   if (dayKeys.length === 0) return [];
 
   const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
+  // Mismo filtro explícito que en getTodayContent, y aquí importa más: este
+  // calendario NO filtra `program_days.published` (decisión A12), así que la
+  // serie era su único control de publicación.
   const { data: rawVariantSeries } = await supabase
     .from("variant_series_map")
-    .select("series_id, ordinal")
-    .eq("program_variant_id", sub.program_variant_id);
+    .select("series_id, ordinal, program_series!inner ( published )")
+    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_series.published", true);
 
-  const variantSeries = (rawVariantSeries ?? []) as VariantSeriesRow[];
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  const variantSeries = (rawVariantSeries ?? []) as unknown as VariantSeriesRow[];
   const seriesId = seriesAtOrdinal(variantSeries, seriesNumber);
   if (!seriesId) return null;
 

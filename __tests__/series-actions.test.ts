@@ -8,6 +8,7 @@ let insertMapError: { code: string; message: string } | null = null;
 let previousMappings: MapRow[] = [];
 let seriesDays: { id: string }[] = [];
 // Filas que devuelve la consulta que nombra la variante en conflicto (23505).
+let seriesOwned = true;
 let conflictRows: {
   program_variant_id: string;
   series_id: string;
@@ -17,15 +18,35 @@ let conflictRows: {
 
 const fakeSupabase = {
   from: (table: string) => ({
-    select: (_cols: string) => ({
-      eq: (_col: string, _val: string) =>
-        Promise.resolve({
-          data: table === "program_days" ? seriesDays : previousMappings,
-          error: null,
-        }),
-      in: (_col: string, _vals: string[]) =>
-        Promise.resolve({ data: conflictRows, error: null }),
-    }),
+    // Encadenable como el builder de Supabase: .eq().eq().maybeSingle(),
+    // .in(...) y también await directo sobre la cadena.
+    select: (_cols: string) => {
+      const rowsFor = (mode: "eq" | "in"): unknown[] => {
+        if (mode === "in") return conflictRows;
+        if (table === "program_days") return seriesDays;
+        if (table === "program_series") return seriesOwned ? [{ id: SERIES_ID }] : [];
+        return previousMappings;
+      };
+      type Chain = {
+        eq: () => Chain;
+        in: () => Chain;
+        maybeSingle: () => Promise<{ data: unknown; error: null }>;
+        single: () => Promise<{ data: unknown; error: null }>;
+        then: (
+          onFulfilled: (v: { data: unknown[]; error: null }) => unknown
+        ) => Promise<unknown>;
+      };
+      const make = (mode: "eq" | "in"): Chain => ({
+        eq: () => make(mode),
+        in: () => make("in"),
+        maybeSingle: () =>
+          Promise.resolve({ data: rowsFor(mode)[0] ?? null, error: null }),
+        single: () => Promise.resolve({ data: rowsFor(mode)[0] ?? null, error: null }),
+        then: (onFulfilled) =>
+          Promise.resolve({ data: rowsFor(mode), error: null }).then(onFulfilled),
+      });
+      return make("eq");
+    },
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
       if (table === "program_series") {
@@ -80,6 +101,8 @@ type MapRow = { program_variant_id: string; series_id: string; ordinal: number }
 const V1 = "11111111-1111-4111-8111-111111111111";
 const V3 = "33333333-3333-4333-8333-333333333333";
 const V4 = "44444444-4444-4444-8444-444444444444";
+const SERIES_ID = "55555555-5555-4555-8555-555555555555";
+const PROG_ID = "66666666-6666-4666-8666-666666666666";
 
 beforeEach(() => {
   calls.length = 0;
@@ -88,12 +111,13 @@ beforeEach(() => {
   previousMappings = [];
   seriesDays = [];
   conflictRows = [];
+  seriesOwned = true;
 });
 
 // ─── createSeries ───────────────────────────────────────────────────
 describe("createSeries", () => {
   it("inserta la serie y un mapeo por variante, cada uno con su posición", async () => {
-    const result = await createSeries("prog-1", {
+    const result = await createSeries(PROG_ID, {
       title: "Fundamentos",
       description: null,
       mappings: [
@@ -113,7 +137,7 @@ describe("createSeries", () => {
   });
 
   it("la serie ya no lleva número: la posición vive en el mapeo", async () => {
-    await createSeries("prog-1", {
+    await createSeries(PROG_ID, {
       title: "T",
       description: null,
       mappings: [{ variantId: V1, ordinal: 3 }],
@@ -127,7 +151,7 @@ describe("createSeries", () => {
   });
 
   it("rechaza una serie sin variantes y no escribe nada", async () => {
-    const result = await createSeries("prog-1", {
+    const result = await createSeries(PROG_ID, {
       title: "Huérfana",
       description: null,
       mappings: [],
@@ -150,7 +174,7 @@ describe("createSeries", () => {
       },
     ];
 
-    const result = await createSeries("prog-1", {
+    const result = await createSeries(PROG_ID, {
       title: "Dup",
       description: null,
       mappings: [{ variantId: V1, ordinal: 2 }],
@@ -169,7 +193,7 @@ describe("createSeries", () => {
   it("borra la serie si el mapeo falla, para no dejarla huérfana e invisible", async () => {
     insertMapError = { code: "23505", message: "unique violation" };
 
-    await createSeries("prog-1", {
+    await createSeries(PROG_ID, {
       title: "Dup",
       description: null,
       mappings: [{ variantId: V1, ordinal: 2 }],
@@ -186,7 +210,7 @@ describe("createSeries", () => {
 // ─── updateSeries ───────────────────────────────────────────────────
 describe("updateSeries", () => {
   it("actualiza los campos de la serie", async () => {
-    const result = await updateSeries("series-1", "prog-1", {
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
       title: "Mes actualizado",
       description: "Nueva desc",
       published: true,
@@ -209,7 +233,7 @@ describe("updateSeries", () => {
   });
 
   it("reconcilia variantes: elimina viejos e inserta los nuevos con su posición", async () => {
-    await updateSeries("series-1", "prog-1", {
+    await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
       published: false,
@@ -240,7 +264,7 @@ describe("updateSeries", () => {
       },
     ];
 
-    const result = await updateSeries("series-1", "prog-1", {
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
       published: false,
@@ -262,11 +286,11 @@ describe("updateSeries", () => {
     // diario) dejaría la serie mapeada a CERO variantes: invisible en todos los
     // currículos e irrecuperable desde el editor.
     previousMappings = [
-      { program_variant_id: V1, series_id: "series-1", ordinal: 2 },
+      { program_variant_id: V1, series_id: SERIES_ID, ordinal: 2 },
     ];
     insertMapError = { code: "23505", message: "unique violation" };
 
-    await updateSeries("series-1", "prog-1", {
+    await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
       published: false,
@@ -281,7 +305,7 @@ describe("updateSeries", () => {
   });
 
   it("rechaza dejar la serie sin variantes", async () => {
-    const result = await updateSeries("series-1", "prog-1", {
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
       published: false,
@@ -300,7 +324,7 @@ describe("deleteSeries", () => {
     // borrar — que tras la migración 015 son todas.
     seriesDays = [{ id: "d1" }, { id: "d2" }];
 
-    const result = await deleteSeries("series-1", "prog-1");
+    const result = await deleteSeries(SERIES_ID, PROG_ID);
 
     expect(result.error).toBeUndefined();
     const order = calls.filter((c) => c.op === "delete").map((c) => c.table);
@@ -317,7 +341,7 @@ describe("deleteSeries", () => {
     // todas las clientes de la plataforma.
     seriesDays = [{ id: "d1" }, { id: "d2" }];
 
-    await deleteSeries("series-1", "prog-1");
+    await deleteSeries(SERIES_ID, PROG_ID);
 
     const logsDelete = calls.find((c) => c.table === "progress_logs" && c.op === "delete");
     expect(logsDelete!.payload).toEqual({
@@ -330,13 +354,13 @@ describe("deleteSeries", () => {
   it("no toca progress_logs si la serie no tiene días", async () => {
     seriesDays = [];
 
-    await deleteSeries("series-1", "prog-1");
+    await deleteSeries(SERIES_ID, PROG_ID);
 
     expect(calls.find((c) => c.table === "progress_logs")).toBeUndefined();
   });
 
   it("elimina el mapeo y luego la serie", async () => {
-    const result = await deleteSeries("series-1", "prog-1");
+    const result = await deleteSeries(SERIES_ID, PROG_ID);
 
     expect(result.error).toBeUndefined();
     expect(
