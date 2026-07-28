@@ -1,3 +1,5 @@
+import { contentProgressLabel } from "@/lib/portal/progress-display";
+
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid";
 
 export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Sin actividad" | null;
@@ -82,14 +84,30 @@ export function pickPrimarySubscription<T extends SubLike>(subs: T[]): T | null 
   );
 }
 
+/**
+ * El progreso de una suscripción tal como lo ve Aura.
+ *
+ * Dice lo mismo que el portal de la cliente —peldaño y posición en rolling,
+ * fracción en plazo fijo— porque la conversación entre las dos falla si cada
+ * pantalla cuenta el avance de otra manera.
+ */
 export function subscriptionProgressLabel(
-  sub: { months_elapsed: number },
+  sub: {
+    months_elapsed: number;
+    content_ordinal: number;
+    content_loops: number;
+    rung_name: string | null;
+  },
   program: { billing_model: string; duration_months: number | null }
 ): string {
-  if (program.billing_model === "fixed_term_monthly" && program.duration_months) {
-    return `Mes ${sub.months_elapsed} de ${program.duration_months}`;
-  }
-  return `Mes ${sub.months_elapsed}`;
+  return contentProgressLabel({
+    billingModel: program.billing_model,
+    durationMonths: program.duration_months,
+    monthsElapsed: sub.months_elapsed,
+    rungName: sub.rung_name,
+    contentOrdinal: sub.content_ordinal,
+    contentLoops: sub.content_loops,
+  }).text;
 }
 
 export function canDeleteClient(

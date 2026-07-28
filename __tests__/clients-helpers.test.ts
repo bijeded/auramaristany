@@ -117,15 +117,15 @@ import { subscriptionProgressLabel } from "@/lib/admin/clients-helpers";
 describe("subscriptionProgressLabel", () => {
   it("programa de término fijo muestra 'Mes N de D'", () => {
     expect(subscriptionProgressLabel(
-      { months_elapsed: 3 },
+      { months_elapsed: 3, content_ordinal: 3, content_loops: 0, rung_name: "CuarentaMás" },
       { billing_model: "fixed_term_monthly", duration_months: 6 }
     )).toBe("Mes 3 de 6");
   });
-  it("programa rolling muestra solo 'Mes N'", () => {
+  it("programa rolling muestra el peldaño y la posición, no los meses cobrados", () => {
     expect(subscriptionProgressLabel(
-      { months_elapsed: 5 },
+      { months_elapsed: 14, content_ordinal: 2, content_loops: 0, rung_name: "Avanzado" },
       { billing_model: "rolling_monthly", duration_months: null }
-    )).toBe("Mes 5");
+    )).toBe("Avanzado · Mes 2");
   });
 });
 

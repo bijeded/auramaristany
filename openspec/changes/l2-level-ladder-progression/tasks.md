@@ -38,17 +38,17 @@
 
 ## 6. Portal display
 
-- [ ] 6.1 Add the persistent repeat marker ("Repitiendo Mes N") to the day view, shown while `content_loops > 0`. Low emphasis, warm first-person Spanish, no modal.
-- [ ] 6.2 Make the progress label rung-aware for `rolling_monthly`: "Avanzado · Mes 2" instead of an elapsed-month count or an empty denominator.
-- [ ] 6.3 Keep the fixed-term label as "Mes X de Y" (`lib/admin/clients-helpers.ts` `subscriptionProgressLabel` and `components/portal/settings/SubscriptionCard.tsx`).
-- [ ] 6.4 Audit every read that means "the client's level" and choose deliberately between `program_variant_id` (what she pays for) and `content_variant_id` (what she is doing). Known cases: `ClientDetailTabs`, the portal header.
+- [x] 6.1 Add the persistent repeat marker ("Repitiendo Mes N") to the day view, shown while `content_loops > 0`. Low emphasis, warm first-person Spanish, no modal.
+- [x] 6.2 Make the progress label rung-aware for `rolling_monthly`: "Avanzado · Mes 2" instead of an elapsed-month count or an empty denominator.
+- [x] 6.3 Keep the fixed-term label as "Mes X de Y" (`lib/admin/clients-helpers.ts` `subscriptionProgressLabel` and `components/portal/settings/SubscriptionCard.tsx`).
+- [x] 6.4 Audit every read that means "the client's level" and choose deliberately between `program_variant_id` (what she pays for) and `content_variant_id` (what she is doing). Known cases: `ClientDetailTabs`, the portal header.
 
 ## 7. Admin content-runway signal
 
-- [ ] 7.1 Write the runway query: for each active subscription, the number of authored series remaining ahead of her, and whether her declared next rung has any series at all.
-- [ ] 7.2 Surface one admin list covering both shapes, with the empty-next-rung case marked more urgent.
-- [ ] 7.3 Handle the empty state explicitly ("no client is running out of content") rather than rendering a blank area.
-- [ ] 7.4 Confirm the screen is behind `requireAdminPage()`.
+- [x] 7.1 Write the runway query: for each active subscription, the number of authored series remaining ahead of her, and whether her declared next rung has any series at all.
+- [x] 7.2 Surface one admin list covering both shapes, with the empty-next-rung case marked more urgent.
+- [x] 7.3 Handle the empty state explicitly ("no client is running out of content") rather than rendering a blank area.
+- [x] 7.4 Confirm the screen is behind `requireAdminPage()`.
 
 ## 8. Verification
 

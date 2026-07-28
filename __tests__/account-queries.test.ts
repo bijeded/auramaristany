@@ -1,18 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { mapSubscription, mapInvoices, progressLabel } from "@/lib/portal/account-queries";
+import { mapSubscription, mapInvoices, accountProgressLabel } from "@/lib/portal/account-queries";
 
 describe("mapSubscription", () => {
   it("aplana los joins a un objeto plano", () => {
     const raw = [{
       status: "active", cancel_at_period_end: false, enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
       months_elapsed: 3,
-      program_variants: { name: "Intermedio", price_mxn: 999, programs: { name: "Fuerza", duration_months: 6 } },
+      content_variant_id: "var-2", content_ordinal: 2, content_loops: 0,
+      program_variants: { name: "Intermedio", price_mxn: 999, programs: { name: "Fuerza", duration_months: 6, billing_model: "fixed_term_monthly" } },
     }];
     expect(mapSubscription(raw)).toEqual({
       program_name: "Fuerza", variant_name: "Intermedio", status: "active",
       cancel_at_period_end: false,
       enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
       price_mxn: 999, months_elapsed: 3, duration_months: 6,
+      billing_model: "fixed_term_monthly",
+      content_variant_id: "var-2", content_ordinal: 2, content_loops: 0,
+      // El nombre del peldaño se resuelve fuera del mapeo, con otra consulta.
+      rung_name: null,
     });
   });
 
@@ -39,14 +44,30 @@ describe("mapInvoices", () => {
   });
 });
 
-describe("progressLabel", () => {
-  it("formatea Mes X de Y", () => {
-    expect(progressLabel(3, 6)).toEqual({ text: "Mes 3 de 6", percent: 50 });
+describe("accountProgressLabel", () => {
+  const base = {
+    program_name: "Fuerza", variant_name: "Principiante", status: "active",
+    cancel_at_period_end: false, enrollment_date: "2026-01-10",
+    current_period_end: null, price_mxn: 999,
+    months_elapsed: 3, duration_months: 6, billing_model: "fixed_term_monthly",
+    content_variant_id: "var-1", content_ordinal: 3, content_loops: 0,
+    rung_name: "Principiante",
+  };
+
+  it("formatea Mes X de Y en plazo fijo", () => {
+    expect(accountProgressLabel(base)).toEqual({ text: "Mes 3 de 6", percent: 50 });
   });
-  it("devuelve null si falta la duración", () => {
-    expect(progressLabel(3, null)).toBeNull();
-  });
-  it("clampa el porcentaje a 100", () => {
-    expect(progressLabel(8, 6)?.percent).toBe(100);
+
+  it("en rolling muestra el peldaño y la posición del puntero", () => {
+    expect(
+      accountProgressLabel({
+        ...base,
+        billing_model: "rolling_monthly",
+        duration_months: null,
+        months_elapsed: 14,
+        rung_name: "Avanzado",
+        content_ordinal: 2,
+      })
+    ).toEqual({ text: "Avanzado · Mes 2", percent: null });
   });
 });

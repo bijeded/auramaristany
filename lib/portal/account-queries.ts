@@ -1,6 +1,10 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { ACCESS_STATES } from "@/lib/content/subscription-access";
+import {
+  contentProgressLabel,
+  type ContentProgress,
+} from "@/lib/portal/progress-display";
 
 export type AccountSubscription = {
   program_name: string;
@@ -12,6 +16,13 @@ export type AccountSubscription = {
   price_mxn: number;
   months_elapsed: number;
   duration_months: number | null;
+  billing_model: string;
+  /** Puntero de contenido: dónde entrena, que puede no ser lo que compró. */
+  content_variant_id: string | null;
+  content_ordinal: number;
+  content_loops: number;
+  /** Nombre de la variante del puntero; se resuelve aparte del join. */
+  rung_name: string | null;
 };
 
 export type AccountInvoice = {
@@ -33,7 +44,10 @@ type RawSub = {
   enrollment_date: string;
   current_period_end: string | null;
   months_elapsed: number;
-  program_variants: { name: string; price_mxn: number; programs: { name: string; duration_months: number | null } | null } | null;
+  content_variant_id: string | null;
+  content_ordinal: number;
+  content_loops: number;
+  program_variants: { name: string; price_mxn: number; programs: { name: string; duration_months: number | null; billing_model: string } | null } | null;
 };
 
 export function mapSubscription(rows: RawSub[] | null): AccountSubscription | null {
@@ -49,6 +63,11 @@ export function mapSubscription(rows: RawSub[] | null): AccountSubscription | nu
     price_mxn: r.program_variants.price_mxn,
     months_elapsed: r.months_elapsed,
     duration_months: r.program_variants.programs?.duration_months ?? null,
+    billing_model: r.program_variants.programs?.billing_model ?? "rolling_monthly",
+    content_variant_id: r.content_variant_id,
+    content_ordinal: r.content_ordinal,
+    content_loops: r.content_loops,
+    rung_name: null,
   };
 }
 
@@ -68,10 +87,21 @@ export function mapInvoices(rows: RawInvoice[] | null): AccountInvoice[] {
   }));
 }
 
-export function progressLabel(monthsElapsed: number, durationMonths: number | null): { text: string; percent: number } | null {
-  if (!durationMonths || durationMonths <= 0) return null;
-  const percent = Math.min(100, Math.round((monthsElapsed / durationMonths) * 100));
-  return { text: `Mes ${monthsElapsed} de ${durationMonths}`, percent };
+/**
+ * La etiqueta de progreso de la ficha de suscripción.
+ *
+ * Delega en el helper compartido para que el portal, la ficha y el admin digan
+ * lo mismo: fracción en plazo fijo, peldaño + posición en rolling.
+ */
+export function accountProgressLabel(sub: AccountSubscription): ContentProgress {
+  return contentProgressLabel({
+    billingModel: sub.billing_model,
+    durationMonths: sub.duration_months,
+    monthsElapsed: sub.months_elapsed,
+    rungName: sub.rung_name,
+    contentOrdinal: sub.content_ordinal,
+    contentLoops: sub.content_loops,
+  });
 }
 
 export async function getAccountData(userId: string): Promise<AccountData> {
@@ -85,7 +115,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
 
   const { data: subRows } = await supabase
     .from("subscriptions")
-    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, program_variants(name, price_mxn, programs(name, duration_months))")
+    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants(name, price_mxn, programs(name, duration_months, billing_model))")
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .order("enrollment_date", { ascending: false });
@@ -95,6 +125,19 @@ export async function getAccountData(userId: string): Promise<AccountData> {
     .select("amount_paid, invoice_date, status, subscriptions(program_variants(programs(name)))")
     .order("invoice_date", { ascending: false });
 
+  // keep: subscriptions JOIN program_variants JOIN programs — nested join shape not inferred.
+  const subscription = mapSubscription(subRows as RawSub[] | null);
+  // El nombre del peldaño se pide aparte: el join de arriba cuelga de
+  // `program_variant_id` (lo que compró) y el puntero puede apuntar a otra.
+  if (subscription?.content_variant_id) {
+    const { data: rungRow } = await supabase
+      .from("program_variants")
+      .select("name")
+      .eq("id", subscription.content_variant_id)
+      .maybeSingle();
+    subscription.rung_name = (rungRow as { name: string } | null)?.name ?? null;
+  }
+
   const p = (profileRow ?? {}) as { full_name?: string; email?: string; phone?: string | null; avatar_url?: string | null };
   return {
     profile: {
@@ -103,8 +146,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
       phone: p.phone ?? null,
       avatar_url: p.avatar_url ?? null,
     },
-    // keep: subscriptions JOIN program_variants JOIN programs — nested join shape not inferred.
-    subscription: mapSubscription(subRows as RawSub[] | null),
+    subscription,
     // keep: invoices JOIN subscriptions JOIN program_variants JOIN programs — nested join not inferred.
     invoices: mapInvoices(invoiceRows as RawInvoice[] | null),
   };

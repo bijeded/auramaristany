@@ -1,5 +1,6 @@
 import type { AccountSubscription } from "@/lib/portal/account-queries";
-import { progressLabel } from "@/lib/portal/account-queries";
+import { accountProgressLabel } from "@/lib/portal/account-queries";
+import { repeatMarker } from "@/lib/portal/progress-display";
 import { longDateLabel } from "@/lib/admin/date-helpers";
 
 const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> = {
@@ -35,7 +36,8 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
   }
 
   const badge = STATUS_BADGE[subscription.status] ?? STATUS_BADGE.canceled;
-  const progress = progressLabel(subscription.months_elapsed, subscription.duration_months);
+  const progress = accountProgressLabel(subscription);
+  const repeat = repeatMarker(subscription.content_loops, subscription.content_ordinal);
 
   return (
     <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -62,17 +64,23 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
           {longDateLabel(subscription.current_period_end)} · {formatMoney(subscription.price_mxn)}
         </Row>
       )}
-      {progress && (
-        <div style={{ marginTop: 16 }}>
-          <div className="flex justify-between" style={{ marginBottom: 6 }}>
-            <span className="font-body text-xs font-semibold" style={{ color: "var(--negro)" }}>{progress.text}</span>
+      <div style={{ marginTop: 16 }}>
+        <div className="flex justify-between" style={{ marginBottom: 6 }}>
+          <span className="font-body text-xs font-semibold" style={{ color: "var(--negro)" }}>{progress.text}</span>
+          {/* Sin duración no hay contra qué medir: se muestra la posición sin barra. */}
+          {progress.percent !== null && (
             <span className="font-body text-xs" style={{ color: "var(--gris-suave)" }}>{progress.percent}%</span>
-          </div>
+          )}
+        </div>
+        {progress.percent !== null && (
           <div style={{ height: 6, borderRadius: 999, background: "var(--gris-linea)", overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${progress.percent}%`, background: "var(--lavanda)" }} />
           </div>
-        </div>
-      )}
+        )}
+        {repeat && (
+          <p className="font-body text-xs" style={{ marginTop: 6, color: "var(--gris-suave)" }}>{repeat}</p>
+        )}
+      </div>
     </div>
   );
 }
