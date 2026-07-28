@@ -9,17 +9,18 @@ import { getCurrentMonthPillars } from "@/lib/content/pillars";
  * resultado distingue "resolvió la serie correcta" de "no resolvió nada" —
  * ambos casos devolverían [] si los pilares estuvieran siempre vacíos.
  *
- * @param monthsElapsed  posición de la cliente en el currículo
- * @param ordinals       posiciones mapeadas a SU variante (`s<n>` = series_id)
+ * @param contentOrdinal  posición de la cliente en el currículo (el puntero)
+ * @param ordinals        posiciones mapeadas a SU peldaño (`s<n>` = series_id)
  */
-function mockSub(slug: string, monthsElapsed = 1, ordinals: number[] = [1]) {
+function mockSub(slug: string, contentOrdinal = 1, ordinals: number[] = [1]) {
   const SERIES_WITH_PILLARS = "s2";
   return {
     from: (table: string) => {
       if (table === "subscriptions") {
         return { select: () => ({ eq: () => ({ in: () => ({ single: () =>
           Promise.resolve({ data: {
-            months_elapsed: monthsElapsed, program_variant_id: "v1",
+            content_variant_id: "v1", content_ordinal: contentOrdinal,
+            program_variant_id: "v1",
             program_variants: { program_id: "pr1", programs: { slug } },
           } }) }) }) }) };
       }
@@ -49,7 +50,7 @@ function mockSub(slug: string, monthsElapsed = 1, ordinals: number[] = [1]) {
   };
 }
 
-function useMock(client: ReturnType<typeof mockSub>) {
+function useMock(client: { from: (table: string) => unknown }) {
   (createClient as ReturnType<typeof vi.fn>).mockResolvedValue(client);
 }
 
@@ -60,14 +61,49 @@ describe("getCurrentMonthPillars", () => {
   });
 
   it("resuelve la serie por el ordinal de la variante", async () => {
-    // months_elapsed 2 → ordinal 2 → s2, la única serie con pilares.
+    // puntero en la posición 2 → s2, la única serie con pilares.
     useMock(mockSub("cuarenta-mas", 2, [1, 2, 3]));
     const result = await getCurrentMonthPillars("u1");
     expect(result.map((p) => p.pillar_key)).toEqual(["alimentacion"]);
   });
 
+  it("consulta el PELDAÑO en el que entrena, no la variante que compró", async () => {
+    // El caso que motiva todo el cambio: una cliente que subió de nivel —o que
+    // Aura evaluó y mandó directa a Intermedio— entrena un peldaño distinto del
+    // que paga. Direccionar por `program_variant_id` le serviría el contenido
+    // del nivel equivocado, que en un programa de fuerza para mujeres de 40+ es
+    // un problema de seguridad, no de gusto.
+    const queried: string[] = [];
+    const base = mockSub("cuarenta-mas", 2, [1, 2, 3]);
+    useMock({
+      from: (table: string) => {
+        if (table === "subscriptions") {
+          return { select: () => ({ eq: () => ({ in: () => ({ single: () =>
+            Promise.resolve({ data: {
+              content_variant_id: "v-avanzado", content_ordinal: 2,
+              program_variant_id: "v-principiante",
+              program_variants: { program_id: "pr1", programs: { slug: "cuarenta-mas" } },
+            } }) }) }) }) };
+        }
+        if (table === "variant_series_map") {
+          return { select: () => ({ eq: (_c: string, val: string) => {
+            queried.push(val);
+            return { eq: () => Promise.resolve({ data: [
+              { series_id: "s1", ordinal: 1 }, { series_id: "s2", ordinal: 2 },
+            ] }) };
+          } }) };
+        }
+        return base.from(table);
+      },
+    });
+
+    await getCurrentMonthPillars("u1");
+
+    expect(queried).toEqual(["v-avanzado"]);
+  });
+
   it("no confunde la posición con otra serie del currículo", async () => {
-    // months_elapsed 3 → s3, que no tiene pilares.
+    // puntero en la posición 3 → s3, que no tiene pilares.
     useMock(mockSub("cuarenta-mas", 3, [1, 2, 3]));
     expect(await getCurrentMonthPillars("u1")).toEqual([]);
   });

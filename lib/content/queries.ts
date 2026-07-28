@@ -2,13 +2,13 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import {
   getCurrentDayKey,
-  getCurrentSeriesNumber,
   getUpcomingDayKeys,
 } from "./access";
 import { ACCESS_STATES } from "./subscription-access";
 import { serverToday } from "./server-today";
 import type { DayKey, UpcomingDayKey } from "./access";
 import { seriesAtOrdinal, type CurriculumEntry } from "./curriculum";
+import { resolveContentPosition } from "./ladder";
 import type { Json } from "@/lib/supabase/types";
 
 export interface Exercise {
@@ -64,7 +64,12 @@ export interface TodayContent {
 // Raw types for complex Supabase selects (Relationships not defined in Database type)
 interface SubRow {
   id: string;
+  // Sólo para la etiqueta "Mes N" del portal. El CONTENIDO se direcciona con el
+  // puntero (content_variant_id/content_ordinal), nunca con esto. La etiqueta se
+  // vuelve consciente del peldaño en la parte 6 del cambio.
   months_elapsed: number;
+  content_variant_id: string | null;
+  content_ordinal: number;
   current_period_start: string | null;
   program_variant_id: string;
   program_variants: { program_id: string; programs: { slug: string } };
@@ -109,7 +114,7 @@ export async function getTodayContent(
   const { data: rawSub } = await supabase
     .from("subscriptions")
     .select(
-      `id, months_elapsed, current_period_start, program_variant_id,
+      `id, months_elapsed, content_variant_id, content_ordinal, current_period_start, program_variant_id,
        program_variants!inner ( program_id,
          programs!inner ( slug )
        )`
@@ -124,7 +129,10 @@ export async function getTodayContent(
   if (!sub || !sub.current_period_start) return null;
 
   const programSlug = sub.program_variants.programs.slug;
-  const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
+  // El contenido se direcciona con el puntero de la suscripción, no con
+  // `months_elapsed`: el peldaño en el que entrena puede no ser el que compró.
+  const position = resolveContentPosition(sub);
+  if (!position) return null;
   const dayKey = getCurrentDayKey(sub.current_period_start, today);
 
   // 2. Qué serie PUBLICADA ocupa esa posición en el currículo de ESTA variante.
@@ -140,12 +148,12 @@ export async function getTodayContent(
   const { data: rawVariantSeries } = await supabase
     .from("variant_series_map")
     .select("series_id, ordinal, program_series!inner ( published )")
-    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_variant_id", position.variantId)
     .eq("program_series.published", true);
 
   // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
   const variantSeries = (rawVariantSeries ?? []) as unknown as VariantSeriesRow[];
-  const seriesId = seriesAtOrdinal(variantSeries, seriesNumber);
+  const seriesId = seriesAtOrdinal(variantSeries, position.ordinal);
 
   if (!seriesId) return null;
 
@@ -236,14 +244,14 @@ export async function getWeekCalendar(
   const { data: rawSub } = await supabase
     .from("subscriptions")
     .select(
-      `id, months_elapsed, current_period_start, current_period_end, program_variant_id`
+      `id, content_variant_id, content_ordinal, current_period_start, current_period_end, program_variant_id`
     )
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .single();
 
   const sub = rawSub as
-    | (Pick<SubRow, "id" | "months_elapsed" | "current_period_start" | "program_variant_id"> & {
+    | (Pick<SubRow, "id" | "content_variant_id" | "content_ordinal" | "current_period_start" | "program_variant_id"> & {
         current_period_end: string | null;
       })
     | null;
@@ -256,19 +264,20 @@ export async function getWeekCalendar(
   );
   if (dayKeys.length === 0) return [];
 
-  const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
+  const position = resolveContentPosition(sub);
+  if (!position) return null;
   // Mismo filtro explícito que en getTodayContent, y aquí importa más: este
   // calendario NO filtra `program_days.published` (decisión A12), así que la
   // serie era su único control de publicación.
   const { data: rawVariantSeries } = await supabase
     .from("variant_series_map")
     .select("series_id, ordinal, program_series!inner ( published )")
-    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_variant_id", position.variantId)
     .eq("program_series.published", true);
 
   // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
   const variantSeries = (rawVariantSeries ?? []) as unknown as VariantSeriesRow[];
-  const seriesId = seriesAtOrdinal(variantSeries, seriesNumber);
+  const seriesId = seriesAtOrdinal(variantSeries, position.ordinal);
   if (!seriesId) return null;
 
   const weekNumbers = Array.from(new Set(dayKeys.map((k) => k.week_number)));

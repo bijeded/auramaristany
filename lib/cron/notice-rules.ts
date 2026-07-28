@@ -3,7 +3,7 @@
 // autentica, orquesta y reporta.
 //
 // Se reutilizan los helpers ya existentes en lugar de reimplementarlos:
-//   getCurrentDayKey / getCurrentSeriesNumber  → lib/content/access.ts
+//   getCurrentDayKey  → lib/content/access.ts
 //   isInactive / INACTIVITY_THRESHOLD_DAYS     → lib/admin/clients-helpers.ts
 //   subscriptionGrantsAccess                   → lib/content/subscription-access.ts
 import { getCurrentDayKey, type DayOfWeek } from "@/lib/content/access";
@@ -25,7 +25,7 @@ export interface NoticeCandidate {
   current_period_start: string;
   /** date (YYYY-MM-DD); centinela de la clave cuando nunca hubo actividad. */
   enrollment_date: string;
-  /** Serie del mes en curso, ya resuelta por la capa de queries (variante + months_elapsed). */
+  /** Serie del mes en curso, ya resuelta por la capa de queries (puntero de contenido). */
   series_id: string | null;
   /** max(progress_logs.log_date) — la señal que dejó A5. */
   last_activity_date: string | null;

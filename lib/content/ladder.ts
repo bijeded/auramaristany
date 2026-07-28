@@ -120,6 +120,32 @@ export function advanceLadderPosition(input: AdvanceInput): LadderPosition {
   return { ...position, ordinal: wrapTo, loops: position.loops + 1 };
 }
 
+/**
+ * Dónde buscar el contenido de una suscripción: el peldaño y la posición.
+ *
+ * El puntero (`content_variant_id`) es la dirección buena. Si viniera en null se
+ * cae a la variante comprada, que es exactamente dónde estaría la cliente si
+ * nunca hubiera subido de peldaño — el mismo valor que dejó el backfill de la
+ * migración 016. Es una red por si alguna fila se creara sin inicializar el
+ * puntero: preferimos servir el contenido del nivel que compró antes que dejar
+ * el portal en blanco, y se avisa por consola porque significa que algo no
+ * inicializó la suscripción.
+ */
+export function resolveContentPosition(sub: {
+  content_variant_id: string | null;
+  content_ordinal: number;
+  program_variant_id: string | null;
+}): { variantId: string; ordinal: number } | null {
+  if (!sub.content_variant_id) {
+    if (!sub.program_variant_id) return null;
+    console.error(
+      "[ladder] suscripción sin content_variant_id; se cae a program_variant_id"
+    );
+    return { variantId: sub.program_variant_id, ordinal: sub.content_ordinal };
+  }
+  return { variantId: sub.content_variant_id, ordinal: sub.content_ordinal };
+}
+
 /** Un programa de plazo fijo que ya cumplió los meses que dura. */
 function hasCompletedFixedTerm(input: AdvanceInput): boolean {
   return (
