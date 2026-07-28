@@ -21,20 +21,20 @@
 
 ## 4. Webhook: idempotency and advancement
 
-- [ ] 4.1 Write a failing test: a redelivered `invoice.paid` for an already-recorded invoice leaves `months_elapsed` and all three pointer columns unchanged.
-- [ ] 4.2 Change `recordInvoice` to report whether it inserted a new row or hit the `stripe_invoice_id` conflict.
-- [ ] 4.3 Gate the `months_elapsed` increment on that result, closing the existing unguarded-increment defect.
-- [ ] 4.4 Advance the content pointer in the same guarded path, using the pure function from task 3.4.
-- [ ] 4.5 Initialise the pointer on subscription creation in `handleCheckoutCompleted`: `content_variant_id = program_variant_id`, `content_ordinal` = that variant's **smallest mapped ordinal** (not a hardcoded 1), `content_loops = 0`.
-- [ ] 4.6 Verify the fixed-term freeze end to end with a simulated CuarentaMás subscription past month 6.
+- [x] 4.1 Write a failing test: a redelivered `invoice.paid` for an already-recorded invoice leaves `months_elapsed` and all three pointer columns unchanged.
+- [x] 4.2 Change `recordInvoice` to report whether it inserted a new row or hit the `stripe_invoice_id` conflict.
+- [x] 4.3 Gate the `months_elapsed` increment on that result, closing the existing unguarded-increment defect.
+- [x] 4.4 Advance the content pointer in the same guarded path, using the pure function from task 3.4.
+- [x] 4.5 Initialise the pointer on subscription creation in `handleCheckoutCompleted`: `content_variant_id = program_variant_id`, `content_ordinal` = that variant's **smallest mapped ordinal** (not a hardcoded 1), `content_loops = 0`.
+- [x] 4.6 Verify the fixed-term freeze end to end with a simulated CuarentaMás subscription past month 6.
 
 ## 5. Content resolution via the pointer
 
-- [ ] 5.1 Switch `lib/content/queries.ts` series resolution (both call sites) to `(content_variant_id, content_ordinal)`.
-- [ ] 5.2 Switch `lib/content/pillars.ts` to the pointer.
-- [ ] 5.3 Switch `lib/cron/notice-queries.ts` to the pointer — the A4 automated-message rules resolve `series_id` the same way and break silently if missed.
-- [ ] 5.4 Remove `getAccessibleSeries` from `lib/content/access.ts` and its tests (no production callers; the cumulative rule it documents has never run).
-- [ ] 5.5 Run the full suite and confirm no remaining reader addresses content by `months_elapsed`.
+- [x] 5.1 Switch `lib/content/queries.ts` series resolution (both call sites) to `(content_variant_id, content_ordinal)`.
+- [x] 5.2 Switch `lib/content/pillars.ts` to the pointer.
+- [x] 5.3 Switch `lib/cron/notice-queries.ts` to the pointer — the A4 automated-message rules resolve `series_id` the same way and break silently if missed.
+- [x] 5.4 Remove `getAccessibleSeries` from `lib/content/access.ts` and its tests (no production callers; the cumulative rule it documents has never run).
+- [x] 5.5 Run the full suite and confirm no remaining reader addresses content by `months_elapsed`.
 
 ## 6. Portal display
 
