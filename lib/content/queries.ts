@@ -9,6 +9,11 @@ import { serverToday } from "./server-today";
 import type { DayKey, UpcomingDayKey } from "./access";
 import { seriesAtOrdinal, type CurriculumEntry } from "./curriculum";
 import { resolveContentPosition } from "./ladder";
+import {
+  contentProgressLabel,
+  repeatMarker,
+  type ContentProgress,
+} from "@/lib/portal/progress-display";
 import type { Json } from "@/lib/supabase/types";
 
 export interface Exercise {
@@ -49,7 +54,10 @@ export interface TodayContent {
   };
   blocks: DayBlock[];
   currentDayKey: DayKey;
-  monthsElapsed: number;
+  /** Cómo se le cuenta dónde va: "Avanzado · Mes 2" o "Mes 3 de 6". */
+  progress: ContentProgress;
+  /** "Repitiendo Mes N" mientras dé vueltas, `null` si no. */
+  repeatLabel: string | null;
   programSlug: string;
   subscriptionId: string;
   existingLog: ProgressLog | null;
@@ -64,15 +72,19 @@ export interface TodayContent {
 // Raw types for complex Supabase selects (Relationships not defined in Database type)
 interface SubRow {
   id: string;
-  // Sólo para la etiqueta "Mes N" del portal. El CONTENIDO se direcciona con el
-  // puntero (content_variant_id/content_ordinal), nunca con esto. La etiqueta se
-  // vuelve consciente del peldaño en la parte 6 del cambio.
+  // Sólo para la etiqueta de progreso de un programa de plazo fijo ("Mes 3 de
+  // 6"), que mide tiempo cobrado. El CONTENIDO se direcciona con el puntero
+  // (content_variant_id/content_ordinal), nunca con esto.
   months_elapsed: number;
   content_variant_id: string | null;
   content_ordinal: number;
+  content_loops: number;
   current_period_start: string | null;
   program_variant_id: string;
-  program_variants: { program_id: string; programs: { slug: string } };
+  program_variants: {
+    program_id: string;
+    programs: { slug: string; billing_model: string; duration_months: number | null };
+  };
 }
 
 // La posición vive en el mapeo (`variant_series_map.ordinal`), así que ya no
@@ -114,9 +126,9 @@ export async function getTodayContent(
   const { data: rawSub } = await supabase
     .from("subscriptions")
     .select(
-      `id, months_elapsed, content_variant_id, content_ordinal, current_period_start, program_variant_id,
+      `id, months_elapsed, content_variant_id, content_ordinal, content_loops, current_period_start, program_variant_id,
        program_variants!inner ( program_id,
-         programs!inner ( slug )
+         programs!inner ( slug, billing_model, duration_months )
        )`
     )
     .eq("profile_id", userId)
@@ -156,6 +168,26 @@ export async function getTodayContent(
   const seriesId = seriesAtOrdinal(variantSeries, position.ordinal);
 
   if (!seriesId) return null;
+
+  // 2b. El nombre del peldaño en el que ENTRENA, para la etiqueta de progreso.
+  //     Se pide aparte porque el join de arriba cuelga de `program_variant_id`
+  //     (lo que compró), y las dos variantes pueden no ser la misma.
+  const { data: rawRung } = await supabase
+    .from("program_variants")
+    .select("name")
+    .eq("id", position.variantId)
+    .maybeSingle();
+  const rungName = (rawRung as { name: string } | null)?.name ?? null;
+
+  const program = sub.program_variants.programs;
+  const progress = contentProgressLabel({
+    billingModel: program.billing_model,
+    durationMonths: program.duration_months,
+    monthsElapsed: sub.months_elapsed,
+    rungName,
+    contentOrdinal: position.ordinal,
+    contentLoops: sub.content_loops,
+  });
 
   // 3. Fetch today's program_day
   const { data: rawDay } = await supabase
@@ -200,7 +232,8 @@ export async function getTodayContent(
     day,
     blocks: (blocks ?? []) as DayBlock[],
     currentDayKey: dayKey,
-    monthsElapsed: sub.months_elapsed,
+    progress,
+    repeatLabel: repeatMarker(sub.content_loops, position.ordinal),
     programSlug,
     subscriptionId: sub.id,
     existingLog,

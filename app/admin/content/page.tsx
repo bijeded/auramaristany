@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, ChevronRight } from "lucide-react";
+import { BookOpen, ChevronRight, AlertTriangle } from "lucide-react";
 import { getAdminPrograms } from "@/lib/admin/queries";
 
 const BILLING_LABELS: Record<string, string> = {
@@ -21,6 +21,24 @@ export default async function AdminContentPage() {
             Selecciona un programa para gestionar sus series y días.
           </p>
         </div>
+        {/* La señal de agotamiento vive aquí porque el remedio es escribir
+            contenido, que es justo lo que se hace en esta pantalla. */}
+        <Link
+          href="/admin/content/runway"
+          className="font-body flex items-center gap-2 rounded-xl px-4 py-2.5"
+          style={{
+            border: "1.5px solid var(--gris-linea)",
+            background: "#fff",
+            color: "var(--negro)",
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <AlertTriangle size={16} color="var(--gris-texto)" strokeWidth={1.8} />
+          Se les acaba el contenido
+        </Link>
       </div>
 
       <div className="flex flex-col gap-3">

@@ -32,11 +32,13 @@ const DAY_LABELS: Record<string, string> = {
 
 
 function ProgramBanner({
-  monthsElapsed,
+  progressText,
+  repeatLabel,
   weekNumber,
   programSlug,
 }: {
-  monthsElapsed: number;
+  progressText: string;
+  repeatLabel: string | null;
   weekNumber: number;
   programSlug: string;
 }) {
@@ -66,11 +68,21 @@ function ProgramBanner({
             className="font-head mt-0.5"
             style={{ fontSize: 22, fontWeight: 600, color: "#5e3d38" }}
           >
-            Mes {monthsElapsed}{" "}
+            {progressText}{" "}
             <span style={{ fontSize: 15, color: "#a87b73", fontWeight: 400 }}>
               · Semana {weekNumber}
             </span>
           </p>
+          {/* Persistente mientras dure la vuelta, no un aviso que se cierra:
+              reconocer el contenido sin explicación se lee como un error. */}
+          {repeatLabel && (
+            <p
+              className="font-body mt-1"
+              style={{ fontSize: 12, color: "#a87b73" }}
+            >
+              {repeatLabel}
+            </p>
+          )}
         </div>
         <span
           className="font-body rounded-full px-3 py-1.5 text-center"
@@ -352,7 +364,8 @@ export function TodayView({
         ) : (
           <>
             <ProgramBanner
-              monthsElapsed={content.monthsElapsed}
+              progressText={content.progress.text}
+              repeatLabel={content.repeatLabel}
               weekNumber={content.currentDayKey.week_number}
               programSlug={content.programSlug}
             />

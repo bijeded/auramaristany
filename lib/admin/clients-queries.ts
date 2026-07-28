@@ -85,6 +85,15 @@ export interface ClientSubscription {
   billing_model: string;
   duration_months: number | null;
   months_elapsed: number;
+  /**
+   * §6.4 — dos preguntas distintas, dos columnas distintas:
+   * `variant_name` es lo que PAGA (`program_variant_id`, inmutable, ligado a su
+   * precio de Stripe) y `rung_name` es lo que ESTÁ HACIENDO (`content_variant_id`).
+   * La ficha muestra las dos sólo cuando difieren.
+   */
+  rung_name: string | null;
+  content_ordinal: number;
+  content_loops: number;
   status: SubStatus;
   enrollment_date: string;
   current_period_end: string | null;
@@ -126,15 +135,33 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   const { data: rawSubs } = await supabase
     .from("subscriptions")
     .select(
-      "id, status, enrollment_date, current_period_end, months_elapsed, program_variants(name, price_mxn, programs(name, billing_model, duration_months))"
+      "id, status, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants(name, price_mxn, programs(name, billing_model, duration_months))"
     )
     .eq("profile_id", clientId)
     .order("enrollment_date", { ascending: false });
 
   type RawSub = {
     id: string; status: SubStatus; enrollment_date: string; current_period_end: string | null; months_elapsed: number;
+    content_variant_id: string | null; content_ordinal: number; content_loops: number;
     program_variants: { name: string; price_mxn: number; programs: { name: string; billing_model: string; duration_months: number | null } | null } | null;
   };
+
+  // Los nombres de los peldaños se piden aparte: el join de arriba cuelga de
+  // `program_variant_id` y el puntero puede apuntar a otra variante.
+  const rungIds = Array.from(
+    new Set(((rawSubs ?? []) as RawSub[]).map((s) => s.content_variant_id).filter((id): id is string => !!id))
+  );
+  const rungNames = new Map<string, string>();
+  if (rungIds.length > 0) {
+    const { data: rungRows } = await supabase
+      .from("program_variants")
+      .select("id, name")
+      .in("id", rungIds);
+    for (const r of (rungRows ?? []) as { id: string; name: string }[]) {
+      rungNames.set(r.id, r.name);
+    }
+  }
+
   // keep: subscriptions JOIN program_variants JOIN programs — nested join not inferred.
   const subscriptions: ClientSubscription[] = ((rawSubs ?? []) as RawSub[])
     .filter((s) => s.program_variants)
@@ -145,6 +172,9 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       billing_model: s.program_variants!.programs?.billing_model ?? "rolling_monthly",
       duration_months: s.program_variants!.programs?.duration_months ?? null,
       months_elapsed: s.months_elapsed,
+      rung_name: s.content_variant_id ? rungNames.get(s.content_variant_id) ?? null : null,
+      content_ordinal: s.content_ordinal,
+      content_loops: s.content_loops,
       status: s.status,
       enrollment_date: s.enrollment_date,
       current_period_end: s.current_period_end,

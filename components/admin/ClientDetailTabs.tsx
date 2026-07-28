@@ -79,7 +79,10 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
                 <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{s.program_name} · {s.variant_name}</h3>
                 {[
                   ["Fecha de inicio", dayLabel(s.enrollment_date)],
-                  ["Progreso", subscriptionProgressLabel({ months_elapsed: s.months_elapsed }, { billing_model: s.billing_model, duration_months: s.duration_months })],
+                  // El encabezado de arriba nombra la variante que PAGA; esta fila,
+                  // el nivel que ESTÁ HACIENDO, que puede haber subido desde entonces.
+                  ["Progreso", subscriptionProgressLabel(s, { billing_model: s.billing_model, duration_months: s.duration_months })],
+                  ...(s.content_loops > 0 ? [["Repeticiones", `${s.content_loops}ª vuelta al nivel`] as [string, string]] : []),
                   ["Próximo cobro", s.current_period_end ? `${dayLabel(s.current_period_end.slice(0, 10))} · ${formatMXN(s.price_mxn)}` : "—"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between" style={{ marginBottom: 10 }}>
