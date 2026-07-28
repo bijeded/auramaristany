@@ -86,7 +86,7 @@ export function SeriesFormModal({
         mappings,
       });
       if (res.error) {
-        if (res.error.includes("Ya existe un Mes")) setFieldError(res.error);
+        if (res.field === "ordinal") setFieldError(res.error);
         else setError(res.error);
         setLoading(false);
         return;
@@ -99,7 +99,7 @@ export function SeriesFormModal({
         mappings,
       });
       if (res.error) {
-        if (res.error.includes("Ya existe un Mes")) setFieldError(res.error);
+        if (res.field === "ordinal") setFieldError(res.error);
         else setError(res.error);
         setLoading(false);
         return;

@@ -24,7 +24,8 @@ export function SeriesDeleteDialog({ series, onClose, onConfirm, loading, error 
         </h2>
         <p className="font-body" style={{ fontSize: 14, color: "var(--gris-texto)", marginBottom: 20 }}>
           <strong>{series.title}</strong> y todo su contenido (días, bloques y pilares) se
-          eliminarán permanentemente. Esta acción no se puede deshacer.
+          eliminarán permanentemente, junto con los entrenamientos que las clientes ya
+          hayan registrado en esos días. Esta acción no se puede deshacer.
         </p>
         {series.mappings.length > 1 && (
           <p

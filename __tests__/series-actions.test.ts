@@ -110,9 +110,7 @@ describe("createSeries", () => {
 
     // Sin variante no tiene posición: no es que quede inalcanzable, es que no
     // se puede representar en ningún currículo.
-    expect(result.error).toBe(
-      "Revisa los datos de la serie: falta el título o la variante."
-    );
+    expect(result.error).toBe("Elige al menos una variante para esta serie.");
     expect(calls).toHaveLength(0);
   });
 
@@ -125,7 +123,10 @@ describe("createSeries", () => {
       mappings: [{ variantId: V1, ordinal: 2 }],
     });
 
-    expect(result.error).toBe("Ya existe un Mes 2 en alguna de las variantes elegidas.");
+    expect(result.error).toBe("Esta variante ya tiene un Mes 2.");
+    // Discriminador explícito: el modal lo pinta inline en el campo Mes #, sin
+    // buscar texto dentro del mensaje.
+    expect(result.field).toBe("ordinal");
   });
 
   it("borra la serie si el mapeo falla, para no dejarla huérfana e invisible", async () => {
@@ -192,7 +193,8 @@ describe("updateSeries", () => {
       mappings: [{ variantId: V1, ordinal: 5 }],
     });
 
-    expect(result.error).toBe("Ya existe un Mes 5 en alguna de las variantes elegidas.");
+    expect(result.error).toBe("Esta variante ya tiene un Mes 5.");
+    expect(result.field).toBe("ordinal");
   });
 
   it("restaura los mapeos anteriores si la inserción falla", async () => {
@@ -226,9 +228,7 @@ describe("updateSeries", () => {
       mappings: [],
     });
 
-    expect(result.error).toBe(
-      "Revisa los datos de la serie: falta el título o la variante."
-    );
+    expect(result.error).toBe("Elige al menos una variante para esta serie.");
     expect(calls).toHaveLength(0);
   });
 });

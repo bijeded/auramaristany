@@ -160,7 +160,9 @@ export async function getAdminProgram(programId: string) {
       }),
   }));
 
-  const seriesCount = byId.size;
+  // Sólo las que aparecen en algún currículo, igual que getAdminPrograms: una
+  // serie sin mapeo no se renderiza en ninguna parte de esta página.
+  const seriesCount = Object.keys(positions).filter((id) => byId.has(id)).length;
 
   return {
     program: program as Omit<AdminProgram, "series_count">,

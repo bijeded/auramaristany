@@ -12,6 +12,17 @@ import { logAndGeneric } from "./errors";
  * y el Mes 4 de otra, así que un único `ordinal` para toda la serie reescribiría
  * la posición de las demás variantes sin que el admin lo pida.
  */
+/**
+ * `field: "ordinal"` = el error pertenece al campo Mes #, para pintarlo inline.
+ * Es un discriminador explícito a propósito: el modal antes lo deducía buscando
+ * un trozo de texto dentro del mensaje, y cualquier cambio de copy lo rompía en
+ * silencio.
+ */
+export interface SeriesActionResult {
+  error?: string;
+  field?: "ordinal";
+}
+
 export interface SeriesMappingInput {
   variantId: string;
   ordinal: number;
@@ -56,9 +67,26 @@ const updateSchema = z.object({ ...baseSchema, published: z.boolean() });
  */
 function positionTakenMessage(mappings: SeriesMappingInput[]): string {
   const months = Array.from(new Set(mappings.map((m) => m.ordinal))).sort((a, b) => a - b);
+  if (mappings.length === 1) {
+    // Caso común: una sola variante, así que el mensaje ya es inequívoco.
+    return `Esta variante ya tiene un Mes ${months[0]}.`;
+  }
   return months.length === 1
     ? `Ya existe un Mes ${months[0]} en alguna de las variantes elegidas.`
     : `Alguna de las variantes elegidas ya tiene ocupado uno de esos meses.`;
+}
+
+/** Mensaje concreto por campo: "revisa los datos" no dice qué corregir. */
+function validationMessage(error: z.ZodError): string {
+  const path = error.issues[0]?.path.join(".") ?? "";
+  if (path.startsWith("mappings")) {
+    return path === "mappings"
+      ? "Elige al menos una variante para esta serie."
+      : "El mes debe ser un número entero mayor o igual a 1.";
+  }
+  if (path === "title") return "El título es requerido (máximo 120 caracteres).";
+  if (path === "description") return "La descripción es demasiado larga (máximo 1000 caracteres).";
+  return "Revisa los datos de la serie.";
 }
 
 function toRows(seriesId: string, mappings: SeriesMappingInput[]) {
@@ -72,7 +100,7 @@ function toRows(seriesId: string, mappings: SeriesMappingInput[]) {
 export async function createSeries(
   programId: string,
   data: CreateSeriesInput
-): Promise<{ error?: string }> {
+): Promise<SeriesActionResult> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
 
@@ -80,7 +108,7 @@ export async function createSeries(
   // que no se puede representar en ningún currículo.
   const parsed = createSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: "Revisa los datos de la serie: falta el título o la variante." };
+    return { error: validationMessage(parsed.error) };
   }
   const input = parsed.data;
   const supabase = auth.supabase;
@@ -115,7 +143,7 @@ export async function createSeries(
     if (rollbackError) logAndGeneric("createSeries.rollback", rollbackError);
 
     if ((mapError as { code?: string }).code === "23505") {
-      return { error: positionTakenMessage(input.mappings) };
+      return { error: positionTakenMessage(input.mappings), field: "ordinal" };
     }
     return { error: logAndGeneric("createSeries.map", mapError) };
   }
@@ -128,27 +156,16 @@ export async function updateSeries(
   seriesId: string,
   programId: string,
   data: UpdateSeriesInput
-): Promise<{ error?: string }> {
+): Promise<SeriesActionResult> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
 
   const parsed = updateSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: "Revisa los datos de la serie: falta el título o la variante." };
+    return { error: validationMessage(parsed.error) };
   }
   const input = parsed.data;
   const supabase = auth.supabase;
-
-  const { error: updateError } = await supabase
-    .from("program_series")
-    .update({
-      title: input.title,
-      description: input.description ?? null,
-      published: input.published,
-    })
-    .eq("id", seriesId);
-
-  if (updateError) return { error: logAndGeneric("updateSeries.update", updateError) };
 
   // Reconciliación borrar-e-insertar: NO es atómica. Se leen los mapeos actuales
   // antes de borrar para poder restaurarlos si la inserción falla — sin eso, un
@@ -186,22 +203,75 @@ export async function updateSeries(
       if (restoreError) logAndGeneric("updateSeries.restoreMap", restoreError);
     }
     if ((insertMapError as { code?: string }).code === "23505") {
-      return { error: positionTakenMessage(input.mappings) };
+      return { error: positionTakenMessage(input.mappings), field: "ordinal" };
     }
     return { error: logAndGeneric("updateSeries.insertMap", insertMapError) };
   }
+
+  // Los metadatos se escriben DESPUÉS de que el mapeo cuadre: si se hicieran
+  // antes, un 23505 devolvería "esta variante ya tiene un Mes N" — que implica
+  // que no se guardó nada — con el título y `published` ya persistidos, y
+  // `published` puede haber puesto contenido en vivo.
+  const { error: updateError } = await supabase
+    .from("program_series")
+    .update({
+      title: input.title,
+      description: input.description ?? null,
+      published: input.published,
+    })
+    .eq("id", seriesId);
+
+  if (updateError) return { error: logAndGeneric("updateSeries.update", updateError) };
 
   revalidatePath(`/admin/content/${programId}`);
   return {};
 }
 
+/**
+ * Borra la serie en orden seguro por FKs.
+ *
+ * Ni `program_days.series_id` ni `progress_logs.program_day_id` tienen cascade
+ * (001:99 y 001:175), así que borrar `program_series` a secas falla con 23503
+ * en cuanto la serie tiene días — es decir, siempre. Sólo caen solos
+ * `program_day_blocks` (desde los días) y `program_series_pillars` →
+ * `program_pillar_blocks` (desde la serie).
+ *
+ * ⚠ Se borran también los `progress_logs` de esos días: son entrenamientos
+ * registrados por clientes. Dejarlos con `program_day_id` en null no es mejor
+ * — `/portal/history` une con `program_days!inner`, así que desaparecerían de
+ * la vista de la propia cliente mientras el admin seguiría viéndolos. El
+ * diálogo de confirmación lo advierte.
+ */
 export async function deleteSeries(
   seriesId: string,
   programId: string
-): Promise<{ error?: string }> {
+): Promise<SeriesActionResult> {
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
+
+  const { data: rawDays, error: daysReadError } = await supabase
+    .from("program_days")
+    .select("id")
+    .eq("series_id", seriesId);
+
+  if (daysReadError) return { error: logAndGeneric("deleteSeries.readDays", daysReadError) };
+
+  const dayIds = ((rawDays ?? []) as { id: string }[]).map((d) => d.id);
+
+  if (dayIds.length > 0) {
+    const { error: logsError } = await supabase
+      .from("progress_logs")
+      .delete()
+      .in("program_day_id", dayIds);
+    if (logsError) return { error: logAndGeneric("deleteSeries.deleteLogs", logsError) };
+
+    const { error: daysError } = await supabase
+      .from("program_days")
+      .delete()
+      .eq("series_id", seriesId);
+    if (daysError) return { error: logAndGeneric("deleteSeries.deleteDays", daysError) };
+  }
 
   const { error: mapError } = await supabase
     .from("variant_series_map")
