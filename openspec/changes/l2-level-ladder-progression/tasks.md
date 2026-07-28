@@ -1,23 +1,23 @@
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm `l2-per-variant-content-model` is merged and its migration applied — `variant_series_map.ordinal` and `program_variants.ladder_next_variant_id` must exist. Stop here if not.
-- [ ] 1.2 Run `/opsx:sync` for `l2-per-variant-content-model` so `content-curriculum-model` exists in `openspec/specs/` before this change is synced.
-- [ ] 1.3 Verify the backfill assumption against live data: every existing subscription entered at its program's first rung, so `content_variant_id = program_variant_id` and `content_ordinal = months_elapsed` is correct. Record the row count checked.
-- [ ] 1.4 Confirm `ladder_next_variant_id` is populated: Strong & Fit Principiante → Intermedio → Avanzado → null; Extra Intermedio → Avanzado → null; all CuarentaMás variants null.
+- [x] 1.1 Confirm `l2-per-variant-content-model` is merged and its migration applied — `variant_series_map.ordinal` and `program_variants.ladder_next_variant_id` must exist. Stop here if not.
+- [x] 1.2 Run `/opsx:sync` for `l2-per-variant-content-model` so `content-curriculum-model` exists in `openspec/specs/` before this change is synced.
+- [x] 1.3 Verify the backfill assumption against live data: every existing subscription entered at its program's first rung, so `content_variant_id = program_variant_id` and `content_ordinal = months_elapsed` is correct. Record the row count checked.
+- [x] 1.4 Confirm `ladder_next_variant_id` is populated: Strong & Fit Principiante → Intermedio → Avanzado → null; Extra Intermedio → Avanzado → null; all CuarentaMás variants null.
 
 ## 2. Migration 016
 
-- [ ] 2.1 Write `supabase/migrations/016_content_ladder_pointer.sql` adding `content_variant_id` (FK to `program_variants`), `content_ordinal` (int, not null, default 1), `content_loops` (int, not null, default 0) to `subscriptions`.
-- [ ] 2.2 Backfill existing rows from `program_variant_id` and `months_elapsed` per task 1.3.
-- [ ] 2.3 Apply via the Supabase Management API — **SQL on ONE single line** (the pipeline eats newlines and `--` comments out the remainder).
-- [ ] 2.4 Update `lib/supabase/types.ts` by hand for the three new columns (keep `Relationships: []`).
+- [x] 2.1 Write `supabase/migrations/016_content_ladder_pointer.sql` adding `content_variant_id` (FK to `program_variants`), `content_ordinal` (int, not null, default 1), `content_loops` (int, not null, default 0) to `subscriptions`.
+- [x] 2.2 Backfill existing rows from `program_variant_id` and `months_elapsed` per task 1.3.
+- [x] 2.3 Apply via the Supabase Management API — **SQL on ONE single line** (the pipeline eats newlines and `--` comments out the remainder).
+- [x] 2.4 Update `lib/supabase/types.ts` by hand for the three new columns (keep `Relationships: []`).
 
 ## 3. Advance rule (pure, TDD)
 
-- [ ] 3.1 Write failing tests for the advance rule covering, in order: fixed-term freeze, advance within a rung, advance across a gap in the ordinals (successor is the next existing ordinal, never `+1`), advance to the next rung, wrap at the top rung, reaching newly published content instead of wrapping.
-- [ ] 3.2 Add a test asserting branch **order**: a fixed-term subscription at `duration_months` whose variant declares no next rung must freeze, not wrap. This is the guard that keeps this change correct while shipping ahead of `l2-rolling-billing-extra`.
-- [ ] 3.3 Add a test asserting rung length is read from the series present at evaluation time, never from a stored count.
-- [ ] 3.4 Implement the pure advance function until the tests pass. It takes the current position, the rung's available ordinals, the declared next rung, and the program's billing model plus duration; it returns the next position. No DB access.
+- [x] 3.1 Write failing tests for the advance rule covering, in order: fixed-term freeze, advance within a rung, advance across a gap in the ordinals (successor is the next existing ordinal, never `+1`), advance to the next rung, wrap at the top rung, reaching newly published content instead of wrapping.
+- [x] 3.2 Add a test asserting branch **order**: a fixed-term subscription at `duration_months` whose variant declares no next rung must freeze, not wrap. This is the guard that keeps this change correct while shipping ahead of `l2-rolling-billing-extra`.
+- [x] 3.3 Add a test asserting rung length is read from the series present at evaluation time, never from a stored count.
+- [x] 3.4 Implement the pure advance function until the tests pass. It takes the current position, the rung's available ordinals, the declared next rung, and the program's billing model plus duration; it returns the next position. No DB access.
 
 ## 4. Webhook: idempotency and advancement
 
