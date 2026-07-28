@@ -100,7 +100,6 @@ export async function getHistoryList(userId: string): Promise<HistoryListItem[]>
 
 interface SubRow {
   id: string;
-  months_elapsed: number;
   current_period_start: string | null;
 }
 
@@ -125,7 +124,7 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
 
   const { data: rawSub } = await supabase
     .from("subscriptions")
-    .select("id, months_elapsed, current_period_start")
+    .select("id, current_period_start")
     .eq("profile_id", userId)
     .in("status", ACCESS_STATES)
     .single();

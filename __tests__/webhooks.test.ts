@@ -10,7 +10,7 @@ const insertMock = vi.fn((_payload: Record<string, unknown>) => ({
 // upsert(...).select("id") devuelve las filas REALMENTE insertadas: con
 // ignoreDuplicates, un conflicto devuelve []. Es lo que distingue una factura
 // nueva de una redelivery de Stripe, y lo que decide si se avanza o no.
-const upsertInsertedRows = vi.fn((): { data: unknown[]; error: unknown } => ({
+const upsertInsertedRows = vi.fn((): { data: unknown[] | null; error: unknown } => ({
   data: [{ id: "inv-new" }],
   error: null,
 }));
@@ -21,8 +21,22 @@ const upsertMock = vi.fn((_payload: Record<string, unknown>, _opts?: Record<stri
 // update().eq() is awaited directly ({ error }) by most handlers, and also chained
 // .select().maybeSingle() by handleSubscriptionDeleted (needs the deleted row's ids).
 const deletedRowMaybeSingle = vi.fn((): { data: unknown; error: unknown } => ({ data: null, error: null }));
+// update().eq() se encadena hasta tres veces (id + guarda optimista sobre
+// months_elapsed y content_ordinal) y termina en .select() o .maybeSingle().
+const updatedRows = vi.fn((): { data: unknown[]; error: unknown } => ({
+  data: [{ id: "db-sub-1" }],
+  error: null,
+}));
+const updateEqChain: Record<string, unknown> = {};
+Object.assign(updateEqChain, {
+  error: null,
+  eq: () => updateEqChain,
+  select: () => updatedRows(),
+  maybeSingle: deletedRowMaybeSingle,
+});
 const updateEqMock = vi.fn((_col: string, _val: string) => ({
   error: null,
+  eq: () => updateEqChain,
   select: () => ({ maybeSingle: deletedRowMaybeSingle }),
 }));
 const updateMock = vi.fn((_payload: Record<string, unknown>) => ({ eq: updateEqMock }));
@@ -303,11 +317,13 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
     vi.clearAllMocks();
     updateEqMock.mockImplementation((_col: string, _val: string) => ({
       error: null,
+      eq: () => updateEqChain,
       select: () => ({ maybeSingle: deletedRowMaybeSingle }),
     }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectEqSingleMock.mockReturnValue(subRow() as any);
     upsertInsertedRows.mockReturnValue({ data: [{ id: "inv-new" }], error: null });
+    updatedRows.mockReturnValue({ data: [{ id: "db-sub-1" }], error: null });
     curriculumRows.mockReturnValue({
       data: [
         { program_variant_id: "variant-1", series_id: "s1", ordinal: 1 },
@@ -400,6 +416,46 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
     expect(payload.content_variant_id).toBe("variant-1");
   });
 
+  it("de plazo fijo, el mes ANTERIOR al último todavía avanza", async () => {
+    // Complementario del test de congelación, y el que fija la convención de
+    // `monthsElapsed`: si se pasara el valor ya incrementado, esta cliente se
+    // congelaría en la posición 5 y no vería nunca el sexto y último mes que
+    // pagó. Con `months_elapsed: 5` y duración 6 TIENE que avanzar a la 6.
+    selectEqSingleMock.mockReturnValue(
+      subRow({
+        months_elapsed: 5,
+        content_ordinal: 2,
+        program_variants: {
+          programs: { billing_model: "fixed_term_monthly", duration_months: 6 },
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any
+    );
+
+    await handleInvoicePaid(renewalInvoice());
+
+    const payload = updateMock.mock.calls[0][0];
+    expect(payload.months_elapsed).toBe(6);
+    expect(payload.content_ordinal).toBe(3);
+  });
+
+  it("relanza si otra escritura concurrente se adelantó (no pierde el avance)", async () => {
+    // La guarda optimista no encuentra fila: alguien ya movió el puntero. Se
+    // relanza para que Stripe reintente en vez de dar el mes por avanzado.
+    updatedRows.mockReturnValue({ data: [], error: null });
+
+    await expect(handleInvoicePaid(renewalInvoice())).rejects.toThrow();
+  });
+
+  it("relanza si falla el registro de la factura, para que Stripe reintente", async () => {
+    // Tragarse el error y responder 200 convertiría un fallo transitorio de la
+    // base en un mes de entrenamiento perdido para siempre: Stripe no reintenta.
+    upsertInsertedRows.mockReturnValue({ data: null, error: { message: "boom" } });
+
+    await expect(handleInvoicePaid(renewalInvoice())).rejects.toThrow();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
   it("no escribe `program_variant_id`: lo que compró no se reescribe nunca", async () => {
     await handleInvoicePaid(renewalInvoice());
 
@@ -448,7 +504,7 @@ describe("handleCheckoutCompleted — inicialización del puntero", () => {
 describe("handleSubscriptionUpdated", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    updateEqMock.mockReturnValue({ error: null, select: () => ({ maybeSingle: deletedRowMaybeSingle }) });
+    updateEqMock.mockReturnValue({ error: null, eq: () => updateEqChain, select: () => ({ maybeSingle: deletedRowMaybeSingle }) });
   });
 
   it("updates current_period_start/end as ISO strings from subscription items", async () => {
@@ -480,6 +536,7 @@ describe("handleSubscriptionDeleted (A9 — involuntary logging)", () => {
     // A prior describe pins updateEqMock via mockReturnValue; restore the chain here.
     updateEqMock.mockImplementation((_col: string, _val: string) => ({
       error: null,
+      eq: () => updateEqChain,
       select: () => ({ maybeSingle: deletedRowMaybeSingle }),
     }));
     deletedRowMaybeSingle.mockReturnValue({ data: { id: "db-sub-1", profile_id: "p-1" }, error: null });

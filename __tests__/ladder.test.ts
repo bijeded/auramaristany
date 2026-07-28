@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   advanceLadderPosition,
+  resolveContentPosition,
   type AdvanceInput,
   type LadderPosition,
 } from "@/lib/content/ladder";
@@ -314,5 +315,44 @@ describe("advanceLadderPosition — pureza", () => {
     advanceLadderPosition(input);
 
     expect(original).toEqual(position(AVANZADO, 6, 0));
+  });
+});
+
+// ── Resolución del puntero para los lectores ────────────────────────────────
+
+describe("resolveContentPosition", () => {
+  it("usa el puntero, no la variante comprada", () => {
+    // El caso que motiva el cambio: sube de peldaño y deja de coincidir con lo
+    // que paga. Servir `program_variant_id` sería contenido del nivel
+    // equivocado.
+    const position = resolveContentPosition({
+      content_variant_id: AVANZADO,
+      content_ordinal: 2,
+      program_variant_id: PRINCIPIANTE,
+    });
+
+    expect(position).toEqual({ variantId: AVANZADO, ordinal: 2 });
+  });
+
+  it("sin puntero cae a la variante comprada", () => {
+    // Red por si alguna fila se creara sin inicializar: es exactamente dónde
+    // estaría si nunca hubiera subido de peldaño.
+    const position = resolveContentPosition({
+      content_variant_id: null,
+      content_ordinal: 3,
+      program_variant_id: PRINCIPIANTE,
+    });
+
+    expect(position).toEqual({ variantId: PRINCIPIANTE, ordinal: 3 });
+  });
+
+  it("sin puntero NI variante devuelve null en vez de inventarse una posición", () => {
+    const position = resolveContentPosition({
+      content_variant_id: null,
+      content_ordinal: 1,
+      program_variant_id: null,
+    });
+
+    expect(position).toBeNull();
   });
 });

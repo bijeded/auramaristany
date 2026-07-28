@@ -122,17 +122,18 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
 
   // Las variantes a consultar son los PELDAÑOS en los que están las clientes,
   // no los que compraron: en cuanto una sube de nivel dejan de coincidir.
-  const positions = new Map(
-    rows.map((r) => [r.profile_id, resolveContentPosition(r)])
-  );
+  //
+  // Se resuelve POR FILA, no en un mapa por `profile_id`: la consulta no es
+  // `.single()`, así que un perfil con dos suscripciones en estado de acceso
+  // devuelve dos filas y un mapa las colapsaría en una — ambas resolverían
+  // contra el peldaño de la que sobreviviera.
+  const variantIds = new Set<string>();
+  for (const r of rows) {
+    const p = resolveContentPosition(r);
+    if (p) variantIds.add(p.variantId);
+  }
   const seriesByVariant = await getSeriesByVariantAndNumber(
-    Array.from(
-      new Set(
-        Array.from(positions.values())
-          .filter((p): p is { variantId: string; ordinal: number } => p !== null)
-          .map((p) => p.variantId)
-      )
-    )
+    Array.from(variantIds)
   );
 
   return rows.map((r) => {
@@ -146,7 +147,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
     // booking-helpers (A6). No se reimplementa aquí para que no puedan divergir.
     const bookings = (r.profiles!.bookings ?? []) as BookingLike[];
 
-    const position = positions.get(r.profile_id) ?? null;
+    const position = resolveContentPosition(r);
     const seriesId = position
       ? seriesByVariant.get(`${position.variantId}|${position.ordinal}`) ?? null
       : null;

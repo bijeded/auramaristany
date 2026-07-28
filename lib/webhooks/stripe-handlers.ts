@@ -253,12 +253,36 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
       : {}),
   };
 
-  const { error: updateError } = await supabase
+  // Guarda optimista: la escritura sólo pega si la fila sigue como se leyó.
+  // Dos `invoice.paid` DISTINTAS de la misma suscripción procesadas en paralelo
+  // leerían las dos el mismo `content_ordinal` y escribirían las dos: un mes de
+  // entrenamiento saltado en silencio. Con la condición, la segunda no encuentra
+  // fila, no escribe, y se relanza para que Stripe reintente con el valor ya
+  // fresco.
+  const { data: updated, error: updateError } = await supabase
     .from("subscriptions")
     .update(updatePayload)
-    .eq("id", sub.id);
+    .eq("id", sub.id)
+    .eq("months_elapsed", sub.months_elapsed)
+    .eq("content_ordinal", sub.content_ordinal)
+    .select("id");
 
-  if (updateError) console.error("[webhook] months_elapsed update error:", updateError);
+  if (updateError) {
+    // Se relanza por la misma razón que en `recordInvoice`: la factura ya quedó
+    // registrada, así que tragarse este fallo deja el mes cobrado sin avanzar y
+    // ninguna redelivery lo arreglará.
+    console.error("[webhook] subscription advance error:", updateError);
+    throw new Error(`subscription advance failed: ${updateError.message}`);
+  }
+
+  if ((updated ?? []).length === 0) {
+    console.error(
+      "[webhook] avance perdido por escritura concurrente:",
+      sub.id,
+      invoice.id
+    );
+    throw new Error("subscription advance lost a concurrent write");
+  }
 }
 
 /**
@@ -297,14 +321,29 @@ async function recordInvoice(
     .select("id");
 
   if (error) {
+    // Se relanza a propósito: la ruta responde 500 y Stripe reintenta. Antes un
+    // fallo aquí era inocuo porque el mes se incrementaba igual; ahora TODO lo
+    // que avanza cuelga de esta llamada, así que tragarse el error y responder
+    // 200 convertiría un fallo transitorio de la base en un mes de
+    // entrenamiento perdido para siempre. El reintento es seguro precisamente
+    // por la guarda de idempotencia que este valor alimenta.
     console.error("[webhook] invoice upsert error:", error);
-    return false;
+    throw new Error(`invoice upsert failed: ${error.message}`);
   }
   // Con `ignoreDuplicates`, un conflicto devuelve cero filas: eso ES la señal.
   return (data ?? []).length > 0;
 }
 
-/** El currículo de una variante: sus posiciones tal como están AHORA. */
+/**
+ * El currículo de una variante: sus posiciones tal como están AHORA.
+ *
+ * A diferencia de los lectores del portal, NO filtra por `program_series
+ * .published`. Es deliberado: el puntero recorre el currículo que Aura ha
+ * montado, y una serie sin publicar es un estado de edición transitorio, no un
+ * hueco permanente. Saltársela dejaría a la cliente pasada de largo cuando Aura
+ * publique; pararse en ella sólo deja el día vacío hasta que lo haga. La señal
+ * de agotamiento de contenido del admin es la que avisa a tiempo.
+ */
 async function readCurriculum(
   supabase: ServiceClient,
   variantIds: string[]
