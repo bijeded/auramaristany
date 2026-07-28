@@ -31,7 +31,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A4** | Automated messages | L | ✅ Done (rules ship **switched off** — see **L11**) |
 | **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
 | **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
-| **L2** | Extra → recurring monthly billing | L | Pending |
+| **L2** | Level ladder + recurring billing (**3 changes**) | L | Explored — proposals written, **L2a is time-sensitive** |
 | **L3** | Onboarding question set | S | Blocked (Aura defines them) |
 | **L4** | E2E smoke test with Aura | S | Pending |
 | **L5** | Real WhatsApp | S | Blocked (Aura's number) |
@@ -132,10 +132,24 @@ Let Aura **create** automated messages, not just edit the two shipped ones.
 Create 10 Products/Prices in live mode (`scripts/seed-stripe.ts` in live mode) → update `stripe_price_id`/`price_mxn` in `program_variants` → flip keys to `sk_live`/`pk_live` in Vercel → register **live webhook** + new `STRIPE_WEBHOOK_SECRET`.
 **Blocked:** Aura's prices (P1) are still missing.
 
-### L2 · Extra → recurring monthly billing — `L`
-`programs.billing_model` for `cuarenta-mas-extra`: `fixed_term_monthly` → `rolling_monthly` (migration) + adjust access/`completed_at`/checkout.
-- **Touches:** `lib/webhooks/stripe-handlers.ts` · `lib/admin/clients-helpers.ts` (`subscriptionProgressLabel`) · `lib/content/access.ts` · review Extra Avanzado prerequisites (today they depend on "Extra Intermedio completado").
-- **Watch out:** today only the **label** was changed in admin; the underlying logic is still pending.
+### L2 · Level ladder + recurring billing — `L` · explored 2026-07-27, **3 changes**
+Originally scoped as "flip `billing_model` for `cuarenta-mas-extra`". Exploration showed that is the *last* and smallest part. Proposals written in `openspec/changes/l2-*` (delta specs + tasks are generated per change when each is picked up).
+
+**The domain rule (from Aura):** a client walks a ladder of levels within a program. Strong & Fit = 6 months Principiante → 6 Intermedio → Avanzado indefinitely. CuarentaMás Extra = 6 months Intermedio → Avanzado indefinitely. Each level has **its own** series numbered from 1, and content differs **per variant** (Principiante *Poco Tiempo* ≠ Principiante *Tiempo Suficiente*). Aura evaluates clients on the WordPress site and redirects them to the level they qualify for, so **entry at any rung** must work. At the top rung the client wraps to its first series. **CuarentaMás stops billing at month 6; Extra and Strong & Fit bill until the client cancels.**
+
+| Change | Ships | Depends on |
+|---|---|---|
+| **L2a** `l2-per-variant-content-model` | `variant_series_map.ordinal` (position moves off `program_series`), drop `unique(program_id, series_number)`, `program_variants.ladder_next_variant_id`, variant-scoped admin authoring. **Destructive migration.** | — |
+| **L2b** `l2-level-ladder-progression` | Content pointer on the subscription + one advance rule, `invoice.paid` idempotency fix, top-rung loop, `Repitiendo Mes N`, `Avanzado · Mes 2`, admin content-runway signal. Full `design.md`. | L2a |
+| **L2c** `l2-rolling-billing-extra` | Extra → `rolling_monthly`, real fixed-term completion (cancel at period end), `status` CHECK, prerequisite gate removed, **graduated portal tier** for completed clients. | L2b |
+
+- **⏰ L2a is time-sensitive.** Its migration is destructive and therefore cheap **only while all content is demo**. `unique(program_id, series_number)` means Aura literally *cannot* author a second level's "Mes 1" today (`createSeries` → *"El mes 1 ya existe en este programa"*). **She should not write the real curriculum until L2a lands.**
+- **🐛 Two live defects found, both fixed in L2c** — pull forward as a `bug-fix` if any real client nears month 6:
+  - **Fixed-term subs are never ended.** `shouldComplete` writes only `completed_at` and never cancels the Stripe subscription; all 10 prices are monthly `recurring` → **a CuarentaMás client is charged in month 7, 8, … indefinitely** against content that ended at month 6.
+  - **`status = 'completed'` is unwritable and unreachable.** In `SubscriptionStatus` and required by the checkout prerequisite gate, but absent from the `subscriptions.status` CHECK (001:146) and never written → a client finishing CuarentaMás is permanently told *"No cumples los prerequisitos"* when buying Extra. (`trialing` has the same enum-vs-CHECK mismatch.)
+- **Decided:** prerequisites move to the funnel (Aura's WordPress evaluation is the real gate) · rung order is declared via `ladder_next_variant_id`, not inferred from `level` · position is stored state, never derived from a count (a growing Avanzado catalog would otherwise retroactively reshuffle looping clients) · a `completed` client keeps account + payment history + progress history/photos + a continue-with-Extra CTA, but no training content.
+- **⚠ L2c is security-sensitive** (new access tier + middleware) → route through `security-review`, not just `code-review`. If it grows unwieldy, the graduated tier is the clean seam to split out — it's the only part not touching billing.
+- **Follow-on (not scoped):** notify the client when she crosses a rung. Fits A4's `automated_messages` exactly, and is the "third rule" signal **A13** was waiting for.
 
 ### L3 · Onboarding question set — `S` · blocked
 Aura loads her real questions from `/admin/onboarding-settings`. Currently there are 3 test seed questions left (migration 002).
@@ -197,4 +211,5 @@ A4 shipped with both rules `is_active = false`. Enabling them is a deliberate, o
 2. **Mediums:** `A1` · `A5` · `A8` · `A9` · `A12` (`A5` before `A4`).
 3. **Projects:** `A6+A7` (Calendly booking) → `A4`.
 4. **In parallel (depends on Aura):** `L1` pricing · `L5` WhatsApp · `L3` onboarding questions.
-5. **Launch close-out:** `L2` · `L4` · `L6` · `L7` · `L10` → `L8` production-checklist.
+5. **Next up — `L2a` first and soon.** Its destructive migration is cheap only while content is demo, and it currently blocks Aura from authoring the real curriculum. Then `L2b` → `L2c` in order (each depends on the previous).
+6. **Launch close-out:** `L4` · `L6` · `L7` → `L8` production-checklist. (`L10` ✅ done.)
