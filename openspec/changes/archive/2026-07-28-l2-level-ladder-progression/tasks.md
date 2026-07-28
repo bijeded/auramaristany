@@ -52,9 +52,9 @@
 
 ## 8. Verification
 
-- [ ] 8.1 `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` all green.
-- [ ] 8.2 Smoke on a Preview URL with a test-checkout subscription: advance a month via Stripe test clock or a replayed invoice and confirm the pointer moves exactly one step.
-- [ ] 8.3 Smoke the redelivery case: replay the same `invoice.paid` from the Stripe dashboard and confirm nothing moves.
-- [ ] 8.4 Smoke rung crossing: a subscription at the last ordinal of a rung advances into the next rung at ordinal 1.
-- [ ] 8.5 Smoke the wrap: a top-rung subscription at its last ordinal wraps to 1, increments `content_loops`, and shows the repeat marker.
-- [ ] 8.6 Update `BACKLOG.md` (L2b → ✅ Done), run `/opsx:sync`, `openspec validate`, then `/opsx:archive`, and re-index codebase-memory in `fast` mode.
+- [x] 8.1 `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` all green.
+- [x] 8.2 Smoke on a Preview URL with a test-checkout subscription: advance a month via Stripe test clock or a replayed invoice and confirm the pointer moves exactly one step.
+- [x] 8.3 Smoke the redelivery case: replay the same `invoice.paid` from the Stripe dashboard and confirm nothing moves.
+- [x] 8.4 Smoke rung crossing: a subscription at the last ordinal of a rung advances into the next rung at ordinal 1.
+- [x] 8.5 Smoke the wrap: a top-rung subscription at its last ordinal wraps to 1, increments `content_loops`, and shows the repeat marker.
+- [x] 8.6 Update `BACKLOG.md` (L2b → ✅ Done), run `/opsx:sync`, `openspec validate`, then `/opsx:archive`, and re-index codebase-memory in `fast` mode.

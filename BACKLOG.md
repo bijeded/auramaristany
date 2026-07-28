@@ -31,7 +31,7 @@ Living list of pending work. **Each item has a stable ID** to launch it directly
 | **A4** | Automated messages | L | ✅ Done (rules ship **switched off** — see **L11**) |
 | **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
 | **L1** | Stripe LIVE + real prices | M | Blocked (Aura's pricing) |
-| **L2** | Level ladder + recurring billing (**3 changes**) | L | **L2a ✅ Done** (PR #16, #17) · L2b next · L2c after |
+| **L2** | Level ladder + recurring billing (**3 changes**) | L | **L2a ✅ Done** (PR #16, #17) · **L2b ✅ Done** (PR #18, #19, #20, #21) · L2c next |
 | **L3** | Onboarding question set | S | Blocked (Aura defines them) |
 | **L4** | E2E smoke test with Aura | S | Pending |
 | **L5** | Real WhatsApp | S | Blocked (Aura's number) |
@@ -140,9 +140,11 @@ Originally scoped as "flip `billing_model` for `cuarenta-mas-extra`". Exploratio
 | Change | Ships | Depends on |
 |---|---|---|
 | **L2a** `l2-per-variant-content-model` — **✅ Done 2026-07-28** (PR #16, #17; migration **015** applied) | `variant_series_map.ordinal` (position moved off `program_series`), dropped `unique(program_id, series_number)`, `program_variants.ladder_next_variant_id` seeded, variant-scoped admin authoring. **Destructive migration — all demo content reseeded** (60 series / 720 days) and the `progress_logs` on the removed days deleted. | — |
-| **L2b** `l2-level-ladder-progression` | Content pointer on the subscription + one advance rule, `invoice.paid` idempotency fix, top-rung loop, `Repitiendo Mes N`, `Avanzado · Mes 2`, admin content-runway signal. Full `design.md`. | L2a |
+| **L2b** `l2-level-ladder-progression` — **✅ Done 2026-07-28** (PR #18, #19, #20 + hotfix #21; migration **016** applied) | Content pointer on the subscription + one advance rule, `invoice.paid` idempotency fix, top-rung loop, `Repitiendo Mes N`, `Avanzado · Mes 2`, admin content-runway signal. Full `design.md`. | L2a |
 | **L2c** `l2-rolling-billing-extra` | Extra → `rolling_monthly`, real fixed-term completion (cancel at period end), `status` CHECK, prerequisite gate removed, **graduated portal tier** for completed clients. | L2b |
 
+- **✅ L2b landed 2026-07-28.** The content address is now stored state (`content_variant_id`, `content_ordinal`, `content_loops`) that advances one step per newly recorded paid invoice, not a count derived from `months_elapsed`. `invoice.paid` is idempotent per invoice, which also closed a live defect where a Stripe redelivery double-incremented the month. Verified against **production** with a Stripe test clock: one paid month advances exactly one step, four redeliveries of the same event move nothing, Principiante 6 → Intermedio 1, and Avanzado 6 → Avanzado 1 with `content_loops = 1`. Screens confirmed in the browser.
+  ⚠ **The smoke also caught a production outage the whole CI gate had missed** — see the `CLAUDE.md` review rule on second FKs and PostgREST embeds. Migration 016's `content_variant_id` made every `subscriptions(program_variants(...))` embed ambiguous; PostgREST returned an *error*, readers checked only `!data`, and the portal silently served a rest day to everyone between PR #19 and hotfix #21. Nothing in `tsc`, lint, 533 tests or the build talks to the database.
 - **✅ L2a landed 2026-07-28.** Aura can now author a "Mes 1" per **variant**, so the real curriculum is unblocked (the old `unique(program_id, series_number)` made a second level's "Mes 1" impossible). Verified on a Preview against the live DB: two variants of one program each hold their own Mes 7, and a duplicate within one variant is refused by name.
   - **Lesson worth keeping — `z.string().uuid()` rejects this project's ids.** The catalog ids are seeded by hand (`00000000-0000-0000-0002-000000000010`) and carry no RFC 4122 version/variant nibbles, so zod refused *every real id* and silently broke create/update/delete. Use the `uuidLike` regex in `lib/admin/seriesActions.ts`, never `.uuid()`. The 484-test suite missed it because its fixtures were canonical v4 uuids — **more** conformant than production data.
   - **Lesson worth keeping — an `!inner` join can be a load-bearing RLS gate.** Removing `program_series!inner` from the readers silently removed the publication gate (RLS hid unpublished series, so PostgREST dropped the row). Client readers now filter `program_series.published` explicitly. Never rely on a join's RLS side effect to enforce a rule.
@@ -217,5 +219,5 @@ A4 shipped with both rules `is_active = false`. Enabling them is a deliberate, o
 2. **Mediums:** `A1` · `A5` · `A8` · `A9` · `A12` (`A5` before `A4`).
 3. **Projects:** `A6+A7` (Calendly booking) → `A4`.
 4. **In parallel (depends on Aura):** `L1` pricing · `L5` WhatsApp · `L3` onboarding questions.
-5. **Next up — `L2b`** (`l2-level-ladder-progression`), then `L2c` in order (each depends on the previous). `L2a` ✅ done 2026-07-28.
+5. **Next up — `L2c`** (`l2-rolling-billing-extra`). `L2a` and `L2b` ✅ done 2026-07-28.
 6. **Launch close-out:** `L4` · `L6` · `L7` → `L8` production-checklist. (`L10` ✅ done.)
