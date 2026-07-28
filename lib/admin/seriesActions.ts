@@ -50,10 +50,24 @@ export interface UpdateSeriesInput {
 const TITLE_MAX = 120;
 const DESCRIPTION_MAX = 1000;
 
+/**
+ * Un id con la FORMA de uuid, no un uuid RFC 4122.
+ *
+ * `z.string().uuid()` exige los bits de versión y variante (el 3er grupo debe
+ * empezar por 1–8, el 4º por 8/9/a/b). Los ids del catálogo están sembrados a
+ * mano — `00000000-0000-0000-0002-000000000010` — así que NO los cumplen, y
+ * `.uuid()` rechazaba cada variante y cada programa reales. Postgres acepta
+ * cualquier uuid de 32 hex, y lo que hay que impedir aquí es que llegue basura
+ * a la consulta, no imponer una versión concreta.
+ */
+const uuidLike = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
 // `months_elapsed` arranca en 1, así que un Mes 0 sería contenido que ninguna
 // cliente puede alcanzar nunca. La columna en la BD es `int` a secas.
 const mappingSchema = z.object({
-  variantId: z.string().uuid(),
+  variantId: uuidLike,
   ordinal: z.number().int().min(1).max(240),
 });
 
@@ -64,8 +78,8 @@ const baseSchema = {
 };
 
 const idSchema = z.object({
-  seriesId: z.string().uuid(),
-  programId: z.string().uuid(),
+  seriesId: uuidLike,
+  programId: uuidLike,
 });
 
 const createSchema = z.object(baseSchema);
@@ -199,7 +213,7 @@ export async function createSeries(
   const input = parsed.data;
   const supabase = auth.supabase;
 
-  if (!z.string().uuid().safeParse(programId).success) {
+  if (!uuidLike.safeParse(programId).success) {
     return { error: "Programa no válido." };
   }
   if (!(await variantsBelongToProgram(supabase, programId, input.mappings))) {

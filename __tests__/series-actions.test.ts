@@ -108,12 +108,22 @@ import { createSeries, updateSeries, deleteSeries } from "@/lib/admin/seriesActi
 
 type MapRow = { program_variant_id: string; series_id: string; ordinal: number };
 
-// zod exige uuid en variantId
-const V1 = "11111111-1111-4111-8111-111111111111";
-const V3 = "33333333-3333-4333-8333-333333333333";
-const V4 = "44444444-4444-4444-8444-444444444444";
-const SERIES_ID = "55555555-5555-4555-8555-555555555555";
-const PROG_ID = "66666666-6666-4666-8666-666666666666";
+/**
+ * Ids con la MISMA forma que los del catálogo real (`supabase/migrations/001`),
+ * que están sembrados a mano y NO son uuid RFC 4122: el 3er grupo no lleva
+ * versión y el 4º no lleva variante.
+ *
+ * Antes estos fixtures eran uuid v4 canónicos y por eso pasaban `.uuid()`
+ * mientras cada id real la fallaba: los tests eran más conformes que la
+ * producción, así que validaban una entrada que no existe. Si estos valores se
+ * "arreglan" a v4, la suite deja de cubrir el caso que rompió el admin.
+ */
+const V1 = "00000000-0000-0000-0002-000000000001";
+const V2 = "00000000-0000-0000-0002-000000000002";
+const V3 = "00000000-0000-0000-0002-000000000003";
+const V4 = "00000000-0000-0000-0002-000000000004";
+const SERIES_ID = "00000000-0000-0000-0005-000000000005";
+const PROG_ID = "00000000-0000-0000-0001-000000000001";
 
 beforeEach(() => {
   calls.length = 0;
@@ -125,7 +135,7 @@ beforeEach(() => {
   seriesOwned = true;
   ownedVariants = [
     { id: V1 },
-    { id: "22222222-2222-4222-8222-222222222222" },
+    { id: V2 },
     { id: V3 },
     { id: V4 },
   ];
@@ -138,8 +148,8 @@ describe("createSeries", () => {
       title: "Fundamentos",
       description: null,
       mappings: [
-        { variantId: "11111111-1111-4111-8111-111111111111", ordinal: 1 },
-        { variantId: "22222222-2222-4222-8222-222222222222", ordinal: 1 },
+        { variantId: V1, ordinal: 1 },
+        { variantId: V2, ordinal: 1 },
       ],
     });
 
@@ -148,8 +158,8 @@ describe("createSeries", () => {
       (c) => c.table === "variant_series_map" && c.op === "insert"
     );
     expect(mapInsert!.payload as MapRow[]).toEqual([
-      { program_variant_id: "11111111-1111-4111-8111-111111111111", series_id: "new-series-id", ordinal: 1 },
-      { program_variant_id: "22222222-2222-4222-8222-222222222222", series_id: "new-series-id", ordinal: 1 },
+      { program_variant_id: V1, series_id: "new-series-id", ordinal: 1 },
+      { program_variant_id: V2, series_id: "new-series-id", ordinal: 1 },
     ]);
   });
 
@@ -223,11 +233,39 @@ describe("createSeries", () => {
     ).toBeTruthy();
   });
 
+  it("acepta los ids sembrados a mano del catálogo, que no son uuid RFC 4122", async () => {
+    // Regresión de un fallo REAL detectado en el Preview: `z.string().uuid()`
+    // exige bits de versión/variante y los ids del catálogo no los tienen, así
+    // que rechazaba TODA creación, edición y borrado en el admin. Este es un id
+    // copiado literalmente de la BD de producción.
+    const REAL = "00000000-0000-0000-0002-000000000010"; // Strong & Fit Avanzado
+    ownedVariants = [{ id: REAL }];
+
+    const result = await createSeries("00000000-0000-0000-0001-000000000003", {
+      title: "Mes 7",
+      description: null,
+      mappings: [{ variantId: REAL, ordinal: 7 }],
+    });
+
+    expect(result.error).toBeUndefined();
+  });
+
+  it("rechaza un id que no tiene forma de uuid", async () => {
+    const result = await createSeries(PROG_ID, {
+      title: "T",
+      description: null,
+      mappings: [{ variantId: "no-soy-un-uuid", ordinal: 1 }],
+    });
+
+    expect(result.error).toBe("Variante no válida.");
+    expect(calls).toHaveLength(0);
+  });
+
   it("rechaza una variante que no pertenece al programa, sin escribir nada", async () => {
     // La variante existe, pero es de OTRO programa: nada en la BD lo impide
     // (el índice único es por variante), así que el chequeo tiene que estar
     // aquí. Si se colara, las clientes de ese programa verían contenido ajeno.
-    const AJENA = "99999999-9999-4999-8999-999999999999";
+    const AJENA = "00000000-0000-0000-0002-000000000099";
 
     const result = await createSeries(PROG_ID, {
       title: "Cruzada",
