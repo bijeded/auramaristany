@@ -1,7 +1,7 @@
 "use client";
 
 interface Props {
-  series: { ordinal: number; title: string; variantIds: string[] };
+  series: { ordinal: number; title: string; mappings: { variantId: string; ordinal: number }[] };
   onClose: () => void;
   onConfirm: () => void;
   loading?: boolean;
@@ -26,7 +26,7 @@ export function SeriesDeleteDialog({ series, onClose, onConfirm, loading, error 
           <strong>{series.title}</strong> y todo su contenido (días, bloques y pilares) se
           eliminarán permanentemente. Esta acción no se puede deshacer.
         </p>
-        {series.variantIds.length > 1 && (
+        {series.mappings.length > 1 && (
           <p
             className="font-body rounded-xl p-3"
             style={{
@@ -36,7 +36,7 @@ export function SeriesDeleteDialog({ series, onClose, onConfirm, loading, error 
               marginBottom: 20,
             }}
           >
-            Esta serie se muestra en {series.variantIds.length} variantes. Al eliminarla
+            Esta serie se muestra en {series.mappings.length} variantes. Al eliminarla
             desaparece de todas.
           </p>
         )}

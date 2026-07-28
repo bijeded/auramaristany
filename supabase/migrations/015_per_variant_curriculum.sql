@@ -20,8 +20,9 @@
 -- ⚠ Al aplicarla, la app desplegada queda rota (lee `series_number`) hasta que
 -- se despliegue el código de este mismo cambio. Decisión tomada: se acepta.
 --
--- Re-ejecutarla es seguro por construcción: borra todo y siembra de cero, así
--- que el estado final es el mismo (no necesita `on conflict do nothing`).
+-- Run-once: NO re-ejecutar. Un segundo intento falla en `add column ordinal`
+-- (42701) y hace rollback — inofensivo, pero no es una comprobación válida ni
+-- deja nada mejor de lo que ya hay (misma lección que 014 con 42P07).
 
 begin;
 

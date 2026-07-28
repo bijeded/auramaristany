@@ -165,7 +165,11 @@ export function getUpcomingDayKeys(
   return keys;
 }
 
-/** The series_number to query for /portal/today is always months_elapsed. */
+/**
+ * La posición del currículo a pedir para /portal/today. Hoy es months_elapsed;
+ * el puntero por suscripción llega en l2-level-ladder-progression.
+ * (`series_number` ya no existe: la posición vive en variant_series_map.ordinal.)
+ */
 export function getCurrentSeriesNumber(monthsElapsed: number): number {
   return monthsElapsed;
 }

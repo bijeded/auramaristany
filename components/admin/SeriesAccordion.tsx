@@ -15,6 +15,8 @@ interface Props {
   programSlug?: string;
   defaultOpen?: boolean;
   variants: AdminVariant[];
+  /** Currículo de qué variante se está mostrando: define qué Mes # se edita. */
+  variantId: string;
 }
 
 export function SeriesAccordion({
@@ -23,6 +25,7 @@ export function SeriesAccordion({
   programSlug,
   defaultOpen = false,
   variants,
+  variantId,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -80,7 +83,7 @@ export function SeriesAccordion({
             <div>
               <p className="font-head" style={{ fontSize: 15, fontWeight: 600, color: "var(--negro)" }}>
                 Mes {series.ordinal}{series.title ? ` — ${series.title}` : ""}
-                {series.variantIds.length > 1 && (
+                {series.mappings.length > 1 && (
                   <span
                     className="font-body ml-2 rounded-full px-2 py-0.5"
                     style={{
@@ -89,9 +92,9 @@ export function SeriesAccordion({
                       background: "var(--lavanda-tint)",
                       color: "var(--lavanda-dark)",
                     }}
-                    title={`Esta serie se muestra en ${series.variantIds.length} variantes. Editarla las cambia todas.`}
+                    title={`Esta serie se muestra en ${series.mappings.length} variantes. Editarla las cambia todas.`}
                   >
-                    Compartida en {series.variantIds.length}
+                    Compartida en {series.mappings.length}
                   </span>
                 )}
               </p>
@@ -191,6 +194,8 @@ export function SeriesAccordion({
           variants={variants}
           mode="edit"
           series={series}
+          currentVariantId={variantId}
+          onRequestDelete={() => setModal("delete")}
           onClose={() => setModal(null)}
         />
       )}

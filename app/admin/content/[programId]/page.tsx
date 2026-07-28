@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { getAdminProgram } from "@/lib/admin/queries";
+import { requireAdminPage } from "@/lib/admin/auth";
 import { SeriesAccordion } from "@/components/admin/SeriesAccordion";
 import { NewSeriesButton } from "@/components/admin/NewSeriesButton";
 
@@ -10,6 +11,7 @@ export default async function AdminProgramPage({
 }: {
   params: Promise<{ programId: string }>;
 }) {
+  await requireAdminPage();
   const { programId } = await params;
   const result = await getAdminProgram(programId);
 
@@ -84,6 +86,7 @@ export default async function AdminProgramPage({
                     programId={programId}
                     programSlug={program.slug}
                     variants={variants}
+                    variantId={variant.id}
                     defaultOpen={i === variant.series.length - 1}
                   />
                 ))}

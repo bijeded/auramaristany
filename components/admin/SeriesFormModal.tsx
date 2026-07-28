@@ -10,18 +10,30 @@ interface Props {
   mode: "create" | "edit";
   series?: Pick<
     AdminSeries,
-    "id" | "ordinal" | "title" | "description" | "published" | "variantIds"
+    "id" | "ordinal" | "title" | "description" | "published" | "mappings"
   >;
+  /** Variante desde cuyo currículo se abrió el editor (modo edición). */
+  currentVariantId?: string;
+  /** Se llama cuando el admin deja la serie sin variantes: eso es un borrado. */
+  onRequestDelete?: () => void;
   onClose: () => void;
 }
 
-export function SeriesFormModal({ programId, variants, mode, series, onClose }: Props) {
+export function SeriesFormModal({
+  programId,
+  variants,
+  mode,
+  series,
+  currentVariantId,
+  onRequestDelete,
+  onClose,
+}: Props) {
   const [title, setTitle] = useState(series?.title ?? "");
   const [description, setDescription] = useState(series?.description ?? "");
   const [seriesNumber, setSeriesNumber] = useState<number | "">(series?.ordinal ?? "");
   const [published, setPublished] = useState(series?.published ?? false);
   const [selectedVariants, setSelectedVariants] = useState<string[]>(
-    series?.variantIds ?? []
+    series?.mappings.map((m) => m.variantId) ?? []
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,17 +51,39 @@ export function SeriesFormModal({ programId, variants, mode, series, onClose }: 
     setFieldError(null);
 
     if (!title.trim()) { setError("El título es requerido."); return; }
-    if (selectedVariants.length === 0) { setError("Selecciona al menos una variante."); return; }
     if (!seriesNumber) { setError("El número de mes es requerido."); return; }
+
+    // Quitar la última variante no es un error de validación: es un borrado.
+    // La serie sin mapeo no tendría posición en ningún currículo.
+    if (selectedVariants.length === 0) {
+      if (mode === "edit" && onRequestDelete) { onRequestDelete(); return; }
+      setError("Selecciona al menos una variante.");
+      return;
+    }
+
+    // Una posición POR VARIANTE. Sólo se mueve la variante desde la que se abrió
+    // el editor (y las que se acaban de añadir); las demás conservan su mes, que
+    // puede ser distinto — la misma serie puede ser el Mes 1 en una y el Mes 4
+    // en otra.
+    const previous = new Map(
+      (series?.mappings ?? []).map((m) => [m.variantId, m.ordinal])
+    );
+    const mappings = selectedVariants.map((variantId) => {
+      const keepsItsOwn =
+        variantId !== currentVariantId && previous.has(variantId);
+      return {
+        variantId,
+        ordinal: keepsItsOwn ? previous.get(variantId)! : Number(seriesNumber),
+      };
+    });
 
     setLoading(true);
 
     if (mode === "create") {
       const res = await createSeries(programId, {
-        ordinal: Number(seriesNumber),
         title: title.trim(),
         description: description.trim() || null,
-        variantIds: selectedVariants,
+        mappings,
       });
       if (res.error) {
         if (res.error.includes("Ya existe un Mes")) setFieldError(res.error);
@@ -59,11 +93,10 @@ export function SeriesFormModal({ programId, variants, mode, series, onClose }: 
       }
     } else {
       const res = await updateSeries(series!.id, programId, {
-        ordinal: Number(seriesNumber),
         title: title.trim(),
         description: description.trim() || null,
         published,
-        variantIds: selectedVariants,
+        mappings,
       });
       if (res.error) {
         if (res.error.includes("Ya existe un Mes")) setFieldError(res.error);
@@ -163,9 +196,27 @@ export function SeriesFormModal({ programId, variants, mode, series, onClose }: 
             </label>
           )}
 
+          {mode === "edit" && (series?.mappings.length ?? 0) > 1 && (
+            <p
+              className="font-body rounded-xl p-3"
+              style={{
+                fontSize: 13,
+                color: "var(--lavanda-dark)",
+                background: "var(--lavanda-tint)",
+              }}
+            >
+              Esta serie se muestra en {series!.mappings.length} variantes. Los cambios de
+              título, descripción y contenido las afectan a todas. El Mes # sólo cambia
+              en la variante desde la que estás editando.
+            </p>
+          )}
+
           <div>
             <p className="font-body mb-2" style={{ fontSize: 13, fontWeight: 600 }}>
               Variantes
+            </p>
+            <p className="font-body mb-2" style={{ fontSize: 12, color: "var(--gris-suave)" }}>
+              Si quitas todas, se elimina la serie.
             </p>
             <div className="flex flex-col gap-2">
               {variants.map((v) => (

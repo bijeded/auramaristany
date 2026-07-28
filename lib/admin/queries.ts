@@ -39,8 +39,13 @@ export interface AdminSeries {
   description: string | null;
   published: boolean;
   days: AdminDay[];
-  /** Todas las variantes a las que está mapeada; >1 = serie compartida. */
-  variantIds: string[];
+  /**
+   * Todas las posiciones de esta serie, una por variante que la muestra.
+   * >1 = serie compartida. Cada variante tiene SU ordinal: la misma serie puede
+   * ser el Mes 1 en una y el Mes 4 en otra, así que el editor necesita todas
+   * para no reescribir la posición de las demás al guardar.
+   */
+  mappings: { variantId: string; ordinal: number }[];
 }
 
 /** Una variante con su currículo propio, ordenado por posición. */
@@ -57,14 +62,19 @@ export async function getAdminPrograms(): Promise<AdminProgram[]> {
 
   if (!data) return [];
 
-  // Count series per program
+  // Series por programa, contadas a través del mapeo: una serie sin variante no
+  // aparece en ningún currículo, así que no debe contarse como contenido. Una
+  // serie compartida por varias variantes se cuenta UNA vez.
   const { data: counts } = await supabase
     .from("program_series")
-    .select("program_id");
+    .select("program_id, variant_series_map(program_variant_id)");
 
   const countMap: Record<string, number> = {};
-  for (const row of counts ?? []) {
-    if (row.program_id) countMap[row.program_id] = (countMap[row.program_id] ?? 0) + 1;
+  type CountRow = { program_id: string | null; variant_series_map: unknown[] | null };
+  for (const row of (counts ?? []) as CountRow[]) {
+    if (!row.program_id) continue;
+    if ((row.variant_series_map?.length ?? 0) === 0) continue;
+    countMap[row.program_id] = (countMap[row.program_id] ?? 0) + 1;
   }
 
   // SDK types the select; cast to align with local AdminProgram (is_active/billing_model fields).
@@ -111,13 +121,17 @@ export async function getAdminProgram(programId: string) {
 
   const mappings = (rawMappings ?? []) as MappingRow[];
 
-  // series_id → todas las variantes que la muestran (para marcar compartidas)
-  const sharedWith: Record<string, string[]> = {};
+  // series_id → todas sus posiciones (para marcar compartidas y para que el
+  // editor conserve el ordinal de las demás variantes)
+  const positions: Record<string, { variantId: string; ordinal: number }[]> = {};
   for (const m of mappings) {
-    (sharedWith[m.series_id] ??= []).push(m.program_variant_id);
+    (positions[m.series_id] ??= []).push({
+      variantId: m.program_variant_id,
+      ordinal: m.ordinal,
+    });
   }
 
-  type RawSeries = Omit<AdminSeries, "days" | "variantIds" | "ordinal"> & {
+  type RawSeries = Omit<AdminSeries, "days" | "mappings" | "ordinal"> & {
     program_days: AdminDay[];
   };
   const byId = new Map(
@@ -140,7 +154,7 @@ export async function getAdminProgram(programId: string) {
             description: s.description,
             published: s.published,
             days: s.program_days ?? [],
-            variantIds: sharedWith[s.id] ?? [],
+            mappings: positions[s.id] ?? [],
           },
         ];
       }),
