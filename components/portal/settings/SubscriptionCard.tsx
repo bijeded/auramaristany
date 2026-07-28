@@ -64,7 +64,15 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
           {longDateLabel(subscription.current_period_end)} · {formatMoney(subscription.price_mxn)}
         </Row>
       )}
+      {/* §6.4 — la fila "Programa" nombra la variante que PAGA; ésta, el nivel
+          en el que ENTRENA. Pueden diferir en cuanto sube de peldaño, así que
+          va rotulada: "Principiante" arriba y "Avanzado · Mes 2" abajo sin
+          etiqueta se lee como una contradicción. */}
       <div style={{ marginTop: 16 }}>
+        <p className="font-body text-xs" style={{ marginBottom: 4, color: "var(--gris-texto)" }}>
+          {/* Sirve para las dos formas: "Avanzado · Mes 2" y "Mes 3 de 6". */}
+          Mi progreso
+        </p>
         <div className="flex justify-between" style={{ marginBottom: 6 }}>
           <span className="font-body text-xs font-semibold" style={{ color: "var(--negro)" }}>{progress.text}</span>
           {/* Sin duración no hay contra qué medir: se muestra la posición sin barra. */}

@@ -58,7 +58,9 @@ export function contentRunway(
 
   for (const c of candidates) {
     // Un plazo fijo termina: ni da la vuelta ni cruza de peldaño, así que no
-    // tiene forma de quedarse sin contenido.
+    // tiene forma de quedarse sin contenido. La guarda pide `durationMonths`
+    // igual que la rama 1 de `advanceLadderPosition`: un plazo fijo sin duración
+    // declarada tampoco se congela allí, así que aquí tampoco se ignora.
     if (c.billingModel === "fixed_term_monthly" && c.durationMonths) continue;
 
     // Lo que le queda son las posiciones que EXISTEN por encima, no la resta de

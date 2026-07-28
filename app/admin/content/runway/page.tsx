@@ -81,10 +81,10 @@ export default async function ContentRunwayPage() {
                     style={{ fontSize: 13, color: urgent ? "var(--error)" : "var(--gris-texto)" }}
                   >
                     {urgent
-                      ? `Al terminar pasa a ${row.nextRungName}, que todavía no tiene ninguna serie: se queda sin contenido nuevo hasta que publiques la primera.`
+                      ? `Al terminar pasa a ${row.nextRungName}, que no tiene ninguna serie publicada: se queda sin contenido nuevo hasta que publiques la primera.`
                       : row.contentLoops > 0
                         ? `Ya va en su ${row.contentLoops}ª vuelta al nivel; al terminar vuelve a empezar.`
-                        : "Al terminar el nivel vuelve a empezar por el Mes 1."}
+                        : "Al terminar el nivel vuelve a empezar desde el principio."}
                   </p>
                 </div>
               </Link>

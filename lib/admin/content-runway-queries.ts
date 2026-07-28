@@ -65,6 +65,12 @@ export async function getContentRunway(
 
   // Sólo cuentan las series PUBLICADAS: una serie en borrador no es contenido
   // que la cliente vaya a ver, así que tampoco es pista de aterrizaje.
+  //
+  // ⚠ Diverge a propósito de la regla de avance: `readCurriculum` NO filtra por
+  // `published`, así que con un peldaño siguiente lleno de borradores la cliente
+  // no se congela, cruza a él y se encuentra el día vacío. La señal avisa igual
+  // —antes, no después— y por eso el aviso habla de series PUBLICADAS y no
+  // promete que se vaya a congelar.
   const { data: rawMap } = await supabase
     .from("variant_series_map")
     .select("program_variant_id, ordinal, program_series!inner ( published )")
