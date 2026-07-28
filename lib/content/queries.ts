@@ -8,6 +8,7 @@ import {
 import { ACCESS_STATES } from "./subscription-access";
 import { serverToday } from "./server-today";
 import type { DayKey, UpcomingDayKey } from "./access";
+import { seriesAtOrdinal, type CurriculumEntry } from "./curriculum";
 import type { Json } from "@/lib/supabase/types";
 
 export interface Exercise {
@@ -69,10 +70,9 @@ interface SubRow {
   program_variants: { program_id: string; programs: { slug: string } };
 }
 
-interface VariantSeriesRow {
-  series_id: string;
-  program_series: { series_number: number };
-}
+// La posición vive en el mapeo (`variant_series_map.ordinal`), así que ya no
+// hace falta unir con `program_series` para resolver el mes.
+type VariantSeriesRow = CurriculumEntry;
 
 interface DayRow {
   id: string;
@@ -127,19 +127,27 @@ export async function getTodayContent(
   const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
   const dayKey = getCurrentDayKey(sub.current_period_start, today);
 
-  // 2. Find which series_id maps to this variant + series_number
+  // 2. Qué serie PUBLICADA ocupa esa posición en el currículo de ESTA variante.
+  //
+  // El filtro por `program_series.published` es explícito a propósito. Antes lo
+  // hacía de rebote el join `program_series!inner`: la policy
+  // `program_series_read_published` (001:352) oculta las series sin publicar a
+  // las clientes, así que PostgREST descartaba la fila entera del mapeo. Al
+  // resolver por `ordinal` ese join dejó de hacer falta — y con él se perdía la
+  // única barrera que impedía servir una serie en borrador. Depender de un
+  // efecto colateral de RLS para una regla de negocio es justo lo que lo hizo
+  // invisible; aquí se dice en voz alta.
   const { data: rawVariantSeries } = await supabase
     .from("variant_series_map")
-    .select("series_id, program_series!inner ( series_number )")
-    .eq("program_variant_id", sub.program_variant_id);
+    .select("series_id, ordinal, program_series!inner ( published )")
+    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_series.published", true);
 
-  // keep: variant_series_map JOIN program_series!inner — join shape not inferred.
-  const variantSeries = rawVariantSeries as VariantSeriesRow[] | null;
-  const seriesEntry = variantSeries?.find(
-    (m) => m.program_series.series_number === seriesNumber
-  );
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  const variantSeries = (rawVariantSeries ?? []) as unknown as VariantSeriesRow[];
+  const seriesId = seriesAtOrdinal(variantSeries, seriesNumber);
 
-  if (!seriesEntry) return null;
+  if (!seriesId) return null;
 
   // 3. Fetch today's program_day
   const { data: rawDay } = await supabase
@@ -147,7 +155,7 @@ export async function getTodayContent(
     .select(
       "id, week_number, day_of_week, workout_focus, title, description, day_type, duration_minutes"
     )
-    .eq("series_id", seriesEntry.series_id)
+    .eq("series_id", seriesId)
     .eq("week_number", dayKey.week_number)
     .eq("day_of_week", dayKey.day_of_week)
     .eq("published", true)
@@ -249,23 +257,25 @@ export async function getWeekCalendar(
   if (dayKeys.length === 0) return [];
 
   const seriesNumber = getCurrentSeriesNumber(sub.months_elapsed);
+  // Mismo filtro explícito que en getTodayContent, y aquí importa más: este
+  // calendario NO filtra `program_days.published` (decisión A12), así que la
+  // serie era su único control de publicación.
   const { data: rawVariantSeries } = await supabase
     .from("variant_series_map")
-    .select("series_id, program_series!inner ( series_number )")
-    .eq("program_variant_id", sub.program_variant_id);
+    .select("series_id, ordinal, program_series!inner ( published )")
+    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_series.published", true);
 
-  // keep: variant_series_map JOIN program_series!inner — join shape not inferred.
-  const variantSeries = rawVariantSeries as VariantSeriesRow[] | null;
-  const seriesEntry = variantSeries?.find(
-    (m) => m.program_series.series_number === seriesNumber
-  );
-  if (!seriesEntry) return null;
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  const variantSeries = (rawVariantSeries ?? []) as unknown as VariantSeriesRow[];
+  const seriesId = seriesAtOrdinal(variantSeries, seriesNumber);
+  if (!seriesId) return null;
 
   const weekNumbers = Array.from(new Set(dayKeys.map((k) => k.week_number)));
   const { data: rawDays } = await supabase
     .from("program_days")
     .select("week_number, day_of_week, title, day_type, workout_focus")
-    .eq("series_id", seriesEntry.series_id)
+    .eq("series_id", seriesId)
     .in("week_number", weekNumbers);
 
   const days = (rawDays ?? []) as WeekDayRow[];

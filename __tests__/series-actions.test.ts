@@ -3,9 +3,61 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── Fake Supabase ──────────────────────────────────────────────────
 const calls: { table: string; op: string; payload?: unknown }[] = [];
 let insertSeriesError: { code: string; message: string } | null = null;
+let insertMapError: { code: string; message: string } | null = null;
+
+let previousMappings: MapRow[] = [];
+let seriesDays: { id: string }[] = [];
+// Filas que devuelve la consulta que nombra la variante en conflicto (23505).
+let seriesOwned = true;
+// Variantes que la BD confirma como pertenecientes al programa consultado.
+let ownedVariants: { id: string }[] = [];
+let conflictRows: {
+  program_variant_id: string;
+  series_id: string;
+  ordinal: number;
+  program_variants: { name: string } | null;
+}[] = [];
 
 const fakeSupabase = {
   from: (table: string) => ({
+    // Encadenable como el builder de Supabase: .eq().eq().maybeSingle(),
+    // .in(...) y también await directo sobre la cadena.
+    select: (_cols: string) => {
+      const rowsFor = (mode: "eq" | "in", inIds: string[] | null): unknown[] => {
+        // Las variantes se leen con .eq(program_id).in(id) para comprobar que
+        // pertenecen al programa. El fake FILTRA de verdad por esos ids: si
+        // devolviera siempre la lista entera, una variante ajena al programa
+        // pasaría el chequeo y el test no distinguiría "pertenece" de "existe".
+        if (table === "program_variants") {
+          return ownedVariants.filter((v) => !inIds || inIds.includes(v.id));
+        }
+        if (table === "program_days") return seriesDays;
+        if (table === "program_series") return seriesOwned ? [{ id: SERIES_ID }] : [];
+        if (mode === "in") return conflictRows;
+        return previousMappings;
+      };
+      type Chain = {
+        eq: () => Chain;
+        in: (col: string, vals: string[]) => Chain;
+        maybeSingle: () => Promise<{ data: unknown; error: null }>;
+        single: () => Promise<{ data: unknown; error: null }>;
+        then: (
+          onFulfilled: (v: { data: unknown[]; error: null }) => unknown
+        ) => Promise<unknown>;
+      };
+      const make = (mode: "eq" | "in", inIds: string[] | null): Chain => ({
+        eq: () => make(mode, inIds),
+        in: (col: string, vals: string[]) =>
+          make("in", col === "id" ? vals : inIds),
+        maybeSingle: () =>
+          Promise.resolve({ data: rowsFor(mode, inIds)[0] ?? null, error: null }),
+        single: () =>
+          Promise.resolve({ data: rowsFor(mode, inIds)[0] ?? null, error: null }),
+        then: (onFulfilled) =>
+          Promise.resolve({ data: rowsFor(mode, inIds), error: null }).then(onFulfilled),
+      });
+      return make("eq", null);
+    },
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
       if (table === "program_series") {
@@ -20,15 +72,25 @@ const fakeSupabase = {
         };
       }
       // variant_series_map — se await directamente sin .select().single()
-      return { error: null };
+      return { error: insertMapError };
     },
     update: (payload: unknown) => {
       calls.push({ table, op: "update", payload });
       return { eq: (_col: string, _val: string) => Promise.resolve({ error: null }) };
     },
     delete: () => {
-      calls.push({ table, op: "delete" });
-      return { eq: (_col: string, _val: string) => Promise.resolve({ error: null }) };
+      const record = { table, op: "delete", payload: undefined as unknown };
+      calls.push(record);
+      return {
+        eq: (col: string, val: string) => {
+          record.payload = { filter: "eq", col, val };
+          return Promise.resolve({ error: null });
+        },
+        in: (col: string, vals: string[]) => {
+          record.payload = { filter: "in", col, vals };
+          return Promise.resolve({ error: null });
+        },
+      };
     },
   }),
 };
@@ -44,78 +106,339 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { createSeries, updateSeries, deleteSeries } from "@/lib/admin/seriesActions";
 
+type MapRow = { program_variant_id: string; series_id: string; ordinal: number };
+
+/**
+ * Ids con la MISMA forma que los del catálogo real (`supabase/migrations/001`),
+ * que están sembrados a mano y NO son uuid RFC 4122: el 3er grupo no lleva
+ * versión y el 4º no lleva variante.
+ *
+ * Antes estos fixtures eran uuid v4 canónicos y por eso pasaban `.uuid()`
+ * mientras cada id real la fallaba: los tests eran más conformes que la
+ * producción, así que validaban una entrada que no existe. Si estos valores se
+ * "arreglan" a v4, la suite deja de cubrir el caso que rompió el admin.
+ */
+const V1 = "00000000-0000-0000-0002-000000000001";
+const V2 = "00000000-0000-0000-0002-000000000002";
+const V3 = "00000000-0000-0000-0002-000000000003";
+const V4 = "00000000-0000-0000-0002-000000000004";
+const SERIES_ID = "00000000-0000-0000-0005-000000000005";
+const PROG_ID = "00000000-0000-0000-0001-000000000001";
+
 beforeEach(() => {
   calls.length = 0;
   insertSeriesError = null;
+  insertMapError = null;
+  previousMappings = [];
+  seriesDays = [];
+  conflictRows = [];
+  seriesOwned = true;
+  ownedVariants = [
+    { id: V1 },
+    { id: V2 },
+    { id: V3 },
+    { id: V4 },
+  ];
 });
 
 // ─── createSeries ───────────────────────────────────────────────────
 describe("createSeries", () => {
-  it("inserta la serie y los mappings de variantes", async () => {
-    const result = await createSeries("prog-1", {
-      series_number: 1,
+  it("inserta la serie y un mapeo por variante, cada uno con su posición", async () => {
+    const result = await createSeries(PROG_ID, {
       title: "Fundamentos",
       description: null,
-      variantIds: ["v1", "v2"],
+      mappings: [
+        { variantId: V1, ordinal: 1 },
+        { variantId: V2, ordinal: 1 },
+      ],
     });
+
     expect(result.error).toBeUndefined();
-    expect(calls.find((c) => c.table === "program_series" && c.op === "insert")).toBeTruthy();
     const mapInsert = calls.find(
       (c) => c.table === "variant_series_map" && c.op === "insert"
     );
-    expect(mapInsert).toBeTruthy();
-    expect((mapInsert!.payload as unknown[]).length).toBe(2);
+    expect(mapInsert!.payload as MapRow[]).toEqual([
+      { program_variant_id: V1, series_id: "new-series-id", ordinal: 1 },
+      { program_variant_id: V2, series_id: "new-series-id", ordinal: 1 },
+    ]);
   });
 
-  it("retorna error si el número de serie ya existe (código 23505)", async () => {
-    insertSeriesError = { code: "23505", message: "unique violation" };
-    const result = await createSeries("prog-1", {
-      series_number: 1,
+  it("la serie ya no lleva número: la posición vive en el mapeo", async () => {
+    await createSeries(PROG_ID, {
+      title: "T",
+      description: null,
+      mappings: [{ variantId: V1, ordinal: 3 }],
+    });
+
+    const seriesInsert = calls.find(
+      (c) => c.table === "program_series" && c.op === "insert"
+    );
+    expect(seriesInsert!.payload).not.toHaveProperty("series_number");
+    expect(seriesInsert!.payload).not.toHaveProperty("ordinal");
+  });
+
+  it("rechaza una serie sin variantes y no escribe nada", async () => {
+    const result = await createSeries(PROG_ID, {
+      title: "Huérfana",
+      description: null,
+      mappings: [],
+    });
+
+    // Sin variante no tiene posición: no es que quede inalcanzable, es que no
+    // se puede representar en ningún currículo.
+    expect(result.error).toBe("Elige al menos una variante para esta serie.");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("traduce el 23505 del mapeo a un error de posición ocupada", async () => {
+    insertMapError = { code: "23505", message: "unique violation" };
+    conflictRows = [
+      {
+        program_variant_id: V1,
+        series_id: "otra-serie",
+        ordinal: 2,
+        program_variants: { name: "CuarentaMás Principiante Poco Tiempo" },
+      },
+    ];
+
+    const result = await createSeries(PROG_ID, {
       title: "Dup",
       description: null,
-      variantIds: ["v1"],
+      mappings: [{ variantId: V1, ordinal: 2 }],
     });
-    expect(result.error).toBe("El mes 1 ya existe en este programa");
+
+    // Nombra la variante concreta: "alguna de las variantes elegidas" no le
+    // dice a Aura qué corregir.
+    expect(result.error).toBe(
+      "CuarentaMás Principiante Poco Tiempo ya tiene un Mes 2."
+    );
+    // Discriminador explícito: el modal lo pinta inline en el campo Mes #, sin
+    // buscar texto dentro del mensaje.
+    expect(result.field).toBe("ordinal");
+  });
+
+  it("borra la serie si el mapeo falla, para no dejarla huérfana e invisible", async () => {
+    insertMapError = { code: "23505", message: "unique violation" };
+
+    await createSeries(PROG_ID, {
+      title: "Dup",
+      description: null,
+      mappings: [{ variantId: V1, ordinal: 2 }],
+    });
+
+    // Sin mapeo la serie no aparece en ningún currículo: el admin no podría
+    // verla para borrarla.
+    expect(
+      calls.find((c) => c.table === "program_series" && c.op === "delete")
+    ).toBeTruthy();
+  });
+
+  it("acepta los ids sembrados a mano del catálogo, que no son uuid RFC 4122", async () => {
+    // Regresión de un fallo REAL detectado en el Preview: `z.string().uuid()`
+    // exige bits de versión/variante y los ids del catálogo no los tienen, así
+    // que rechazaba TODA creación, edición y borrado en el admin. Este es un id
+    // copiado literalmente de la BD de producción.
+    const REAL = "00000000-0000-0000-0002-000000000010"; // Strong & Fit Avanzado
+    ownedVariants = [{ id: REAL }];
+
+    const result = await createSeries("00000000-0000-0000-0001-000000000003", {
+      title: "Mes 7",
+      description: null,
+      mappings: [{ variantId: REAL, ordinal: 7 }],
+    });
+
+    expect(result.error).toBeUndefined();
+  });
+
+  it("rechaza un id que no tiene forma de uuid", async () => {
+    const result = await createSeries(PROG_ID, {
+      title: "T",
+      description: null,
+      mappings: [{ variantId: "no-soy-un-uuid", ordinal: 1 }],
+    });
+
+    expect(result.error).toBe("Variante no válida.");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("rechaza una variante que no pertenece al programa, sin escribir nada", async () => {
+    // La variante existe, pero es de OTRO programa: nada en la BD lo impide
+    // (el índice único es por variante), así que el chequeo tiene que estar
+    // aquí. Si se colara, las clientes de ese programa verían contenido ajeno.
+    const AJENA = "00000000-0000-0000-0002-000000000099";
+
+    const result = await createSeries(PROG_ID, {
+      title: "Cruzada",
+      description: null,
+      mappings: [{ variantId: V1, ordinal: 1 }, { variantId: AJENA, ordinal: 1 }],
+    });
+
+    expect(result.error).toBe("Variante no válida.");
+    // Ni la serie ni el mapeo: se rechaza ANTES de tocar la BD, así que no hay
+    // nada que revertir.
+    expect(calls.filter((c) => c.op === "insert")).toHaveLength(0);
   });
 });
 
 // ─── updateSeries ───────────────────────────────────────────────────
 describe("updateSeries", () => {
   it("actualiza los campos de la serie", async () => {
-    const result = await updateSeries("series-1", "prog-1", {
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
       title: "Mes actualizado",
       description: "Nueva desc",
       published: true,
-      variantIds: ["v1"],
+      mappings: [{ variantId: V1, ordinal: 1 }],
     });
+
     expect(result.error).toBeUndefined();
     const upd = calls.find((c) => c.table === "program_series" && c.op === "update");
     expect((upd?.payload as { title: string })?.title).toBe("Mes actualizado");
     expect((upd?.payload as { published: boolean })?.published).toBe(true);
+
+    // El orden importa y es invisible salvo que se afirme: el mapeo primero.
+    const mapInsertIdx = calls.findIndex(
+      (c) => c.table === "variant_series_map" && c.op === "insert"
+    );
+    const updateIdx = calls.findIndex(
+      (c) => c.table === "program_series" && c.op === "update"
+    );
+    expect(mapInsertIdx).toBeLessThan(updateIdx);
   });
 
-  it("reconcilia variantes: elimina viejos e inserta los nuevos", async () => {
-    await updateSeries("series-1", "prog-1", {
+  it("reconcilia variantes: elimina viejos e inserta los nuevos con su posición", async () => {
+    await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
       published: false,
-      variantIds: ["v3", "v4"],
+      mappings: [
+        { variantId: V3, ordinal: 4 },
+        { variantId: V4, ordinal: 9 },
+      ],
     });
+
     expect(
       calls.find((c) => c.table === "variant_series_map" && c.op === "delete")
     ).toBeTruthy();
     const mapInsert = calls.find(
       (c) => c.table === "variant_series_map" && c.op === "insert"
     );
-    expect((mapInsert?.payload as unknown[]).length).toBe(2);
+    // Cada fila lleva SU posición: v4 conserva la suya en vez de heredar la de v3.
+    expect((mapInsert!.payload as MapRow[]).map((r) => r.ordinal)).toEqual([4, 9]);
+  });
+
+  it("traduce el 23505 del mapeo a un error de posición ocupada", async () => {
+    insertMapError = { code: "23505", message: "unique violation" };
+    conflictRows = [
+      {
+        program_variant_id: V1,
+        series_id: "otra-serie",
+        ordinal: 5,
+        program_variants: { name: "Strong & Fit Intermedio" },
+      },
+    ];
+
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
+      title: "T",
+      description: null,
+      published: false,
+      mappings: [{ variantId: V1, ordinal: 5 }],
+    });
+
+    expect(result.error).toBe("Strong & Fit Intermedio ya tiene un Mes 5.");
+    expect(result.field).toBe("ordinal");
+    // Los metadatos se escriben DESPUÉS del mapeo: si se escribieran antes, el
+    // admin vería "esta variante ya tiene un Mes 5" (que implica que no se
+    // guardó nada) con el título y `published` ya persistidos.
+    expect(
+      calls.find((c) => c.table === "program_series" && c.op === "update")
+    ).toBeUndefined();
+  });
+
+  it("restaura los mapeos anteriores si la inserción falla", async () => {
+    // Sin esto, un 23505 (posición ocupada — un error que el admin provoca a
+    // diario) dejaría la serie mapeada a CERO variantes: invisible en todos los
+    // currículos e irrecuperable desde el editor.
+    previousMappings = [
+      { program_variant_id: V1, series_id: SERIES_ID, ordinal: 2 },
+    ];
+    insertMapError = { code: "23505", message: "unique violation" };
+
+    await updateSeries(SERIES_ID, PROG_ID, {
+      title: "T",
+      description: null,
+      published: false,
+      mappings: [{ variantId: V3, ordinal: 5 }],
+    });
+
+    const mapInserts = calls.filter(
+      (c) => c.table === "variant_series_map" && c.op === "insert"
+    );
+    expect(mapInserts).toHaveLength(2);
+    expect(mapInserts[1].payload as MapRow[]).toEqual(previousMappings);
+  });
+
+  it("rechaza dejar la serie sin variantes", async () => {
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
+      title: "T",
+      description: null,
+      published: false,
+      mappings: [],
+    });
+
+    expect(result.error).toBe("Elige al menos una variante para esta serie.");
+    expect(calls).toHaveLength(0);
   });
 });
 
 // ─── deleteSeries ───────────────────────────────────────────────────
 describe("deleteSeries", () => {
-  it("elimina la serie de program_series", async () => {
-    const result = await deleteSeries("series-1", "prog-1");
+  it("borra los días antes que la serie: program_days.series_id no tiene cascade", async () => {
+    // Sin esto Postgres devuelve 23503 y NINGUNA serie con días se puede
+    // borrar — que tras la migración 015 son todas.
+    seriesDays = [{ id: "d1" }, { id: "d2" }];
+
+    const result = await deleteSeries(SERIES_ID, PROG_ID);
+
     expect(result.error).toBeUndefined();
+    const order = calls.filter((c) => c.op === "delete").map((c) => c.table);
+    expect(order).toEqual([
+      "progress_logs",
+      "program_days",
+      "variant_series_map",
+      "program_series",
+    ]);
+  });
+
+  it("borra SÓLO los registros de esos días, nunca todos", async () => {
+    // Un delete sin filtrar aquí borraría el historial de entrenamiento de
+    // todas las clientes de la plataforma.
+    seriesDays = [{ id: "d1" }, { id: "d2" }];
+
+    await deleteSeries(SERIES_ID, PROG_ID);
+
+    const logsDelete = calls.find((c) => c.table === "progress_logs" && c.op === "delete");
+    expect(logsDelete!.payload).toEqual({
+      filter: "in",
+      col: "program_day_id",
+      vals: ["d1", "d2"],
+    });
+  });
+
+  it("no toca progress_logs si la serie no tiene días", async () => {
+    seriesDays = [];
+
+    await deleteSeries(SERIES_ID, PROG_ID);
+
+    expect(calls.find((c) => c.table === "progress_logs")).toBeUndefined();
+  });
+
+  it("elimina el mapeo y luego la serie", async () => {
+    const result = await deleteSeries(SERIES_ID, PROG_ID);
+
+    expect(result.error).toBeUndefined();
+    expect(
+      calls.find((c) => c.table === "variant_series_map" && c.op === "delete")
+    ).toBeTruthy();
     expect(
       calls.find((c) => c.table === "program_series" && c.op === "delete")
     ).toBeTruthy();

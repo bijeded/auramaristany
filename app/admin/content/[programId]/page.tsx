@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { getAdminProgram } from "@/lib/admin/queries";
+import { requireAdminPage } from "@/lib/admin/auth";
 import { SeriesAccordion } from "@/components/admin/SeriesAccordion";
 import { NewSeriesButton } from "@/components/admin/NewSeriesButton";
 
@@ -10,12 +11,13 @@ export default async function AdminProgramPage({
 }: {
   params: Promise<{ programId: string }>;
 }) {
+  await requireAdminPage();
   const { programId } = await params;
   const result = await getAdminProgram(programId);
 
   if (!result) notFound();
 
-  const { program, series, variants } = result;
+  const { program, curricula, variants, seriesCount } = result;
 
   return (
     <div className="p-8 max-w-4xl">
@@ -38,7 +40,8 @@ export default async function AdminProgramPage({
             {program.name}
           </h1>
           <p className="font-body mt-1" style={{ fontSize: 14, color: "var(--gris-texto)" }}>
-            {series.length} {series.length === 1 ? "serie" : "series"} ·{" "}
+            {seriesCount} {seriesCount === 1 ? "serie" : "series"} en{" "}
+            {variants.length} {variants.length === 1 ? "variante" : "variantes"} ·{" "}
             {program.duration_months
               ? `${program.duration_months} meses de contenido`
               : "Programa continuo"}
@@ -47,33 +50,65 @@ export default async function AdminProgramPage({
         <NewSeriesButton programId={programId} variants={variants} />
       </div>
 
-      {/* Lista de series */}
-      {series.length === 0 ? (
+      {/* Un currículo por variante: cada nivel numera sus meses desde 1 */}
+      {curricula.length === 0 && (
         <div
           className="rounded-xl p-10 text-center"
           style={{ border: "1.5px dashed var(--gris-linea)", background: "#fff" }}
         >
           <p className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-            Sin series todavía
+            Este programa no tiene variantes
           </p>
           <p className="font-body" style={{ fontSize: 14, color: "var(--gris-texto)" }}>
-            Crea la primera serie para empezar a cargar contenido.
+            El contenido se organiza por variante, así que primero hay que crear una.
           </p>
         </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {series.map((s, i) => (
-            <SeriesAccordion
-              key={s.id}
-              series={s}
-              programId={programId}
-              programSlug={program.slug}
-              variants={variants}
-              defaultOpen={i === series.length - 1}
-            />
-          ))}
-        </div>
       )}
+
+      <div className="flex flex-col gap-10">
+        {curricula.map((variant) => (
+          <section key={variant.id}>
+            <h2
+              className="font-head mb-3"
+              style={{ fontSize: 17, fontWeight: 700, color: "var(--negro)" }}
+            >
+              {variant.name}
+              <span
+                className="font-body ml-2"
+                style={{ fontSize: 13, fontWeight: 400, color: "var(--gris-suave)" }}
+              >
+                {variant.series.length}{" "}
+                {variant.series.length === 1 ? "mes" : "meses"}
+              </span>
+            </h2>
+
+            {variant.series.length === 0 ? (
+              <div
+                className="rounded-xl p-6 text-center"
+                style={{ border: "1.5px dashed var(--gris-linea)", background: "#fff" }}
+              >
+                <p className="font-body" style={{ fontSize: 14, color: "var(--gris-texto)" }}>
+                  Sin contenido todavía. Crea el Mes 1 de esta variante.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {variant.series.map((s, i) => (
+                  <SeriesAccordion
+                    key={`${variant.id}:${s.id}`}
+                    series={s}
+                    programId={programId}
+                    programSlug={program.slug}
+                    variants={variants}
+                    variantId={variant.id}
+                    defaultOpen={i === variant.series.length - 1}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

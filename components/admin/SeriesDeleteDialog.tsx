@@ -1,7 +1,7 @@
 "use client";
 
 interface Props {
-  series: { series_number: number; title: string };
+  series: { ordinal: number; title: string; mappings: { variantId: string; ordinal: number }[] };
   onClose: () => void;
   onConfirm: () => void;
   loading?: boolean;
@@ -20,12 +20,27 @@ export function SeriesDeleteDialog({ series, onClose, onConfirm, loading, error 
         style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}
       >
         <h2 className="font-head" style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-          ¿Eliminar Mes {series.series_number}?
+          ¿Eliminar Mes {series.ordinal}?
         </h2>
         <p className="font-body" style={{ fontSize: 14, color: "var(--gris-texto)", marginBottom: 20 }}>
           <strong>{series.title}</strong> y todo su contenido (días, bloques y pilares) se
-          eliminarán permanentemente. Esta acción no se puede deshacer.
+          eliminarán permanentemente, junto con los entrenamientos que las clientes ya
+          hayan registrado en esos días. Esta acción no se puede deshacer.
         </p>
+        {series.mappings.length > 1 && (
+          <p
+            className="font-body rounded-xl p-3"
+            style={{
+              fontSize: 13,
+              color: "var(--lavanda-dark)",
+              background: "var(--lavanda-tint)",
+              marginBottom: 20,
+            }}
+          >
+            Esta serie se muestra en {series.mappings.length} variantes. Al eliminarla
+            desaparece de todas.
+          </p>
+        )}
         {error && (
           <p className="font-body mb-4" style={{ fontSize: 13, color: "#e05c5c" }}>{error}</p>
         )}

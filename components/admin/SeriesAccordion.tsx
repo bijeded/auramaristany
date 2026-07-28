@@ -15,6 +15,8 @@ interface Props {
   programSlug?: string;
   defaultOpen?: boolean;
   variants: AdminVariant[];
+  /** Currículo de qué variante se está mostrando: define qué Mes # se edita. */
+  variantId: string;
 }
 
 export function SeriesAccordion({
@@ -23,6 +25,7 @@ export function SeriesAccordion({
   programSlug,
   defaultOpen = false,
   variants,
+  variantId,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,11 +78,25 @@ export function SeriesAccordion({
                 fontSize: 15, fontWeight: 700,
               }}
             >
-              {series.series_number}
+              {series.ordinal}
             </div>
             <div>
               <p className="font-head" style={{ fontSize: 15, fontWeight: 600, color: "var(--negro)" }}>
-                Mes {series.series_number}{series.title ? ` — ${series.title}` : ""}
+                Mes {series.ordinal}{series.title ? ` — ${series.title}` : ""}
+                {series.mappings.length > 1 && (
+                  <span
+                    className="font-body ml-2 rounded-full px-2 py-0.5"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: "var(--lavanda-tint)",
+                      color: "var(--lavanda-dark)",
+                    }}
+                    title={`Esta serie se muestra en ${series.mappings.length} variantes. Editarla las cambia todas.`}
+                  >
+                    Compartida en {series.mappings.length}
+                  </span>
+                )}
               </p>
               <p className="font-body" style={{ fontSize: 12, color: "var(--gris-texto)", marginTop: 2 }}>
                 {publishedCount > 0 && (
@@ -108,9 +125,13 @@ export function SeriesAccordion({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+                aria-label="Acciones de la serie"
                 style={{
                   background: "none", border: "none", cursor: "pointer",
                   color: "var(--gris-texto)", padding: "4px",
+                  // Área táctil ≥44px sin agrandar el icono (CLAUDE.md → Design)
+                  minWidth: 44, minHeight: 44,
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 <MoreVertical size={16} />
@@ -177,6 +198,8 @@ export function SeriesAccordion({
           variants={variants}
           mode="edit"
           series={series}
+          currentVariantId={variantId}
+          onRequestDelete={() => setModal("delete")}
           onClose={() => setModal(null)}
         />
       )}

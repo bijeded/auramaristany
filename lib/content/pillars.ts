@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { ACCESS_STATES } from "./subscription-access";
+import { seriesAtOrdinal, type CurriculumEntry } from "./curriculum";
 
 export interface PillarWithBlocks {
   id: string;
@@ -51,19 +52,23 @@ export async function getCurrentMonthPillars(userId: string): Promise<PillarWith
   if (!sub) return [];
   if (!ALLOWED.has(sub.program_variants.programs.slug)) return [];
 
+  // Filtro explícito por serie publicada — ver el comentario largo en
+  // lib/content/queries.ts: el join `program_series!inner` lo hacía antes de
+  // rebote vía RLS y se perdió al resolver por `ordinal`.
   const { data: rawMap } = await supabase
     .from("variant_series_map")
-    .select("series_id, program_series!inner ( series_number )")
-    .eq("program_variant_id", sub.program_variant_id);
-  // keep: variant_series_map JOIN program_series!inner — nested join not inferred.
-  const map = rawMap as { series_id: string; program_series: { series_number: number } }[] | null;
-  const seriesEntry = map?.find((m) => m.program_series.series_number === sub.months_elapsed);
-  if (!seriesEntry) return [];
+    .select("series_id, ordinal, program_series!inner ( published )")
+    .eq("program_variant_id", sub.program_variant_id)
+    .eq("program_series.published", true);
+  // keep: variant_series_map JOIN program_series!inner — forma del join no inferida.
+  const map = (rawMap ?? []) as unknown as CurriculumEntry[];
+  const seriesId = seriesAtOrdinal(map, sub.months_elapsed);
+  if (!seriesId) return [];
 
   const { data: rawPillars } = await supabase
     .from("program_series_pillars")
     .select("id, pillar_key, title")
-    .eq("series_id", seriesEntry.series_id)
+    .eq("series_id", seriesId)
     .eq("published", true)
     .order("sort_order");
   // SDK types the simple select; cast to local interface (no "blocks" field yet).
