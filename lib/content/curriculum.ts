@@ -8,6 +8,14 @@
  * currículo ya leído y responden dónde está y hacia dónde sigue una cliente.
  */
 
+/**
+ * Una posición del currículo de una variante.
+ *
+ * Precondición: dentro de un mismo currículo `ordinal` es único. Lo garantiza
+ * `unique(program_variant_id, ordinal)` en la base de datos, NO estas funciones
+ * — si alguna vez se construyen estas entradas desde otra fuente, la unicidad
+ * es una suposición, no una validación.
+ */
 export interface CurriculumEntry {
   ordinal: number;
   series_id: string;
