@@ -40,6 +40,7 @@ const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", 
 export type CancellationState =
   | { kind: "eligible" }
   | { kind: "grace"; endsAt: string | null }
+  | { kind: "completed"; endsAt: string | null }
   | { kind: "none" };
 
 /** Derive how the SubscriptionCard should present cancellation, from the
@@ -49,6 +50,14 @@ export function deriveCancellationState(input: {
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd?: string | null;
 }): CancellationState {
+  // L2c — el ESTADO se mira primero. Terminar el programa también deja
+  // `cancel_at_period_end` en true (la completion programa la cancelación en
+  // Stripe), así que mirar sólo la bandera le ofrecería "Reactivar" a quien
+  // acaba de terminar: reanudar el cobro de un contenido que ya se acabó.
+  if (input.status === "completed") {
+    return { kind: "completed", endsAt: input.currentPeriodEnd ?? null };
+  }
+
   if (input.cancelAtPeriodEnd && ELIGIBLE_STATUSES.includes(input.status)) {
     return { kind: "grace", endsAt: input.currentPeriodEnd ?? null };
   }

@@ -16,14 +16,39 @@ describe("mapSubscription", () => {
       price_mxn: 999, months_elapsed: 3, duration_months: 6,
       billing_model: "fixed_term_monthly",
       content_variant_id: "var-2", content_ordinal: 2, content_loops: 0,
-      // El nombre del peldaño se resuelve fuera del mapeo, con otra consulta.
+      // El nombre y el nivel del peldaño se resuelven fuera del mapeo, con otra consulta.
       rung_name: null,
+      rung_level: null,
     });
   });
 
   it("devuelve null si no hay filas", () => {
     expect(mapSubscription([])).toBeNull();
     expect(mapSubscription(null)).toBeNull();
+  });
+
+  // L2c — la ficha de cuenta también lee las terminadas (es donde vive el CTA
+  // para seguir con Extra), así que una clienta puede traer dos filas.
+  it("prefiere la suscripción que paga sobre la terminada, venga en el orden que venga", () => {
+    const variants = { name: "Intermedio", price_mxn: 999, programs: { name: "Fuerza", duration_months: null, billing_model: "rolling_monthly" } };
+    const completed = {
+      status: "completed", cancel_at_period_end: true, enrollment_date: "2026-06-01", current_period_end: null,
+      months_elapsed: 6, content_variant_id: "var-1", content_ordinal: 6, content_loops: 0, program_variants: variants,
+    };
+    const active = { ...completed, status: "active", enrollment_date: "2026-01-01", months_elapsed: 2, content_ordinal: 2 };
+
+    expect(mapSubscription([completed, active])?.status).toBe("active");
+    expect(mapSubscription([active, completed])?.status).toBe("active");
+  });
+
+  it("si la única que hay terminó, es la que se muestra", () => {
+    const completed = [{
+      status: "completed", cancel_at_period_end: true, enrollment_date: "2026-06-01", current_period_end: null,
+      months_elapsed: 6, content_variant_id: "var-1", content_ordinal: 6, content_loops: 0,
+      program_variants: { name: "Intermedio", price_mxn: 999, programs: { name: "CuarentaMás", duration_months: 6, billing_model: "fixed_term_monthly" } },
+    }];
+
+    expect(mapSubscription(completed)?.status).toBe("completed");
   });
 });
 
@@ -52,6 +77,7 @@ describe("accountProgressLabel", () => {
     months_elapsed: 3, duration_months: 6, billing_model: "fixed_term_monthly",
     content_variant_id: "var-1", content_ordinal: 3, content_loops: 0,
     rung_name: "Principiante",
+    rung_level: "principiante",
   };
 
   it("formatea Mes X de Y en plazo fijo", () => {
@@ -69,5 +95,12 @@ describe("accountProgressLabel", () => {
         content_ordinal: 2,
       })
     ).toEqual({ text: "Avanzado · Mes 2", percent: null });
+  });
+
+  it("una suscripción terminada lo dice, en vez de seguir contando meses", () => {
+    expect(accountProgressLabel({ ...base, status: "completed", months_elapsed: 6 })).toEqual({
+      text: "Programa completado",
+      percent: 100,
+    });
   });
 });

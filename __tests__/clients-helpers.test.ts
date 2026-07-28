@@ -147,6 +147,18 @@ describe("canDeleteClient", () => {
     expect(canDeleteClient([{ status: "past_due" }]).ok).toBe(false);
     expect(canDeleteClient([{ status: "unpaid" }]).ok).toBe(false);
   });
+
+  // L2c — una terminada ya no cobra: su cancelación en Stripe está programada a
+  // fin de periodo. Tratarla como viva dejaría a la clienta imposible de borrar
+  // para siempre, porque `completed` es terminal y nunca pasa a `canceled`.
+  it("permite borrar si la única suscripción terminó", () => {
+    expect(canDeleteClient([{ status: "completed" }])).toEqual({ ok: true });
+    expect(canDeleteClient([{ status: "completed" }, { status: "canceled" }]).ok).toBe(true);
+  });
+
+  it("sigue bloqueando si además hay una que paga", () => {
+    expect(canDeleteClient([{ status: "completed" }, { status: "active" }]).ok).toBe(false);
+  });
 });
 
 import { clientsToCSV } from "@/lib/admin/clients-helpers";
@@ -165,5 +177,9 @@ describe("clientsToCSV", () => {
   it("traduce el status a etiqueta en español", () => {
     const csv = clientsToCSV([{ ...base, status: "past_due" }]);
     expect(csv.split("\n")[1]).toContain("Pago fallido");
+  });
+  it("la suscripción terminada tiene su propia etiqueta", () => {
+    const csv = clientsToCSV([{ ...base, status: "completed" }]);
+    expect(csv.split("\n")[1]).toContain("Completada");
   });
 });

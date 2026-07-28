@@ -14,12 +14,27 @@ const BASE_ITEMS = [
 
 const PILARES_ITEM = { href: "/portal/pilares", label: "Pilares", icon: Layers } as const;
 
-export function PortalNav({ showPilares, unreadMessages = 0 }: { showPilares: boolean; unreadMessages?: number }) {
+// L2c — lo que le queda a una clienta graduada. Las pestañas de entrenamiento
+// desaparecen porque la ruta ya no es suya: dejarlas sería ofrecerle puertas
+// que el middleware le cierra en la cara.
+const GRADUATED_ITEMS = [BASE_ITEMS[2], BASE_ITEMS[3], BASE_ITEMS[4]] as const;
+
+export function PortalNav({
+  showPilares,
+  unreadMessages = 0,
+  graduated = false,
+}: {
+  showPilares: boolean;
+  unreadMessages?: number;
+  graduated?: boolean;
+}) {
   const pathname = usePathname();
 
-  const items = showPilares
-    ? [BASE_ITEMS[0], BASE_ITEMS[1], PILARES_ITEM, ...BASE_ITEMS.slice(2)]
-    : [...BASE_ITEMS];
+  const items = graduated
+    ? [...GRADUATED_ITEMS]
+    : showPilares
+      ? [BASE_ITEMS[0], BASE_ITEMS[1], PILARES_ITEM, ...BASE_ITEMS.slice(2)]
+      : [...BASE_ITEMS];
 
   return (
     <nav

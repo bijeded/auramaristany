@@ -18,7 +18,10 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (state.kind === "none") return null;
+  // `completed` no ofrece nada aquí: ni Reactivar (reanudaría el cobro de un
+  // programa que ya terminó) ni Cancelar mi plan (invitaría a cancelar algo que
+  // ya se acabó). Lo que le toca a la graduada lo dice la GraduatedCard.
+  if (state.kind === "none" || state.kind === "completed") return null;
 
   async function reactivate() {
     setBusy(true);

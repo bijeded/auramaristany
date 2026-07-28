@@ -74,4 +74,30 @@ describe("deriveCancellationState", () => {
     expect(deriveCancellationState({ status: "canceled", cancelAtPeriodEnd: false }).kind).toBe("none");
     expect(deriveCancellationState({ status: "unpaid", cancelAtPeriodEnd: false }).kind).toBe("none");
   });
+
+  // L2c — terminar NO es estar en la ventana de gracia. La completion programa
+  // la cancelación en Stripe, así que `cancel_at_period_end` también queda en
+  // true: si el estado no se mirara PRIMERO, a quien acaba de terminar le
+  // ofreceríamos "Reactivar" un programa que ya se acabó, reanudando el cobro.
+  it("es 'completed' cuando el estado es completed, aunque cancele a fin de periodo", () => {
+    const s = deriveCancellationState({
+      status: "completed",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: "2026-08-15T00:00:00Z",
+    });
+    expect(s.kind).toBe("completed");
+    if (s.kind === "completed") expect(s.endsAt).toBe("2026-08-15T00:00:00Z");
+  });
+
+  it("es 'completed' también antes de que Stripe marque la cancelación", () => {
+    expect(deriveCancellationState({ status: "completed", cancelAtPeriodEnd: false }).kind).toBe(
+      "completed"
+    );
+  });
+
+  it("no es ni 'grace' ni 'eligible': ni Reactivar ni Cancelar mi plan", () => {
+    const kind = deriveCancellationState({ status: "completed", cancelAtPeriodEnd: true }).kind;
+    expect(kind).not.toBe("grace");
+    expect(kind).not.toBe("eligible");
+  });
 });

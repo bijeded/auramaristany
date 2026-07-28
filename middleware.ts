@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { ACCESS_STATES } from "@/lib/content/subscription-access";
+import {
+  PORTAL_SHELL_STATES,
+  derivePortalTier,
+} from "@/lib/content/subscription-access";
 import { getRedirectPath } from "@/lib/middleware-utils";
 import type { UserRole } from "@/lib/supabase/types";
 
@@ -35,6 +38,7 @@ export async function middleware(request: NextRequest) {
   let role: UserRole | null = null;
   let onboardingCompleted = false;
   let hasActiveSubscription = false;
+  let hasGraduatedSubscription = false;
 
   if (user) {
     const { data: profile } = await supabase
@@ -49,14 +53,21 @@ export async function middleware(request: NextRequest) {
     }
 
     if (role === "client") {
-      const { data: sub } = await supabase
+      // Se leen TODAS las filas que dan portal, no una sola: quien termina
+      // CuarentaMás y compra Extra tiene dos a la vez, y un `.maybeSingle()`
+      // sobre dos filas devuelve error —no filas—, que la dejaría fuera del
+      // portal entero justo después de pagar.
+      const { data: subs } = await supabase
         .from("subscriptions")
-        .select("id")
+        .select("status")
         .eq("profile_id", user.id)
-        .in("status", ACCESS_STATES as readonly string[])
-        .maybeSingle();
+        .in("status", PORTAL_SHELL_STATES as readonly string[]);
 
-      hasActiveSubscription = !!sub;
+      const tier = derivePortalTier(
+        ((subs ?? []) as { status: string }[]).map((s) => s.status)
+      );
+      hasActiveSubscription = tier === "paying";
+      hasGraduatedSubscription = tier === "graduated";
     }
   }
 
@@ -66,6 +77,7 @@ export async function middleware(request: NextRequest) {
     role,
     onboardingCompleted,
     hasActiveSubscription,
+    hasGraduatedSubscription,
   });
 
   if (redirectPath) {
