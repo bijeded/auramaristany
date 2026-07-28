@@ -10,7 +10,7 @@ interface Props {
   mode: "create" | "edit";
   series?: Pick<
     AdminSeries,
-    "id" | "series_number" | "title" | "description" | "published" | "variantIds"
+    "id" | "ordinal" | "title" | "description" | "published" | "variantIds"
   >;
   onClose: () => void;
 }
@@ -18,7 +18,7 @@ interface Props {
 export function SeriesFormModal({ programId, variants, mode, series, onClose }: Props) {
   const [title, setTitle] = useState(series?.title ?? "");
   const [description, setDescription] = useState(series?.description ?? "");
-  const [seriesNumber, setSeriesNumber] = useState<number | "">(series?.series_number ?? "");
+  const [seriesNumber, setSeriesNumber] = useState<number | "">(series?.ordinal ?? "");
   const [published, setPublished] = useState(series?.published ?? false);
   const [selectedVariants, setSelectedVariants] = useState<string[]>(
     series?.variantIds ?? []
@@ -40,31 +40,37 @@ export function SeriesFormModal({ programId, variants, mode, series, onClose }: 
 
     if (!title.trim()) { setError("El título es requerido."); return; }
     if (selectedVariants.length === 0) { setError("Selecciona al menos una variante."); return; }
-    if (mode === "create" && !seriesNumber) { setError("El número de mes es requerido."); return; }
+    if (!seriesNumber) { setError("El número de mes es requerido."); return; }
 
     setLoading(true);
 
     if (mode === "create") {
       const res = await createSeries(programId, {
-        series_number: Number(seriesNumber),
+        ordinal: Number(seriesNumber),
         title: title.trim(),
         description: description.trim() || null,
         variantIds: selectedVariants,
       });
       if (res.error) {
-        if (res.error.includes("ya existe")) setFieldError(res.error);
+        if (res.error.includes("Ya existe un Mes")) setFieldError(res.error);
         else setError(res.error);
         setLoading(false);
         return;
       }
     } else {
       const res = await updateSeries(series!.id, programId, {
+        ordinal: Number(seriesNumber),
         title: title.trim(),
         description: description.trim() || null,
         published,
         variantIds: selectedVariants,
       });
-      if (res.error) { setError(res.error); setLoading(false); return; }
+      if (res.error) {
+        if (res.error.includes("Ya existe un Mes")) setFieldError(res.error);
+        else setError(res.error);
+        setLoading(false);
+        return;
+      }
     }
 
     onClose();
@@ -81,15 +87,17 @@ export function SeriesFormModal({ programId, variants, mode, series, onClose }: 
         style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxHeight: "90vh", overflowY: "auto" }}
       >
         <h2 className="font-head mb-5" style={{ fontSize: 20, fontWeight: 700 }}>
-          {mode === "create" ? "Nueva serie" : `Editar Mes ${series!.series_number}`}
+          {mode === "create" ? "Nueva serie" : `Editar Mes ${series!.ordinal}`}
         </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {mode === "create" && (
-            <div>
+          <div>
               <label className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
                 Mes #
               </label>
+              <p className="font-body mb-2" style={{ fontSize: 12, color: "var(--gris-suave)" }}>
+                La posición es por variante: cada nivel numera sus meses desde 1.
+              </p>
               <input
                 type="number"
                 min={1}
@@ -110,8 +118,7 @@ export function SeriesFormModal({ programId, variants, mode, series, onClose }: 
                   {fieldError}
                 </p>
               )}
-            </div>
-          )}
+          </div>
 
           <div>
             <label className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>

@@ -192,6 +192,8 @@ export type Database = {
           stripe_price_id: string;
           price_mxn: number;
           is_active: boolean;
+          /** Variante que sigue en la escalera de niveles; null = no escala. */
+          ladder_next_variant_id: string | null;
         };
         Insert: {
           program_id?: string | null;
@@ -202,6 +204,7 @@ export type Database = {
           stripe_price_id: string;
           price_mxn: number;
           is_active?: boolean;
+          ladder_next_variant_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["program_variants"]["Insert"]>;
         Relationships: [];
@@ -229,7 +232,6 @@ export type Database = {
         Row: {
           id: string;
           program_id: string | null;
-          series_number: number;
           title: string;
           description: string | null;
           published: boolean;
@@ -238,7 +240,6 @@ export type Database = {
         };
         Insert: {
           program_id?: string | null;
-          series_number: number;
           title: string;
           description?: string | null;
           published?: boolean;
@@ -338,10 +339,12 @@ export type Database = {
         Row: {
           program_variant_id: string;
           series_id: string;
+          ordinal: number;
         };
         Insert: {
           program_variant_id: string;
           series_id: string;
+          ordinal: number;
         };
         Update: Partial<Database["public"]["Tables"]["variant_series_map"]["Insert"]>;
         Relationships: [];

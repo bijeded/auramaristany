@@ -152,12 +152,12 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
   });
 }
 
-/** Mapa "<variant_id>|<series_number>" → series_id. */
+/** Mapa "<variant_id>|<ordinal>" → series_id. */
 async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<string, string>> {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("variant_series_map")
-    .select("program_variant_id, series_id, program_series!inner ( series_number )")
+    .select("program_variant_id, series_id, ordinal")
     .in("program_variant_id", variantIds);
 
   const map = new Map<string, string>();
@@ -168,17 +168,14 @@ async function getSeriesByVariantAndNumber(variantIds: string[]): Promise<Map<st
     throw new NoticeQueryError("No se pudieron resolver las series del mes");
   }
 
-  // keep: variant_series_map JOIN program_series!inner — join shape not inferred.
   type Row = {
     program_variant_id: string;
     series_id: string;
-    program_series: { series_number: number } | null;
+    ordinal: number;
   };
 
-  for (const row of (data ?? []) as unknown as Row[]) {
-    if (row.program_series) {
-      map.set(`${row.program_variant_id}|${row.program_series.series_number}`, row.series_id);
-    }
+  for (const row of (data ?? []) as Row[]) {
+    map.set(`${row.program_variant_id}|${row.ordinal}`, row.series_id);
   }
   return map;
 }

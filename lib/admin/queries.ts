@@ -33,12 +33,19 @@ export interface AdminVariant {
 
 export interface AdminSeries {
   id: string;
-  series_number: number;
+  /** Posición dentro del currículo de LA VARIANTE en la que se está viendo. */
+  ordinal: number;
   title: string;
   description: string | null;
   published: boolean;
   days: AdminDay[];
+  /** Todas las variantes a las que está mapeada; >1 = serie compartida. */
   variantIds: string[];
+}
+
+/** Una variante con su currículo propio, ordenado por posición. */
+export interface AdminVariantCurriculum extends AdminVariant {
+  series: AdminSeries[];
 }
 
 export async function getAdminPrograms(): Promise<AdminProgram[]> {
@@ -81,10 +88,9 @@ export async function getAdminProgram(programId: string) {
   const { data: rawSeries } = await supabase
     .from("program_series")
     .select(
-      "id, series_number, title, description, published, program_days(id, week_number, day_of_week, workout_focus, title, day_type, published)"
+      "id, title, description, published, program_days(id, week_number, day_of_week, workout_focus, title, day_type, published)"
     )
-    .eq("program_id", programId)
-    .order("series_number");
+    .eq("program_id", programId);
 
   const { data: rawVariants } = await supabase
     .from("program_variants")
@@ -92,37 +98,68 @@ export async function getAdminProgram(programId: string) {
     .eq("program_id", programId)
     .order("name");
 
-  const seriesIds = ((rawSeries ?? []) as { id: string }[]).map((s) => s.id);
-  const { data: rawMappings } = seriesIds.length > 0
-    ? await supabase
-        .from("variant_series_map")
-        .select("series_id, program_variant_id")
-        .in("series_id", seriesIds)
-    : { data: [] as { series_id: string; program_variant_id: string }[] };
-
-  const variantMap: Record<string, string[]> = {};
-  for (const m of (rawMappings ?? []) as { series_id: string; program_variant_id: string }[]) {
-    if (!variantMap[m.series_id]) variantMap[m.series_id] = [];
-    variantMap[m.series_id].push(m.program_variant_id);
-  }
-
-  type RawSeries = Omit<AdminSeries, "days" | "variantIds"> & {
-    program_days: AdminDay[];
-  };
-
-  const series: AdminSeries[] = ((rawSeries ?? []) as RawSeries[]).map((s) => ({
-    id: s.id,
-    series_number: s.series_number,
-    title: s.title,
-    description: s.description,
-    published: s.published,
-    days: s.program_days ?? [],
-    variantIds: variantMap[s.id] ?? [],
-  }));
-
   const variants: AdminVariant[] = (rawVariants ?? []) as AdminVariant[];
 
-  return { program: program as Omit<AdminProgram, "series_count">, series, variants };
+  // La posición vive en el mapeo, así que el currículo se arma desde ahí: una
+  // misma serie puede aparecer en dos variantes en posiciones distintas.
+  const { data: rawMappings } = variants.length > 0
+    ? await supabase
+        .from("variant_series_map")
+        .select("series_id, program_variant_id, ordinal")
+        .in("program_variant_id", variants.map((v) => v.id))
+    : { data: [] as MappingRow[] };
+
+  const mappings = (rawMappings ?? []) as MappingRow[];
+
+  // series_id → todas las variantes que la muestran (para marcar compartidas)
+  const sharedWith: Record<string, string[]> = {};
+  for (const m of mappings) {
+    (sharedWith[m.series_id] ??= []).push(m.program_variant_id);
+  }
+
+  type RawSeries = Omit<AdminSeries, "days" | "variantIds" | "ordinal"> & {
+    program_days: AdminDay[];
+  };
+  const byId = new Map(
+    ((rawSeries ?? []) as RawSeries[]).map((s) => [s.id, s])
+  );
+
+  const curricula: AdminVariantCurriculum[] = variants.map((v) => ({
+    ...v,
+    series: mappings
+      .filter((m) => m.program_variant_id === v.id)
+      .sort((a, b) => a.ordinal - b.ordinal)
+      .flatMap((m) => {
+        const s = byId.get(m.series_id);
+        if (!s) return [];
+        return [
+          {
+            id: s.id,
+            ordinal: m.ordinal,
+            title: s.title,
+            description: s.description,
+            published: s.published,
+            days: s.program_days ?? [],
+            variantIds: sharedWith[s.id] ?? [],
+          },
+        ];
+      }),
+  }));
+
+  const seriesCount = byId.size;
+
+  return {
+    program: program as Omit<AdminProgram, "series_count">,
+    curricula,
+    variants,
+    seriesCount,
+  };
+}
+
+interface MappingRow {
+  series_id: string;
+  program_variant_id: string;
+  ordinal: number;
 }
 
 export interface BlockData {

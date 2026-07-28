@@ -75,11 +75,25 @@ export function SeriesAccordion({
                 fontSize: 15, fontWeight: 700,
               }}
             >
-              {series.series_number}
+              {series.ordinal}
             </div>
             <div>
               <p className="font-head" style={{ fontSize: 15, fontWeight: 600, color: "var(--negro)" }}>
-                Mes {series.series_number}{series.title ? ` — ${series.title}` : ""}
+                Mes {series.ordinal}{series.title ? ` — ${series.title}` : ""}
+                {series.variantIds.length > 1 && (
+                  <span
+                    className="font-body ml-2 rounded-full px-2 py-0.5"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      background: "var(--lavanda-tint)",
+                      color: "var(--lavanda-dark)",
+                    }}
+                    title={`Esta serie se muestra en ${series.variantIds.length} variantes. Editarla las cambia todas.`}
+                  >
+                    Compartida en {series.variantIds.length}
+                  </span>
+                )}
               </p>
               <p className="font-body" style={{ fontSize: 12, color: "var(--gris-texto)", marginTop: 2 }}>
                 {publishedCount > 0 && (
