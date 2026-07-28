@@ -65,6 +65,13 @@ describe("getCurrentMonthPillars", () => {
     expect(await getCurrentMonthPillars("u1")).toEqual([]);
   });
 
+  it("una posición en un hueco no resuelve a la serie más cercana", async () => {
+    // Ordinales 1,2,4,5 y la cliente en la 3: el 3 NO existe, así que no debe
+    // devolver ni el 2 ni el 4. Distingue "ordinal exacto" de "más cercano".
+    useMock(mockSub("cuarenta-mas", 3, [1, 2, 4, 5]));
+    expect(await getCurrentMonthPillars("u1")).toEqual([]);
+  });
+
   it("returns [] cuando la variante no tiene esa posición", async () => {
     useMock(mockSub("cuarenta-mas", 5, [1, 2, 3]));
     expect(await getCurrentMonthPillars("u1")).toEqual([]);

@@ -125,13 +125,14 @@ export function SeriesFormModal({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-              <label className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
+              <label htmlFor="serie-mes" className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
                 Mes #
               </label>
               <p className="font-body mb-2" style={{ fontSize: 12, color: "var(--gris-suave)" }}>
                 La posición es por variante: cada nivel numera sus meses desde 1.
               </p>
               <input
+                id="serie-mes"
                 type="number"
                 min={1}
                 value={seriesNumber}
@@ -154,10 +155,11 @@ export function SeriesFormModal({
           </div>
 
           <div>
-            <label className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
+            <label htmlFor="serie-titulo" className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
               Título
             </label>
             <input
+              id="serie-titulo"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -168,11 +170,12 @@ export function SeriesFormModal({
           </div>
 
           <div>
-            <label className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
+            <label htmlFor="serie-descripcion" className="font-body block mb-1" style={{ fontSize: 13, fontWeight: 600 }}>
               Descripción{" "}
               <span style={{ fontWeight: 400, color: "var(--gris-texto)" }}>(opcional)</span>
             </label>
             <textarea
+              id="serie-descripcion"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}

@@ -5,13 +5,12 @@ import { z } from "zod";
 import { requireAdmin } from "./auth";
 import { logAndGeneric } from "./errors";
 
-/**
- * Una posición concreta: qué variante muestra la serie y en qué mes.
- *
- * Es por FILA, no por serie. Una misma serie puede ser el Mes 1 de una variante
- * y el Mes 4 de otra, así que un único `ordinal` para toda la serie reescribiría
- * la posición de las demás variantes sin que el admin lo pida.
- */
+type SupabaseLike = Awaited<ReturnType<typeof requireAdmin>> & { ok: true } extends {
+  supabase: infer S;
+}
+  ? S
+  : never;
+
 /**
  * `field: "ordinal"` = el error pertenece al campo Mes #, para pintarlo inline.
  * Es un discriminador explícito a propósito: el modal antes lo deducía buscando
@@ -23,6 +22,13 @@ export interface SeriesActionResult {
   field?: "ordinal";
 }
 
+/**
+ * Una posición concreta: qué variante muestra la serie y en qué mes.
+ *
+ * Es por FILA, no por serie. Una misma serie puede ser el Mes 1 de una variante
+ * y el Mes 4 de otra, así que un único `ordinal` para toda la serie reescribiría
+ * la posición de las demás variantes sin que el admin lo pida.
+ */
 export interface SeriesMappingInput {
   variantId: string;
   ordinal: number;
@@ -65,28 +71,73 @@ const updateSchema = z.object({ ...baseSchema, published: z.boolean() });
  * posición. Ya NO puede venir de `program_series`: el mes es único por
  * variante, no por programa, que es justo lo que este cambio arregla.
  */
-function positionTakenMessage(mappings: SeriesMappingInput[]): string {
+/**
+ * Nombra la variante y el mes que chocaron. Se consulta DESPUÉS del 23505, no
+ * antes: el índice único sigue siendo lo que garantiza la integridad; esto sólo
+ * convierte "alguna de las variantes elegidas" en algo que Aura puede corregir.
+ * Si la consulta falla se cae al mensaje genérico.
+ */
+async function positionTakenMessage(
+  supabase: SupabaseLike,
+  mappings: SeriesMappingInput[],
+  excludeSeriesId?: string
+): Promise<string> {
   const months = Array.from(new Set(mappings.map((m) => m.ordinal))).sort((a, b) => a - b);
-  if (mappings.length === 1) {
-    // Caso común: una sola variante, así que el mensaje ya es inequívoco.
-    return `Esta variante ya tiene un Mes ${months[0]}.`;
+  const generic =
+    months.length === 1
+      ? `Ya existe un Mes ${months[0]} en alguna de las variantes elegidas.`
+      : `Alguna de las variantes elegidas ya tiene ocupado uno de esos meses.`;
+
+  const { data } = await supabase
+    .from("variant_series_map")
+    .select("program_variant_id, series_id, ordinal, program_variants(name)")
+    .in("program_variant_id", mappings.map((m) => m.variantId));
+
+  // keep: variant_series_map JOIN program_variants — forma del join no inferida.
+  const rows = (data ?? []) as unknown as {
+    program_variant_id: string;
+    series_id: string;
+    ordinal: number;
+    program_variants: { name: string } | null;
+  }[];
+
+  for (const m of mappings) {
+    const clash = rows.find(
+      (r) =>
+        r.program_variant_id === m.variantId &&
+        r.ordinal === m.ordinal &&
+        r.series_id !== excludeSeriesId
+    );
+    if (clash?.program_variants?.name) {
+      return `${clash.program_variants.name} ya tiene un Mes ${m.ordinal}.`;
+    }
   }
-  return months.length === 1
-    ? `Ya existe un Mes ${months[0]} en alguna de las variantes elegidas.`
-    : `Alguna de las variantes elegidas ya tiene ocupado uno de esos meses.`;
+  return generic;
 }
 
-/** Mensaje concreto por campo: "revisa los datos" no dice qué corregir. */
-function validationMessage(error: z.ZodError): string {
+/**
+ * Mensaje concreto por campo: "revisa los datos" no dice qué corregir.
+ * Devuelve también `field` para que el modal pinte el error del mes inline,
+ * igual que hace con el 23505 — si no, el mismo problema aparece en dos sitios
+ * distintos de la interfaz según de dónde venga.
+ */
+function validationFailure(error: z.ZodError): SeriesActionResult {
   const path = error.issues[0]?.path.join(".") ?? "";
-  if (path.startsWith("mappings")) {
-    return path === "mappings"
-      ? "Elige al menos una variante para esta serie."
-      : "El mes debe ser un número entero mayor o igual a 1.";
+  if (path === "mappings") {
+    return { error: "Elige al menos una variante para esta serie." };
   }
-  if (path === "title") return "El título es requerido (máximo 120 caracteres).";
-  if (path === "description") return "La descripción es demasiado larga (máximo 1000 caracteres).";
-  return "Revisa los datos de la serie.";
+  if (path.startsWith("mappings") && path.endsWith("ordinal")) {
+    return {
+      error: "El mes debe ser un número entero mayor o igual a 1.",
+      field: "ordinal",
+    };
+  }
+  if (path.startsWith("mappings")) return { error: "Variante no válida." };
+  if (path === "title") return { error: "El título es requerido (máximo 120 caracteres)." };
+  if (path === "description") {
+    return { error: "La descripción es demasiado larga (máximo 1000 caracteres)." };
+  }
+  return { error: "Revisa los datos de la serie." };
 }
 
 function toRows(seriesId: string, mappings: SeriesMappingInput[]) {
@@ -108,7 +159,7 @@ export async function createSeries(
   // que no se puede representar en ningún currículo.
   const parsed = createSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: validationMessage(parsed.error) };
+    return validationFailure(parsed.error);
   }
   const input = parsed.data;
   const supabase = auth.supabase;
@@ -143,7 +194,10 @@ export async function createSeries(
     if (rollbackError) logAndGeneric("createSeries.rollback", rollbackError);
 
     if ((mapError as { code?: string }).code === "23505") {
-      return { error: positionTakenMessage(input.mappings), field: "ordinal" };
+      return {
+        error: await positionTakenMessage(supabase, input.mappings),
+        field: "ordinal",
+      };
     }
     return { error: logAndGeneric("createSeries.map", mapError) };
   }
@@ -162,7 +216,7 @@ export async function updateSeries(
 
   const parsed = updateSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: validationMessage(parsed.error) };
+    return validationFailure(parsed.error);
   }
   const input = parsed.data;
   const supabase = auth.supabase;
@@ -203,7 +257,10 @@ export async function updateSeries(
       if (restoreError) logAndGeneric("updateSeries.restoreMap", restoreError);
     }
     if ((insertMapError as { code?: string }).code === "23505") {
-      return { error: positionTakenMessage(input.mappings), field: "ordinal" };
+      return {
+        error: await positionTakenMessage(supabase, input.mappings, seriesId),
+        field: "ordinal",
+      };
     }
     return { error: logAndGeneric("updateSeries.insertMap", insertMapError) };
   }

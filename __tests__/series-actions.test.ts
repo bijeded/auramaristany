@@ -7,6 +7,13 @@ let insertMapError: { code: string; message: string } | null = null;
 
 let previousMappings: MapRow[] = [];
 let seriesDays: { id: string }[] = [];
+// Filas que devuelve la consulta que nombra la variante en conflicto (23505).
+let conflictRows: {
+  program_variant_id: string;
+  series_id: string;
+  ordinal: number;
+  program_variants: { name: string } | null;
+}[] = [];
 
 const fakeSupabase = {
   from: (table: string) => ({
@@ -16,6 +23,8 @@ const fakeSupabase = {
           data: table === "program_days" ? seriesDays : previousMappings,
           error: null,
         }),
+      in: (_col: string, _vals: string[]) =>
+        Promise.resolve({ data: conflictRows, error: null }),
     }),
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
@@ -78,6 +87,7 @@ beforeEach(() => {
   insertMapError = null;
   previousMappings = [];
   seriesDays = [];
+  conflictRows = [];
 });
 
 // ─── createSeries ───────────────────────────────────────────────────
@@ -131,6 +141,14 @@ describe("createSeries", () => {
 
   it("traduce el 23505 del mapeo a un error de posición ocupada", async () => {
     insertMapError = { code: "23505", message: "unique violation" };
+    conflictRows = [
+      {
+        program_variant_id: V1,
+        series_id: "otra-serie",
+        ordinal: 2,
+        program_variants: { name: "CuarentaMás Principiante Poco Tiempo" },
+      },
+    ];
 
     const result = await createSeries("prog-1", {
       title: "Dup",
@@ -138,7 +156,11 @@ describe("createSeries", () => {
       mappings: [{ variantId: V1, ordinal: 2 }],
     });
 
-    expect(result.error).toBe("Esta variante ya tiene un Mes 2.");
+    // Nombra la variante concreta: "alguna de las variantes elegidas" no le
+    // dice a Aura qué corregir.
+    expect(result.error).toBe(
+      "CuarentaMás Principiante Poco Tiempo ya tiene un Mes 2."
+    );
     // Discriminador explícito: el modal lo pinta inline en el campo Mes #, sin
     // buscar texto dentro del mensaje.
     expect(result.field).toBe("ordinal");
@@ -175,6 +197,15 @@ describe("updateSeries", () => {
     const upd = calls.find((c) => c.table === "program_series" && c.op === "update");
     expect((upd?.payload as { title: string })?.title).toBe("Mes actualizado");
     expect((upd?.payload as { published: boolean })?.published).toBe(true);
+
+    // El orden importa y es invisible salvo que se afirme: el mapeo primero.
+    const mapInsertIdx = calls.findIndex(
+      (c) => c.table === "variant_series_map" && c.op === "insert"
+    );
+    const updateIdx = calls.findIndex(
+      (c) => c.table === "program_series" && c.op === "update"
+    );
+    expect(mapInsertIdx).toBeLessThan(updateIdx);
   });
 
   it("reconcilia variantes: elimina viejos e inserta los nuevos con su posición", async () => {
@@ -200,6 +231,14 @@ describe("updateSeries", () => {
 
   it("traduce el 23505 del mapeo a un error de posición ocupada", async () => {
     insertMapError = { code: "23505", message: "unique violation" };
+    conflictRows = [
+      {
+        program_variant_id: V1,
+        series_id: "otra-serie",
+        ordinal: 5,
+        program_variants: { name: "Strong & Fit Intermedio" },
+      },
+    ];
 
     const result = await updateSeries("series-1", "prog-1", {
       title: "T",
@@ -208,8 +247,14 @@ describe("updateSeries", () => {
       mappings: [{ variantId: V1, ordinal: 5 }],
     });
 
-    expect(result.error).toBe("Esta variante ya tiene un Mes 5.");
+    expect(result.error).toBe("Strong & Fit Intermedio ya tiene un Mes 5.");
     expect(result.field).toBe("ordinal");
+    // Los metadatos se escriben DESPUÉS del mapeo: si se escribieran antes, el
+    // admin vería "esta variante ya tiene un Mes 5" (que implica que no se
+    // guardó nada) con el título y `published` ya persistidos.
+    expect(
+      calls.find((c) => c.table === "program_series" && c.op === "update")
+    ).toBeUndefined();
   });
 
   it("restaura los mapeos anteriores si la inserción falla", async () => {

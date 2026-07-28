@@ -51,6 +51,20 @@ export default async function AdminProgramPage({
       </div>
 
       {/* Un currículo por variante: cada nivel numera sus meses desde 1 */}
+      {curricula.length === 0 && (
+        <div
+          className="rounded-xl p-10 text-center"
+          style={{ border: "1.5px dashed var(--gris-linea)", background: "#fff" }}
+        >
+          <p className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            Este programa no tiene variantes
+          </p>
+          <p className="font-body" style={{ fontSize: 14, color: "var(--gris-texto)" }}>
+            El contenido se organiza por variante, así que primero hay que crear una.
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-10">
         {curricula.map((variant) => (
           <section key={variant.id}>

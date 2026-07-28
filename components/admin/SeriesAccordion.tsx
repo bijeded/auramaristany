@@ -125,9 +125,13 @@ export function SeriesAccordion({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}
+                aria-label="Acciones de la serie"
                 style={{
                   background: "none", border: "none", cursor: "pointer",
                   color: "var(--gris-texto)", padding: "4px",
+                  // Área táctil ≥44px sin agrandar el icono (CLAUDE.md → Design)
+                  minWidth: 44, minHeight: 44,
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 <MoreVertical size={16} />
