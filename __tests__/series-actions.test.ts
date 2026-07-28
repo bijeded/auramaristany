@@ -6,12 +6,16 @@ let insertSeriesError: { code: string; message: string } | null = null;
 let insertMapError: { code: string; message: string } | null = null;
 
 let previousMappings: MapRow[] = [];
+let seriesDays: { id: string }[] = [];
 
 const fakeSupabase = {
   from: (table: string) => ({
     select: (_cols: string) => ({
       eq: (_col: string, _val: string) =>
-        Promise.resolve({ data: previousMappings, error: null }),
+        Promise.resolve({
+          data: table === "program_days" ? seriesDays : previousMappings,
+          error: null,
+        }),
     }),
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
@@ -34,8 +38,18 @@ const fakeSupabase = {
       return { eq: (_col: string, _val: string) => Promise.resolve({ error: null }) };
     },
     delete: () => {
-      calls.push({ table, op: "delete" });
-      return { eq: (_col: string, _val: string) => Promise.resolve({ error: null }) };
+      const record = { table, op: "delete", payload: undefined as unknown };
+      calls.push(record);
+      return {
+        eq: (col: string, val: string) => {
+          record.payload = { filter: "eq", col, val };
+          return Promise.resolve({ error: null });
+        },
+        in: (col: string, vals: string[]) => {
+          record.payload = { filter: "in", col, vals };
+          return Promise.resolve({ error: null });
+        },
+      };
     },
   }),
 };
@@ -63,6 +77,7 @@ beforeEach(() => {
   insertSeriesError = null;
   insertMapError = null;
   previousMappings = [];
+  seriesDays = [];
 });
 
 // ─── createSeries ───────────────────────────────────────────────────
@@ -235,6 +250,46 @@ describe("updateSeries", () => {
 
 // ─── deleteSeries ───────────────────────────────────────────────────
 describe("deleteSeries", () => {
+  it("borra los días antes que la serie: program_days.series_id no tiene cascade", async () => {
+    // Sin esto Postgres devuelve 23503 y NINGUNA serie con días se puede
+    // borrar — que tras la migración 015 son todas.
+    seriesDays = [{ id: "d1" }, { id: "d2" }];
+
+    const result = await deleteSeries("series-1", "prog-1");
+
+    expect(result.error).toBeUndefined();
+    const order = calls.filter((c) => c.op === "delete").map((c) => c.table);
+    expect(order).toEqual([
+      "progress_logs",
+      "program_days",
+      "variant_series_map",
+      "program_series",
+    ]);
+  });
+
+  it("borra SÓLO los registros de esos días, nunca todos", async () => {
+    // Un delete sin filtrar aquí borraría el historial de entrenamiento de
+    // todas las clientes de la plataforma.
+    seriesDays = [{ id: "d1" }, { id: "d2" }];
+
+    await deleteSeries("series-1", "prog-1");
+
+    const logsDelete = calls.find((c) => c.table === "progress_logs" && c.op === "delete");
+    expect(logsDelete!.payload).toEqual({
+      filter: "in",
+      col: "program_day_id",
+      vals: ["d1", "d2"],
+    });
+  });
+
+  it("no toca progress_logs si la serie no tiene días", async () => {
+    seriesDays = [];
+
+    await deleteSeries("series-1", "prog-1");
+
+    expect(calls.find((c) => c.table === "progress_logs")).toBeUndefined();
+  });
+
   it("elimina el mapeo y luego la serie", async () => {
     const result = await deleteSeries("series-1", "prog-1");
 
