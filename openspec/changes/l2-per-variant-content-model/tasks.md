@@ -1,17 +1,18 @@
 ## 1. Preconditions
 
-- [ ] 1.1 **Confirm all program content is still demo content.** Query `program_series`/`program_days` and confirm nothing Aura authored for real is present. If real content exists, STOP — the migration below is destructive and must be re-scoped to a backfill.
-- [ ] 1.2 Confirm with Aura that she has not begun the real curriculum, and that she should not until this ships.
-- [ ] 1.3 Record the current row counts for `program_series`, `program_days`, `program_day_blocks`, `series_pillar_blocks`, `variant_series_map` so the reseed can be sanity-checked.
+- [x] 1.1 **Confirmed 2026-07-27** — exactly ONE series exists across all programs ("Actividad Física", published, 28 days), i.e. the original seed. Nothing Aura authored. **Confirm all program content is still demo content.** Query `program_series`/`program_days` and confirm nothing Aura authored for real is present. If real content exists, STOP — the migration below is destructive and must be re-scoped to a backfill.
+- [x] 1.2 Confirmed by the human 2026-07-27. Confirm with Aura that she has not begun the real curriculum, and that she should not until this ships.
+- [x] 1.3 Row counts recorded 2026-07-27 (pre-migration): `program_series` 1 · `program_days` 28 · `program_day_blocks` 244 · `variant_series_map` 5 · `program_variants` 10.
 
 ## 2. Migration 015 (destructive)
 
 - [ ] 2.1 Write `supabase/migrations/015_per_variant_curriculum.sql`: add `variant_series_map.ordinal` (int, not null) with `unique(program_variant_id, ordinal)`; drop `program_series_program_id_series_number_key`; drop `program_series.series_number`; add `program_variants.ladder_next_variant_id` (nullable FK to `program_variants`) with a self-reference check.
-- [ ] 2.2 In the same migration, delete existing demo content (`program_day_blocks`, `series_pillar_blocks`, `program_days`, `variant_series_map`, `program_series`) in FK-safe order.
+- [ ] 2.2 In the same migration, delete existing demo content in FK-safe order: `variant_series_map`, then `program_days` (its `series_id` FK has **no** cascade), then `program_series`. `program_day_blocks` cascades from `program_days`, and `program_series_pillars` → `program_pillar_blocks` cascade from `program_series` — verified in 001 and 004. (Note: there is no `series_pillar_blocks` table; the pillar tables are `program_series_pillars` and `program_pillar_blocks`.)
 - [ ] 2.3 Reseed a minimal demo curriculum under the new shape — at least two variants of one program, each with its own months numbered from 1, so the per-variant case is exercised in the running app.
 - [ ] 2.4 Seed `ladder_next_variant_id`: Strong & Fit Principiante → Intermedio → Avanzado → null; Extra Intermedio → Avanzado → null; all CuarentaMás variants null.
-- [ ] 2.5 Apply via the Supabase Management API — **SQL on ONE single line** (the pipeline eats newlines and `--` comments out the remainder). Seed inserts take `on conflict do nothing`.
-- [ ] 2.6 Update `lib/supabase/types.ts` by hand: `ordinal` on `variant_series_map`, `ladder_next_variant_id` on `program_variants`, remove `series_number` from `program_series`. Keep `Relationships: []`.
+- [ ] 2.5 **⚠ Applying this migration takes the live demo down.** The demo and production share one Supabase project (`bgvxaagfnzvzamtxqbkg`), so dropping `series_number` breaks every deployed reader — `/portal/today`, `/portal/semana`, pillars, the admin content editor — until this branch merges and Vercel deploys. Decided 2026-07-27: accept the outage for the duration of the branch (option C). Before applying: tell Aura the app will be down while the content model is rebuilt.
+- [ ] 2.6 Apply via the Supabase Management API — **SQL on ONE single line** (the pipeline eats newlines and `--` comments out the remainder). Seed inserts take `on conflict do nothing`.
+- [ ] 2.7 Update `lib/supabase/types.ts` by hand: `ordinal` on `variant_series_map`, `ladder_next_variant_id` on `program_variants`, remove `series_number` from `program_series`. Keep `Relationships: []`.
 
 ## 3. Curriculum resolution (pure, TDD)
 
