@@ -16,22 +16,27 @@ export function subscriptionGrantsAccess(status: string): boolean {
 // `completed` ahí le serviría entrenamientos nuevos a quien ya no paga, por
 // todos ellos de golpe, sin que nadie tuviera que decidirlo.
 //
-// Por eso el nivel graduado es un predicado APARTE y con otro nombre: quien
-// terminó su programa conserva lo suyo (su cuenta, sus pagos, su historial y
-// sus fotos) y pierde lo que estaba pagando. Los caminos que sirven contenido
-// siguen preguntando por `subscriptionGrantsAccess`; sólo la cáscara del portal
-// pregunta por esto.
+// Por eso el nivel graduado se define APARTE y con otro nombre: quien terminó
+// su programa conserva lo suyo (su cuenta, sus pagos, su historial y sus fotos)
+// y pierde lo que estaba pagando. Los caminos que sirven contenido siguen
+// preguntando por `subscriptionGrantsAccess`; la cáscara del portal se resuelve
+// con el conjunto de abajo, aplicado en la consulta.
 // ---------------------------------------------------------------------------
 
 /** Estados que conservan el portal sin dar contenido nuevo. */
 export const GRADUATED_STATES = ["completed"] as const;
 
-/** Quién entra al portal, pague o haya terminado. */
+/**
+ * Quién entra al portal, pague o haya terminado.
+ *
+ * Es un CONJUNTO y no un predicado a propósito (D18). Los tres lectores de la
+ * cáscara —middleware, el layout del portal y account-queries— lo empujan a SQL
+ * con `.in(...)`, así que el filtro ocurre en la base y toda fila que llega a
+ * memoria ya es de la cáscara. Un predicado sobre una fila ya filtrada
+ * contestaría `true` siempre: no protegería nada y, peor, se leería como el
+ * hermano de `subscriptionGrantsAccess` al que también hay que preguntar.
+ */
 export const PORTAL_SHELL_STATES = [...ACCESS_STATES, ...GRADUATED_STATES] as const;
-
-export function subscriptionGrantsPortalShell(status: string): boolean {
-  return (PORTAL_SHELL_STATES as readonly string[]).includes(status);
-}
 
 export function subscriptionIsGraduated(status: string): boolean {
   return (GRADUATED_STATES as readonly string[]).includes(status);

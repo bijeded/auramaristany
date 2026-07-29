@@ -12,16 +12,6 @@ export interface DayKey {
   day_of_week: DayOfWeek;
 }
 
-const DAY_ORDER: Record<DayOfWeek, number> = {
-  lunes: 1,
-  martes: 2,
-  miercoles: 3,
-  jueves: 4,
-  viernes: 5,
-  sabado: 6,
-  domingo: 7,
-};
-
 // JS getUTCDay() → DayOfWeek (0=domingo, 1=lunes, …). UTC para alinearse con
 // getCurrentDayKey, que computa la semana con Date.UTC (EDGE-3).
 const JS_DAY_TO_DOW: DayOfWeek[] = [
@@ -65,20 +55,6 @@ export function getCurrentDayKey(
   const week_number = Math.min(Math.floor(daysElapsed / 7) + 1, 4);
   const day_of_week = toDayOfWeek(today);
   return { week_number, day_of_week };
-}
-
-/**
- * Returns true when (dayWeekNumber, dayDayOfWeek) is on or before the current position.
- * Used to gate whether a specific day's content is visible to the client.
- */
-export function isDayAccessible(
-  dayWeekNumber: number,
-  dayDayOfWeek: DayOfWeek,
-  current: DayKey
-): boolean {
-  if (dayWeekNumber < current.week_number) return true;
-  if (dayWeekNumber > current.week_number) return false;
-  return DAY_ORDER[dayDayOfWeek] <= DAY_ORDER[current.day_of_week];
 }
 
 export interface UpcomingDayKey {

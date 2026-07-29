@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   subscriptionGrantsAccess,
-  subscriptionGrantsPortalShell,
   subscriptionIsGraduated,
   derivePortalTier,
   ACCESS_STATES,
@@ -35,18 +34,20 @@ describe("subscriptionGrantsAccess", () => {
   });
 });
 
-describe("subscriptionGrantsPortalShell", () => {
-  it.each(["active", "trialing", "past_due"])("quien paga sigue entrando: %s", (s) => {
-    expect(subscriptionGrantsPortalShell(s)).toBe(true);
-  });
-  it("quien terminó entra al portal (sus datos son suyos)", () => {
-    expect(subscriptionGrantsPortalShell("completed")).toBe(true);
-  });
-  it.each(["canceled", "unpaid", "desconocido"])("niega la cáscara a %s", (s) => {
-    expect(subscriptionGrantsPortalShell(s)).toBe(false);
-  });
-  it("PORTAL_SHELL_STATES = ACCESS_STATES + los graduados", () => {
+// D18 — `subscriptionGrantsPortalShell` se retiró: era redundante por
+// construcción. Los tres lectores de la cáscara empujan PORTAL_SHELL_STATES a
+// SQL con `.in(...)`, así que toda fila que llega a memoria YA es de la
+// cáscara y el predicado habría contestado `true` siempre. Lo que de verdad
+// guarda la frontera es el conjunto —y eso sí se comprueba aquí.
+describe("PORTAL_SHELL_STATES", () => {
+  it("es ACCESS_STATES + los graduados", () => {
     expect([...PORTAL_SHELL_STATES]).toEqual([...ACCESS_STATES, ...GRADUATED_STATES]);
+  });
+  it("incluye completed: quien terminó entra al portal, sus datos son suyos", () => {
+    expect([...PORTAL_SHELL_STATES]).toContain("completed");
+  });
+  it.each(["canceled", "unpaid"])("deja fuera a %s", (s) => {
+    expect([...PORTAL_SHELL_STATES]).not.toContain(s);
   });
 });
 

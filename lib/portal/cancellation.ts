@@ -13,6 +13,18 @@ const REASON_LABELS: Record<CancellationReason, string> = {
   pago_fallido: "Pago fallido",
 };
 
+/**
+ * Pinta un motivo de baja para que lo lea una persona.
+ *
+ * D18 — hoy NO tiene llamador, y se queda a propósito. El barrido de exports
+ * muertos retiró los otros dos que estaban igual; éste no está muerto, está
+ * temprano: lo único que enseñaría motivos a una persona es la vista de admin
+ * sobre `cancellation_surveys`, que es un cambio aparte y planeado. Borrarlo
+ * sólo significaría volver a escribirlo.
+ *
+ * Sin esta nota, la siguiente limpieza llega a la misma conclusión que ésta y
+ * lo borra.
+ */
 export function cancellationReasonLabel(reason: CancellationReason): string {
   return REASON_LABELS[reason];
 }
