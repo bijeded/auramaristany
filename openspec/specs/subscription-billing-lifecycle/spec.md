@@ -1,7 +1,9 @@
 # subscription-billing-lifecycle Specification
 
 ## Purpose
-TBD - created by archiving change l2-rolling-billing-extra. Update Purpose after archive.
+
+Cuándo empieza y cuándo deja de cobrar una suscripción, y cómo termina. Distingue los programas de plazo fijo —que cobran un número definido de meses y luego se acaban— de los rolling, que cobran hasta que la cliente cancela. Cubre también la diferencia entre terminar un programa y abandonarlo, que no son lo mismo ni para el cobro ni para lo que la cliente conserva después.
+
 ## Requirements
 ### Requirement: A fixed-term subscription stops billing at its defined end
 
