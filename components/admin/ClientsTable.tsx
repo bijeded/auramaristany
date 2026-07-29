@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
   filterClients, clientsToCSV, canDeleteClient,
+  nextChargeCell,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
 import { paginate } from "@/lib/admin/pagination";
-import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
 const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Completadas", "Sin actividad"];
@@ -127,7 +127,19 @@ export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string
                       </td>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--gris-texto)" }}>{dayLabel(c.enrollment_date)}</td>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--gris-texto)" }}>
-                        {c.current_period_end ? `${dayLabel(c.current_period_end.slice(0, 10))} · ${formatMXN(c.price_mxn)}` : "—"}
+                        {(() => {
+                          const cell = nextChargeCell(c);
+                          return (
+                            <>
+                              {cell.value}
+                              {cell.label !== "Próximo cobro" && (
+                                <div className="font-body" style={{ fontSize: 11.5, color: "var(--gris-suave)" }}>
+                                  {cell.label.toLowerCase()}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: "12px 20px" }}>
                         <span className="font-body" style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: badge.bg, color: badge.color }}>{badge.label}</span>
