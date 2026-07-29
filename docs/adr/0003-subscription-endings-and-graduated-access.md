@@ -36,12 +36,19 @@ The deletion handler is therefore the arbiter of *which* ending occurred: carryi
 `completed_at` means she finished, anything else means she quit, and `completed` is terminal —
 neither the deletion nor the update handler may downgrade it.
 
-**2 · Graduated access is a second, separately named predicate.** `subscriptionGrantsAccess`
-keeps its exact meaning — may this client receive training content — and
-`subscriptionGrantsPortalShell` answers may she reach the portal at all. Content paths keep
-calling the strict one. A `completed` client keeps her account, payments, progress history,
-photos and messages, plus a CTA to continue with Extra; she gets no training content. The
-reachable set is an allow-list, so a training route added later is closed to her by default.
+**2 · Graduated access is a second, separately named definition.** `subscriptionGrantsAccess`
+keeps its exact meaning — may this client receive training content — and shell access is decided
+by `PORTAL_SHELL_STATES` (applied in the query, where the three shell readers select rows) plus
+`derivePortalTier`, which turns a client's statuses into her tier. Content paths keep calling the
+strict one. A `completed` client keeps her account, payments, progress history, photos and
+messages, plus a CTA to continue with Extra; she gets no training content. The reachable set is
+an allow-list, so a training route added later is closed to her by default.
+
+> Amended by **D18** (2026-07-29). This originally named a second *predicate*,
+> `subscriptionGrantsPortalShell`. That function was retired as redundant by construction: the
+> shell boundary is applied in SQL, so every row reaching memory is already a shell row and the
+> predicate answered `true` unconditionally. The separation this decision protects — never
+> widening `ACCESS_STATES` to include `completed` — is unchanged and is now pinned by a test.
 
 **3 · Eligibility is enforced by the funnel, not by the application.** The
 `program_variant_prerequisites` rows for Extra are deleted and the checkout gate removed.

@@ -16,11 +16,11 @@ export function subscriptionGrantsAccess(status: string): boolean {
 // `completed` ahí le serviría entrenamientos nuevos a quien ya no paga, por
 // todos ellos de golpe, sin que nadie tuviera que decidirlo.
 //
-// Por eso el nivel graduado es un predicado APARTE y con otro nombre: quien
-// terminó su programa conserva lo suyo (su cuenta, sus pagos, su historial y
-// sus fotos) y pierde lo que estaba pagando. Los caminos que sirven contenido
-// siguen preguntando por `subscriptionGrantsAccess`; sólo la cáscara del portal
-// pregunta por esto.
+// Por eso el nivel graduado se define APARTE y con otro nombre: quien terminó
+// su programa conserva lo suyo (su cuenta, sus pagos, su historial y sus fotos)
+// y pierde lo que estaba pagando. Los caminos que sirven contenido siguen
+// preguntando por `subscriptionGrantsAccess`; la cáscara del portal se resuelve
+// con el conjunto de abajo, aplicado en la consulta.
 // ---------------------------------------------------------------------------
 
 /** Estados que conservan el portal sin dar contenido nuevo. */

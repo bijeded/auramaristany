@@ -12,7 +12,6 @@ export interface DayKey {
   day_of_week: DayOfWeek;
 }
 
-
 // JS getUTCDay() → DayOfWeek (0=domingo, 1=lunes, …). UTC para alinearse con
 // getCurrentDayKey, que computa la semana con Date.UTC (EDGE-3).
 const JS_DAY_TO_DOW: DayOfWeek[] = [
