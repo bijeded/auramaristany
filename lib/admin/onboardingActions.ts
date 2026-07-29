@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { validateQuestion, type QuestionInput } from "./onboarding-helpers";
+import { z } from "zod";
+import { validateQuestion, reindexOrder, type QuestionInput } from "./onboarding-helpers";
 import { requireAdmin } from "./auth";
-import { logAndGeneric } from "./errors";
+import { logAndGeneric, ADMIN_GENERIC_ERROR } from "./errors";
+
+// Tope alineado con el de la función de la base (migración 018): más allá de
+// ahí no hay un cuestionario, hay un abuso del endpoint.
+const REORDER_IDS = z.array(z.string().uuid()).max(200);
 
 function revalidate() {
   revalidatePath("/admin/onboarding-settings");
@@ -55,13 +60,45 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase
-      .from("onboarding_questions")
-      .update({ sort_order: i })
-      .eq("id", orderedIds[i]);
-    if (error) return { error: logAndGeneric("reorderQuestions", error) };
-  }
+
+  // Un server action es un endpoint: los ids llegan del navegador y se validan
+  // aquí, no se confían por venir del propio componente. El tope acompaña al de
+  // la función de la base — el cuestionario no se acerca a 200 preguntas.
+  const parsed = REORDER_IDS.safeParse(orderedIds);
+  if (!parsed.success) return { error: ADMIN_GENERIC_ERROR };
+  if (parsed.data.length === 0) return {};
+
+  // Las posiciones las calcula reindexOrder —su único hogar, con tests—; la
+  // función de la base sólo las aplica, y las aplica de una sola vez. El bucle
+  // de `update` que había aquí repetía esa regla sin tests y, al salir al
+  // primer error, podía dejar el cuestionario renumerado a medias.
+  //
+  // keep: declarar la función en `Database["public"]["Functions"]` NO es opción.
+  // Con Functions vacío supabase-js resuelve los embeds de forma laxa; en cuanto
+  // se puebla, pasa a resolverlos contra `Relationships`, que en este proyecto
+  // están a `[]` a propósito (types.ts se mantiene a mano) — y entonces revientan
+  // TODOS los selects con join del repo, no sólo éste. Se tipa el rpc aquí.
+  // El cast va sobre el CLIENTE, no sobre el método. Sacar `supabase.rpc` a una
+  // variable lo desliga de su receptor, y dentro de supabase-js `rpc` lee
+  // `this.rest` → "Cannot read properties of undefined". Compila, pasa los
+  // tests (un fake con arrow function no usa `this`) y revienta en producción.
+  const client = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: { payload: { id: string; sort_order: number }[] }
+    ) => Promise<{ data: number | null; error: { message: string } | null }>;
+  };
+
+  // La función comprueba ella misma que tocó una fila por par y levanta si no,
+  // así que la llamada entera se deshace. Comprobarlo aquí, con la respuesta ya
+  // en la mano, llegaría tarde: el update habría hecho commit y estaríamos
+  // devolviendo "error" sobre una base sí modificada — el orden a medias que
+  // este cambio viene a quitar.
+  const { error } = await client.rpc("reorder_onboarding_questions", {
+    payload: reindexOrder(parsed.data),
+  });
+  if (error) return { error: logAndGeneric("reorderQuestions", error) };
+
   revalidate();
   return {};
 }
