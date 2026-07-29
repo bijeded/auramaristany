@@ -7,6 +7,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const calls: { op: string; table?: string; fn?: string; args?: unknown }[] = [];
 let rpcError: { code: string; message: string } | null = null;
 let adminOk = true;
+// Cuántas filas dice la función que tocó. `null` = "las que le pidieron", que
+// es el caso sano; los tests que prueban el desajuste lo fijan a mano.
+let rpcRowsUpdated: number | null = null;
 
 const fakeSupabase = {
   from: (table: string) => ({
@@ -19,7 +22,11 @@ const fakeSupabase = {
   }),
   rpc: (fn: string, args: unknown) => {
     calls.push({ op: "rpc", fn, args });
-    return Promise.resolve({ error: rpcError });
+    const sent = (args as { payload: unknown[] }).payload.length;
+    return Promise.resolve({
+      data: rpcRowsUpdated ?? sent,
+      error: rpcError,
+    });
   },
 };
 
@@ -38,6 +45,7 @@ beforeEach(() => {
   calls.length = 0;
   rpcError = null;
   adminOk = true;
+  rpcRowsUpdated = null;
 });
 
 describe("reorderQuestions", () => {
@@ -92,6 +100,31 @@ describe("reorderQuestions", () => {
     expect(r.error).toBeTruthy();
     expect(r.error).not.toContain("42883");
     expect(r.error).not.toContain("does not exist");
+  });
+
+  // Sin este chequeo la acción devolvía éxito aunque la escritura no hubiera
+  // tocado nada: la admin veía su orden nuevo pintado y al recargar volvía el
+  // viejo. Pasa si una pregunta se borró en otra pestaña, o si RLS la filtra.
+  it("si no se actualizaron todas las preguntas, falla en vez de mentir", async () => {
+    // Arrange — se piden 3, la base sólo tocó 2
+    rpcRowsUpdated = 2;
+
+    // Act
+    const r = await reorderQuestions(["q-a", "q-b", "q-c"]);
+
+    // Assert
+    expect(r.error).toBeTruthy();
+  });
+
+  it("cero filas tocadas también falla", async () => {
+    // Arrange — es lo que ve alguien a quien RLS no deja escribir
+    rpcRowsUpdated = 0;
+
+    // Act
+    const r = await reorderQuestions(["q-a"]);
+
+    // Assert
+    expect(r.error).toBeTruthy();
   });
 
   it("quien no es admin no escribe nada", async () => {
