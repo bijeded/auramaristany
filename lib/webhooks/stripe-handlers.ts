@@ -199,7 +199,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { data: rawSub, error } = await supabase
     .from("subscriptions")
     .select(
-      "id, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variant_id, program_variants!program_variant_id(programs(billing_model, duration_months))"
+      "id, months_elapsed, completed_at, content_variant_id, content_ordinal, content_loops, program_variant_id, program_variants!program_variant_id(programs(billing_model, duration_months))"
     )
     .eq("stripe_subscription_id", subscriptionId)
     .single();
@@ -213,6 +213,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   type SubWithVariant = {
     id: string;
     months_elapsed: number;
+    completed_at?: string | null;
     content_variant_id: string | null;
     content_ordinal: number;
     content_loops: number;
@@ -239,7 +240,12 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // porque puesta después un fallo aquí sería definitivo: el reintento
   // encontraría la factura ya registrada, volvería sin hacer nada, y la
   // cancelación no se programaría nunca.
-  if (shouldComplete) {
+  // Ya programada: no se vuelve a llamar. Un reenvío manual de la última
+  // factura después de que el periodo acabara pegaría contra una suscripción ya
+  // cancelada, Stripe devolvería 400, el handler relanzaría y ese evento no
+  // podría volver a responder 200 nunca.
+  const alreadyScheduled = !!(sub as SubWithVariant & { completed_at?: string | null }).completed_at;
+  if (shouldComplete && !alreadyScheduled) {
     try {
       await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
     } catch (err) {
@@ -518,7 +524,15 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
             // not in our SubscriptionStatus union; mapping via cast as the DB stores them as-is.
             status: subscription.status as import("@/lib/supabase/types").SubscriptionStatus,
           }),
-      cancel_at_period_end: subscription.cancel_at_period_end,
+      // La bandera NO se baja mientras la fila lleve `completed_at`: es una de
+      // las dos señales de las que depende el veredicto del borrado, y
+      // espejarla a ciegas desde Stripe (un evento que la reporte en false, o
+      // una edición manual en el dashboard) volvería a partir en dos el estado
+      // que la derivación única existe para juntar — y grabaría que se fue
+      // quien terminó.
+      ...(local?.completed_at && !subscription.cancel_at_period_end
+        ? {}
+        : { cancel_at_period_end: subscription.cancel_at_period_end }),
       current_period_start,
       current_period_end,
     })

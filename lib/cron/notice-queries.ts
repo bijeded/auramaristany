@@ -82,7 +82,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
   const { data, error } = await supabase
     .from("subscriptions")
     .select(
-      `profile_id, status, cancel_at_period_end, current_period_start, enrollment_date,
+      `profile_id, status, cancel_at_period_end, completed_at, current_period_start, enrollment_date,
        content_variant_id, content_ordinal, program_variant_id,
        profiles!inner ( email, full_name, progress_logs ( log_date ), bookings ( scheduled_at, status ) )`
     )
@@ -102,6 +102,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
     profile_id: string;
     status: string;
     cancel_at_period_end: boolean | null;
+    completed_at: string | null;
     current_period_start: string | null;
     enrollment_date: string;
     content_variant_id: string | null;
@@ -158,6 +159,7 @@ export async function getNoticeCandidates(now: Date): Promise<NoticeCandidate[]>
       full_name: r.profiles!.full_name,
       status: r.status as NoticeCandidate["status"],
       cancel_at_period_end: r.cancel_at_period_end === true,
+    completed_at: r.completed_at,
       current_period_start: r.current_period_start!,
       enrollment_date: r.enrollment_date,
       series_id: seriesId,

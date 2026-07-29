@@ -56,6 +56,10 @@ export function SubscriptionCard({
   const isCompleted = state.kind === "completed";
   // Programada pero aún corriendo: sigue entrenando y ya no se le cobrará.
   const isCompleting = state.kind === "completing";
+  // La baja voluntaria en su periodo de gracia tampoco vuelve a cobrar: la
+  // tarjeta anunciaba "Próximo cobro · $999" justo encima del "Tu plan termina
+  // el {fecha}" que pone A9 debajo.
+  const isEnding = state.kind === "grace";
   const progress = accountProgressLabel(subscription);
   const repeat = repeatMarker(subscription.content_loops, subscription.content_ordinal);
 
@@ -84,8 +88,8 @@ export function SubscriptionCard({
           <Row label="Tu acceso terminó el">
             {longDateLabel(subscription.current_period_end)}
           </Row>
-        ) : isCompleting ? (
-          <Row label="Tu último mes termina el">
+        ) : isCompleting || isEnding ? (
+          <Row label={isEnding ? "Tu acceso termina el" : "Tu último mes termina el"}>
             {longDateLabel(subscription.current_period_end)}
           </Row>
         ) : (

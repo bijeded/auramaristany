@@ -57,10 +57,13 @@ async function getOwnedCancelableSub(
   // que de verdad está terminando, y así una CuarentaMás en su último mes no
   // le secuestra la acción a una Extra que sí paga.
   const rows = (data as OwnedSub[] | null) ?? [];
+  // Se PREFIERE la que no está terminando, pero si no hay otra se devuelve la
+  // que sí: así las guardas de abajo llegan a ejecutarse y la cliente lee por
+  // qué no puede, en vez del genérico "no tienes ninguna suscripción".
   const usable = rows.find(
     (r) => !isCompletionScheduled({ completedAt: r.completed_at, cancelAtPeriodEnd: r.cancel_at_period_end })
   );
-  return usable ?? null;
+  return usable ?? rows[0] ?? null;
 }
 
 export async function cancelSubscription(input: { reason?: string; detail?: string }): Promise<ActionResult> {

@@ -696,23 +696,6 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
     expect(updateMock.mock.calls[0][0].cancel_at_period_end).toBe(true);
   });
 
-  it("una marca vieja de L2b (sin cancelación) no cuenta como final programado", async () => {
-    subLookupRow.mockReturnValue({
-      data: {
-        id: "db-sub-1", profile_id: "p-1", status: "active",
-        completed_at: "2026-01-01T00:00:00Z", cancel_at_period_end: false,
-      },
-      error: null,
-    });
-
-    await handleSubscriptionDeleted({
-      id: "sub_stripe_1",
-      cancellation_details: { reason: "cancellation_requested" },
-    } as unknown as Stripe.Subscription);
-
-    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ status: "canceled" }));
-  });
-
   it("y sella completed_at, sin tocar todavía el estado", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectEqSingleMock.mockReturnValue(fixedTermSub(5) as any);
@@ -884,6 +867,23 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
     expect(insertMock).not.toHaveBeenCalled();
   });
 
+  it("una marca vieja de L2b (sin cancelación) no cuenta como final programado", async () => {
+    subLookupRow.mockReturnValue({
+      data: {
+        id: "db-sub-1", profile_id: "p-1", status: "active",
+        completed_at: "2026-01-01T00:00:00Z", cancel_at_period_end: false,
+      },
+      error: null,
+    });
+
+    await handleSubscriptionDeleted({
+      id: "sub_stripe_1",
+      cancellation_details: { reason: "cancellation_requested" },
+    } as unknown as Stripe.Subscription);
+
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ status: "canceled" }));
+  });
+
   it("terminar no escribe encuesta de baja involuntaria", async () => {
     subLookupRow.mockReturnValue({
       data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
@@ -980,5 +980,55 @@ describe("handleSubscriptionUpdated — no degrada una terminada", () => {
     } as unknown as Stripe.Subscription);
 
     expect(updateMock.mock.calls[0][0].status).toBe("past_due");
+  });
+});
+
+describe("handleSubscriptionUpdated — no parte en dos el estado del final", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateEqMock.mockImplementation(() => ({
+      error: null,
+      eq: () => updateEqChain,
+      select: () => ({ maybeSingle: deletedRowMaybeSingle }),
+    }));
+  });
+
+  // El veredicto del borrado depende de `cancel_at_period_end`. Espejarla a
+  // ciegas —un evento que la reporte en false, una edición en el dashboard—
+  // volvería a partir el estado que la derivación única junta, y grabaría que
+  // se fue quien terminó.
+  it("no baja cancel_at_period_end sobre una fila que está terminando", async () => {
+    subLookupRow.mockReturnValue({
+      data: {
+        id: "db-sub-1", profile_id: "p-1", status: "active",
+        completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true,
+      },
+      error: null,
+    });
+
+    await handleSubscriptionUpdated({
+      id: "sub_123",
+      status: "active",
+      cancel_at_period_end: false,
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+    } as unknown as Stripe.Subscription);
+
+    expect(updateMock.mock.calls[0][0].cancel_at_period_end).toBeUndefined();
+  });
+
+  it("una baja voluntaria normal sí la espeja en los dos sentidos", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null, cancel_at_period_end: true },
+      error: null,
+    });
+
+    await handleSubscriptionUpdated({
+      id: "sub_123",
+      status: "active",
+      cancel_at_period_end: false,
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+    } as unknown as Stripe.Subscription);
+
+    expect(updateMock.mock.calls[0][0].cancel_at_period_end).toBe(false);
   });
 });
