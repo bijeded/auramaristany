@@ -58,19 +58,36 @@ export function OnboardingBuilder({ questions }: { questions: OnboardingQuestion
   const [items, setItems] = useState<OnboardingQuestion[]>(questions);
   const [editing, setEditing] = useState<OnboardingQuestion | null>(null);
   const [creating, setCreating] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
 
-  // Re-sincroniza cuando el server revalida tras una acción.
-  useEffect(() => setItems(questions), [questions]);
+  // Re-sincroniza cuando el server revalida tras una acción. Si llega lista
+  // nueva, el aviso de reorden fallido ya no describe lo que se ve: se quita,
+  // o se quedaría colgado mientras la admin edita o activa otras preguntas.
+  useEffect(() => {
+    setItems(questions);
+    setReorderError(null);
+  }, [questions]);
 
   async function onDragEnd(e: { active: { id: string | number }; over: { id: string | number } | null }) {
     if (!e.over || e.active.id === e.over.id) return;
     const oldI = items.findIndex((q) => q.id === e.active.id);
     const newI = items.findIndex((q) => q.id === e.over!.id);
+    const previous = items;
     const next = [...items];
     const [moved] = next.splice(oldI, 1);
     next.splice(newI, 0, moved);
     setItems(next); // optimista
-    await reorderQuestions(next.map((q) => q.id));
+    setReorderError(null);
+
+    const { error } = await reorderQuestions(next.map((q) => q.id));
+    if (error) {
+      // El orden no se guardó: la escritura se deshace entera, así que la lista
+      // buena es la de antes. Dejar la optimista pintada le enseñaría a la admin
+      // un orden que no existe y que se desharía al recargar, sin decirle nada.
+      setItems(previous);
+      setReorderError(error);
+      return;
+    }
     router.refresh();
   }
 
@@ -99,6 +116,27 @@ export function OnboardingBuilder({ questions }: { questions: OnboardingQuestion
       <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13.5, marginBottom: 22 }}>
         Arrastra para reordenar. Las preguntas inactivas no aparecen en el cuestionario del cliente.
       </p>
+
+      {reorderError ? (
+        <div
+          role="alert"
+          className="font-body"
+          style={{
+            marginBottom: 12,
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: "var(--error-tint)",
+            borderLeft: "3px solid var(--error)",
+            // El texto NO usa var(--error): #e05c5c sobre el tint queda en ~3.2:1,
+            // por debajo del 4.5:1 que pide un texto de 14px. El token se queda
+            // en el fondo y el borde, que es donde sí cumple.
+            color: "#8a2a20",
+            fontSize: 14,
+          }}
+        >
+          El orden se quedó como estaba. {reorderError}
+        </div>
+      ) : null}
 
       {items.length === 0 ? (
         <div style={{ textAlign: "center", padding: 48, border: "1px dashed var(--gris-linea)", borderRadius: 12 }}>
