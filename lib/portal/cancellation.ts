@@ -67,7 +67,12 @@ export function deriveCancellationState(input: {
   if (input.status === "completed") {
     return { kind: "completed", endsAt: input.currentPeriodEnd ?? null };
   }
-  if (input.completedAt) {
+  // Se exigen las DOS señales. `completed_at` por sí solo no basta: es una
+  // columna que ya existía y que L2b escribía sin cancelar nada en Stripe, así
+  // que una fila vieja lo trae puesto sin que haya ninguna cancelación
+  // programada. Prometerle "no habrá más cobros" a partir de esa marca sería
+  // mentirle justo sobre el cobro.
+  if (input.completedAt && input.cancelAtPeriodEnd) {
     return { kind: "completing", endsAt: input.currentPeriodEnd ?? null };
   }
 

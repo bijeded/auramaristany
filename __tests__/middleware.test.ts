@@ -279,8 +279,7 @@ describe("getRedirectPath — acceso graduado (status completed)", () => {
   });
 });
 
-import { graduatedMayReachRoute } from "@/lib/middleware-utils";
-import { graduatedNavItems } from "@/components/portal/PortalNav";
+import { graduatedMayReachRoute, graduatedNavItems } from "@/lib/middleware-utils";
 
 describe("graduatedMayReachRoute", () => {
   it("deja pasar las rutas suyas y sus subrutas", () => {
@@ -301,6 +300,8 @@ describe("graduatedMayReachRoute", () => {
     expect(graduatedMayReachRoute("/portal/settings/../today")).toBe(false);
     expect(graduatedMayReachRoute("/portal/settings/../../admin/clients")).toBe(false);
     expect(graduatedMayReachRoute("/portal/%74oday")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/settings/..%2ftoday")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/%ZZ")).toBe(false);
     expect(graduatedMayReachRoute("/portal/history/%2e%2e/today")).toBe(false);
   });
 
@@ -331,5 +332,35 @@ describe("graduatedNavItems", () => {
 
   it("una pestaña de entrenamiento nueva nace fuera de su barra", () => {
     expect(graduatedNavItems([{ href: "/portal/pilares" }, { href: "/portal/nueva" }])).toEqual([]);
+  });
+});
+
+describe("getRedirectPath — saneado de la ruta", () => {
+  // Una puerta que se abre escribiendo dos barras no debería existir: sin
+  // colapsarlas, `//portal/today` no empieza por "/portal" y se saltaba TODAS
+  // las reglas, no sólo la de la graduada.
+  it("las barras repetidas no saltan las reglas", () => {
+    expect(
+      getRedirectPath({
+        pathname: "//portal/today",
+        hasSession: true,
+        role: "client",
+        onboardingCompleted: true,
+        hasActiveSubscription: false,
+        hasGraduatedSubscription: true,
+      })
+    ).toBe("/portal/settings");
+  });
+
+  it("tampoco para quien no tiene ninguna suscripción", () => {
+    expect(
+      getRedirectPath({
+        pathname: "//portal/today",
+        hasSession: true,
+        role: "client",
+        onboardingCompleted: true,
+        hasActiveSubscription: false,
+      })
+    ).toBe("/portal/sin-suscripcion");
   });
 });

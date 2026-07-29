@@ -68,6 +68,14 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
   const sub = await getOwnedCancelableSub(supabase, user.id);
   if (!sub) return { ok: false, error: "No tienes una suscripción activa que cancelar." };
 
+  // Simétrico al de `reactivateSubscription`: una suscripción que ya está
+  // terminando no se cancela. La cancelación en Stripe ya está programada, así
+  // que lo único que añadiría es una fila de encuesta "voluntary" para una
+  // cliente que TERMINÓ en vez de irse — dato de baja falseado.
+  if (sub.completed_at) {
+    return { ok: false, error: "Tu programa ya está por terminar; no hay nada que cancelar." };
+  }
+
   // Cancel in Stripe first — it is the primary action and the source of truth.
   try {
     await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: true });

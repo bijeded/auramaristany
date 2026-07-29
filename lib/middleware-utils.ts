@@ -11,7 +11,7 @@ interface RedirectParams {
 }
 
 /**
- * Lo que alcanza una clienta graduada. Es una lista de PERMITIDOS, no de
+ * Lo que alcanza una cliente graduada. Es una lista de PERMITIDOS, no de
  * prohibidos: así una ruta de contenido futura nace cerrada para ella en vez de
  * quedar abierta hasta que alguien se acuerde de añadirla a una lista negra.
  *
@@ -41,17 +41,44 @@ const GRADUATED_ALLOWED_ROUTES: readonly string[] = [
  * deja pasar salgan de la misma lista.
  */
 export function graduatedMayReachRoute(pathname: string): boolean {
-  if (pathname.includes("%")) return false;
-  const segments = pathname.split("/");
-  if (segments.some((s) => s === "." || s === "..")) return false;
+  // Se decodifica UNA vez y luego se buscan los segmentos de punto, en vez de
+  // rechazar todo lo que lleve un `%`: una ruta permitida puede llevar un id
+  // escapado legítimo. Un escape malformado no se interpreta: se rechaza.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    return false;
+  }
+  const normalized = decoded.replace(/\/{2,}/g, "/");
+  if (normalized.split("/").some((s) => s === "." || s === "..")) return false;
 
+  // Se compara la ruta YA normalizada, no la de entrada: comprobar una y dejar
+  // pasar la otra es precisamente el hueco que abre este tipo de saneado.
   return GRADUATED_ALLOWED_ROUTES.some(
-    (allowed) => pathname === allowed || pathname.startsWith(`${allowed}/`)
+    (allowed) => normalized === allowed || normalized.startsWith(`${allowed}/`)
   );
 }
 
+/**
+ * Las pestañas que le quedan a una cliente graduada.
+ *
+ * Filtra por `href` contra la MISMA lista que aplica el middleware, no por
+ * posición: con índices, reordenar la barra —la edición que más recibe— le
+ * devolvería "Hoy" en silencio. Vive aquí, junto a la lista, para que lo que se
+ * pinta y lo que se deja pasar no puedan separarse.
+ */
+export function graduatedNavItems<T extends { href: string }>(items: readonly T[]): T[] {
+  return items.filter((item) => graduatedMayReachRoute(item.href));
+}
+
 export function getRedirectPath(params: RedirectParams): string | null {
-  const { pathname, hasSession, role, onboardingCompleted, hasActiveSubscription } = params;
+  const { hasSession, role, onboardingCompleted, hasActiveSubscription } = params;
+  // `//portal/today` no empieza por `/portal`, así que sin colapsar las barras
+  // se saltaba TODAS las reglas de abajo —no sólo la de la graduada—. No era
+  // explotable (las consultas de contenido filtran por su cuenta), pero una
+  // puerta que se abre escribiendo dos barras no debería existir.
+  const pathname = params.pathname.replace(/\/{2,}/g, "/");
   // Sólo cuenta cuando no hay ninguna que pague: si compró Extra después de
   // terminar CuarentaMás, es clienta de pleno derecho otra vez.
   const isGraduated = !hasActiveSubscription && params.hasGraduatedSubscription === true;

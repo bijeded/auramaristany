@@ -28,11 +28,17 @@ describe("extraCheckoutSlugForLevel", () => {
 });
 
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // El CTA cuelga de dos slugs literales. Un rename en el seed los rompería con
 // TODAS las pruebas en verde, porque aquí no hay nada que consulte el catálogo.
 describe("los slugs del CTA existen en el catálogo sembrado", () => {
-  const seed = readFileSync("supabase/migrations/002_seed_programs_variants.sql", "utf8");
+  // Vitest corre con la raíz del proyecto como cwd (vitest.config.ts), que es
+  // lo que ancla esta ruta.
+  const seed = readFileSync(
+    resolve(process.cwd(), "supabase/migrations/002_seed_programs_variants.sql"),
+    "utf8"
+  );
 
   it.each(["cuarenta-mas-extra-intermedio", "cuarenta-mas-extra-avanzado"])(
     "%s está sembrado",
