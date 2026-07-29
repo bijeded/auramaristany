@@ -250,6 +250,20 @@ describe("canDeleteClient", () => {
   it("sigue bloqueando si además hay una que paga", () => {
     expect(canDeleteClient([{ status: "completed" }, { status: "active" }]).ok).toBe(false);
   });
+
+  // El mismo defecto que L2c arregló para `completed`, con el valor que el tipo
+  // estrecho hacía invisible: `incomplete_expired` murió sin cobrar nunca y es
+  // final. Contándola viva, el guard pedía "cancélala en Stripe" cuando no hay
+  // nada que cancelar, y la cliente quedaba imposible de borrar para siempre.
+  it("permite borrar si la suscripción expiró sin llegar a cobrar", () => {
+    expect(canDeleteClient([{ status: "incomplete_expired" }])).toEqual({ ok: true });
+  });
+
+  // Las otras dos que la base permite NO son terminales: pueden volver a cobrar,
+  // así que siguen bloqueando el borrado y hay algo real que cancelar en Stripe.
+  it.each(["paused", "incomplete"] as const)("%s sigue bloqueando el borrado", (status) => {
+    expect(canDeleteClient([{ status }]).ok).toBe(false);
+  });
 });
 
 import { clientsToCSV, statusBadge } from "@/lib/admin/clients-helpers";

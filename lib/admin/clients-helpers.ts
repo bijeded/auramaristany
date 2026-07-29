@@ -58,8 +58,10 @@ export function nextChargeCell(sub: {
  * sin salida que tiraba el listado completo con un `paused`.
  *
  * Ahora es un alias: la lista vive en un solo sitio y no puede volver a
- * separarse de la base sin que `tsc` lo note. No cambia ningún comportamiento en
- * ejecución —esas filas ya llegaban aquí—, sólo deja de mentir el tipo.
+ * separarse de la base sin que `tsc` lo note. Ensanchar el tipo no cambió por sí
+ * solo ningún comportamiento —esas filas ya llegaban aquí—, pero al hacerlas
+ * expresables destapó una que sí había que corregir: ver `incomplete_expired` en
+ * `canDeleteClient`.
  */
 export type SubStatus = SubscriptionStatus;
 
@@ -229,7 +231,15 @@ export function canDeleteClient(
   // L2c — `completed` es terminal y su cobro ya está cancelado a fin de
   // periodo, así que no es una suscripción viva: contarla como tal dejaría a la
   // cliente imposible de borrar para siempre, porque nunca pasará a `canceled`.
-  const DEAD: readonly SubStatus[] = ["canceled", "completed"];
+  //
+  // `incomplete_expired` es el MISMO defecto con otro valor, y sólo se pudo ver
+  // al ensanchar el tipo: es una suscripción que murió sin cobrar nunca —Stripe
+  // la marca así cuando el primer pago no se completa en 23 horas— y es final,
+  // no pasa a `canceled`. Contándola como viva, el guard le pedía a Aura
+  // "cancélala en Stripe" cuando no hay nada que cancelar, y esa cliente no se
+  // podía borrar jamás. `paused` e `incomplete` sí siguen vivas: las dos pueden
+  // volver a cobrar.
+  const DEAD: readonly SubStatus[] = ["canceled", "completed", "incomplete_expired"];
   const live = subs.some((s) => !DEAD.includes(s.status));
   if (live) {
     return { ok: false, reason: "Tiene una suscripción activa. Cancélala en Stripe antes de eliminar." };
@@ -255,19 +265,23 @@ export function canDeleteClient(
  * se acuerde de esta pantalla, y entonces un status nuevo debe verse raro, no
  * borrar la lista de clientes de Aura.
  */
+// Ámbar = "todavía puede cobrar". Se nombra porque ahora lo usan tres entradas
+// y un hex repetido a mano es un hex que acaba divergiendo.
+const AMBAR = { bg: "rgba(240,198,116,.18)", color: "#9a7b1f" };
+
 const STATUS_PRESENTATION: Record<string, { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
   past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
-  unpaid: { label: "Impaga", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  unpaid: { label: "Impaga", ...AMBAR },
   canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
   // L2c — terminó el programa completo. Es un logro, no una baja: verde como
   // la activa, para que Aura no la lea de un vistazo como una cliente perdida.
   completed: { label: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   // Los tres que la base ya aceptaba y aquí no existían. Ámbar los dos que
   // pueden volver a cobrar; gris el que murió sin llegar a cobrar nunca.
-  paused: { label: "Pausada", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
-  incomplete: { label: "Incompleta", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  paused: { label: "Pausada", ...AMBAR },
+  incomplete: { label: "Incompleta", ...AMBAR },
   incomplete_expired: { label: "Expirada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
 };
 
