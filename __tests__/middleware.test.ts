@@ -278,3 +278,58 @@ describe("getRedirectPath — acceso graduado (status completed)", () => {
     ).toBe("/portal/sin-suscripcion");
   });
 });
+
+import { graduatedMayReachRoute } from "@/lib/middleware-utils";
+import { graduatedNavItems } from "@/components/portal/PortalNav";
+
+describe("graduatedMayReachRoute", () => {
+  it("deja pasar las rutas suyas y sus subrutas", () => {
+    expect(graduatedMayReachRoute("/portal/settings")).toBe(true);
+    expect(graduatedMayReachRoute("/portal/history/abc-123")).toBe(true);
+    expect(graduatedMayReachRoute("/portal/messages/42")).toBe(true);
+  });
+
+  it("cierra el contenido de entrenamiento", () => {
+    expect(graduatedMayReachRoute("/portal/today")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/pilares/abc")).toBe(false);
+  });
+
+  // Un prefijo permitido no puede convertirse en la llave de todo lo demás.
+  // Hoy Next no resuelve los segmentos de punto, así que esto no es explotable;
+  // la lista de permitidos no debería depender de que siga siendo así.
+  it("rechaza segmentos de punto y rutas escapadas en vez de confiar en el router", () => {
+    expect(graduatedMayReachRoute("/portal/settings/../today")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/settings/../../admin/clients")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/%74oday")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/history/%2e%2e/today")).toBe(false);
+  });
+
+  it("un hermano con el mismo prefijo no cuela", () => {
+    expect(graduatedMayReachRoute("/portal/historyX")).toBe(false);
+    expect(graduatedMayReachRoute("/portal/history-secret")).toBe(false);
+  });
+});
+
+describe("graduatedNavItems", () => {
+  // Se filtra por href, no por posición: con índices, reordenar la barra —el
+  // tipo de edición que más recibe— le devolvería "Hoy" a la graduada sin que
+  // ninguna prueba se enterara.
+  it("deja sólo las pestañas que la graduada puede abrir", () => {
+    const items = graduatedNavItems([
+      { href: "/portal/today" },
+      { href: "/portal/semana" },
+      { href: "/portal/history" },
+      { href: "/portal/messages" },
+      { href: "/portal/settings" },
+    ]);
+    expect(items.map((i) => i.href)).toEqual([
+      "/portal/history",
+      "/portal/messages",
+      "/portal/settings",
+    ]);
+  });
+
+  it("una pestaña de entrenamiento nueva nace fuera de su barra", () => {
+    expect(graduatedNavItems([{ href: "/portal/pilares" }, { href: "/portal/nueva" }])).toEqual([]);
+  });
+});

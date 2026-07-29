@@ -9,6 +9,9 @@ const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> 
   past_due: { text: "Pago pendiente", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
   canceled: { text: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
   unpaid: { text: "Sin pagar", bg: "var(--error-tint)", color: "var(--error)" },
+  // L2c — terminar es un logro, no una baja. Sin esta entrada caía al fallback
+  // `canceled` y le decía "Cancelada" a quien acaba de completar el programa.
+  completed: { text: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
 };
 
 function formatMoney(mxn: number): string {
@@ -36,6 +39,10 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
   }
 
   const badge = STATUS_BADGE[subscription.status] ?? STATUS_BADGE.canceled;
+  // Una suscripción terminada ya no cobra: su cancelación está programada a fin
+  // de periodo. Anunciar un "Próximo cobro" le diría que le van a volver a
+  // cobrar justo debajo del cartel que celebra que terminó.
+  const isCompleted = subscription.status === "completed";
   const progress = accountProgressLabel(subscription);
   const repeat = repeatMarker(subscription.content_loops, subscription.content_ordinal);
 
@@ -60,9 +67,15 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
       </Row>
       <Row label="Fecha de inicio">{longDateLabel(subscription.enrollment_date)}</Row>
       {subscription.current_period_end && (
-        <Row label="Próximo cobro">
-          {longDateLabel(subscription.current_period_end)} · {formatMoney(subscription.price_mxn)}
-        </Row>
+        isCompleted ? (
+          <Row label="Tu acceso termina el">
+            {longDateLabel(subscription.current_period_end)}
+          </Row>
+        ) : (
+          <Row label="Próximo cobro">
+            {longDateLabel(subscription.current_period_end)} · {formatMoney(subscription.price_mxn)}
+          </Row>
+        )
       )}
       {/* §6.4 — la fila "Programa" nombra la variante que PAGA; ésta, el nivel
           en el que ENTRENA. Pueden diferir en cuanto sube de peldaño, así que

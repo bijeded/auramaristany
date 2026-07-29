@@ -22,17 +22,19 @@ export default async function PortalLayout({
     : [false, 0];
   // Una sola lectura para las dos preguntas de la cáscara: si hay un pago
   // pendiente (banner) y en qué nivel está la clienta (qué pestañas ve).
-  const { data: subRows } = user
+  const { data: subRows, error: subsError } = user
     ? await supabase
         .from("subscriptions")
         .select("status")
         .eq("profile_id", user.id)
         .in("status", PORTAL_SHELL_STATES)
-    : { data: null };
+    : { data: null, error: null };
 
   const statuses = ((subRows ?? []) as { status: string }[]).map((s) => s.status);
   const pastDue = statuses.includes("past_due");
-  const graduated = derivePortalTier(statuses) === "graduated";
+  // Si la lectura falla se pinta la barra reducida, no la completa: enseñar
+  // pestañas que el middleware cierra es peor que enseñar de menos.
+  const graduated = subsError ? true : derivePortalTier(statuses) === "graduated";
 
   return (
     <div style={{ background: "#e8e0e0", minHeight: "100dvh" }}>

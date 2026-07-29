@@ -28,7 +28,23 @@ const GRADUATED_ALLOWED_ROUTES: readonly string[] = [
   "/portal/activando",
 ];
 
-function graduatedMayReach(pathname: string): boolean {
+/**
+ * ¿Alcanza una cliente graduada esta ruta?
+ *
+ * Rechaza de entrada cualquier ruta con segmentos `.` / `..` o con escapes
+ * `%`: hoy Next no resuelve los segmentos de punto —así que
+ * `/portal/settings/../today` es un 404, no un salto—, pero la lista de
+ * permitidos no debe depender de eso. Si mañana algo normalizara la ruta antes
+ * que nosotros, un prefijo permitido se convertiría en la llave de todo.
+ *
+ * También la usa la barra de navegación, para que lo que se pinta y lo que se
+ * deja pasar salgan de la misma lista.
+ */
+export function graduatedMayReachRoute(pathname: string): boolean {
+  if (pathname.includes("%")) return false;
+  const segments = pathname.split("/");
+  if (segments.some((s) => s === "." || s === "..")) return false;
+
   return GRADUATED_ALLOWED_ROUTES.some(
     (allowed) => pathname === allowed || pathname.startsWith(`${allowed}/`)
   );
@@ -82,7 +98,7 @@ export function getRedirectPath(params: RedirectParams): string | null {
     if (isGraduated) {
       // Conserva lo que ganó; pierde lo que estaba pagando. El onboarding
       // tampoco aplica: ya lo hizo, y el cuestionario sólo sirve para empezar.
-      return graduatedMayReach(pathname) ? null : GRADUATED_HOME;
+      return graduatedMayReachRoute(pathname) ? null : GRADUATED_HOME;
     }
     if (!hasActiveSubscription) {
       return "/portal/sin-suscripcion";

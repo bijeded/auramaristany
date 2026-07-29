@@ -25,20 +25,25 @@ Stripe bills upfront, and `handleCheckoutCompleted` seeds `months_elapsed: 1` wh
 period 1 begins   checkout          months_elapsed = 1
 period 2 begins   invoice.paid      months_elapsed = 2
 …
-period 6 begins   invoice.paid      months_elapsed = 6  → completion fires
-                                    status = 'completed', cancel_at_period_end = true
-period 6 ends     subscription ends; no month-7 invoice
+period 6 begins   invoice.paid      months_elapsed = 6  → completion is SCHEDULED
+                                    completed_at set, cancel_at_period_end = true
+                                    status stays 'active' → month 6 content served
+period 6 ends     sub.deleted       status = 'completed'; no month-7 invoice
 ```
 
-Completion therefore fires at the **start** of the client's final month. `cancel_at_period_end` lets month 6 play out and suppresses the month-7 invoice.
+Completion is therefore **scheduled** at the start of the client's final month and **takes effect** at its end. `cancel_at_period_end` lets month 6 play out and suppresses the month-7 invoice.
 
 The two neighbouring options are both wrong in ways that are easy to ship: cancelling **immediately** cuts short a month she has already paid for; waiting for the **next** `invoice.paid` charges her for a seventh month, which is the current live defect. This off-by-one must be pinned by a test.
+
+**Amended 2026-07-28, during implementation.** This decision originally wrote `status = 'completed'` at the *start* of period 6. Code review caught that it collides with Decision 4: `completed` is exactly the status that withdraws training content, so writing it then would take from the client the month she had just paid for — contradicting this document's own promise that "month 6 plays out" and task 7.2's "content still served for the remainder of the period".
+
+The fix keeps the billing behaviour identical and moves only the status write: at the final invoice the system records `completed_at` (completion is pending) and schedules the Stripe cancellation; `customer.subscription.deleted` at period end turns that into `status = 'completed'`. The alternative — teaching the content paths that a `completed` subscription still serves content until `current_period_end` — was rejected: it puts time-based logic inside the access boundary and touches all eight strict content call sites, which is the widening Decision 4 exists to prevent.
 
 ## Decision 2 — `customer.subscription.deleted` must not clobber `completed`
 
 `handleSubscriptionDeleted` unconditionally writes `status: 'canceled'`. When completion sets `cancel_at_period_end`, Stripe fires `customer.subscription.deleted` at period end — which would overwrite `completed` with `canceled` and erase the distinction the graduated tier depends on. A client who *finished* the programme would be recorded as having *quit*, and would lose the graduated access this change grants her.
 
-**Rule:** `handleSubscriptionDeleted` SHALL NOT downgrade a subscription already in `completed`. Completion is terminal and outranks the generic deletion path.
+**Rule (as amended by Decision 1 above):** `handleSubscriptionDeleted` decides between the two endings rather than assuming one. A deleted subscription carrying `completed_at` becomes `completed`; anything else becomes `canceled` as before. And a subscription already in `completed` is never downgraded — completion is terminal and outranks the generic deletion path, which also keeps Stripe's redeliveries harmless.
 
 The involuntary-survey branch is unaffected: a completion-initiated cancellation carries `cancellation_details.reason = 'cancellation_requested'`, which already writes no survey row.
 
@@ -56,13 +61,15 @@ A9 renders "Tu plan termina el {fecha}" plus a **Reactivar** action whenever `ca
 
 ```
 completed client CAN reach    account · payment history · progress history · progress photos
-                              continue-with-Extra CTA
+                              messages · continue-with-Extra CTA
 completed client CANNOT reach /portal/today · /portal/semana · pillars · any series content
 ```
 
 The tier encodes the distinction: she keeps what she earned, and loses what she was paying for. It also turns the CuarentaMás → Extra handoff into a funnel inside the app rather than a round trip through WordPress.
 
 Her own data remains reachable because it is owner-scoped by RLS, which is unaffected by subscription status.
+
+**Messages are included** (added during implementation, flagged by both reviewers as spec-vs-enforcement drift). They are how Aura talks to her, they are owner-scoped by `recipient_id`, and they carry no training content — cutting them off at the exact moment we are asking her to continue would be the wrong silence.
 
 ## Decision 5 — Eligibility enforcement moves to the funnel
 

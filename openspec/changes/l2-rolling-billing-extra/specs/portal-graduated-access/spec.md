@@ -4,13 +4,19 @@
 
 A client whose subscription status is `completed` SHALL retain access to the portal shell and to her own data, and SHALL NOT receive any training content. She SHALL be shown a clear way to continue with the program that follows.
 
-Reachable: her account, her payment history, her progress history, and her progress photos, plus a call to action to continue with CuarentaMás Extra. Not reachable: the day view, the week view, the pillars, and any series content.
+Reachable: her account, her payment history, her progress history, her progress photos and her messages, plus a call to action to continue with CuarentaMás Extra. Not reachable: the day view, the week view, the pillars, and any series content.
+
+Messages are included because they are how Aura reaches her and they carry no training content; they are owner-scoped by recipient. The set of reachable routes SHALL be expressed as an allow-list, so that a training route added later is closed to her by default rather than open until someone remembers to close it.
 
 The distinction encoded is that she keeps what she earned and loses what she was paying for. Locking her out entirely would take her own data from her at the moment she is most likely to continue.
 
 #### Scenario: Completed client reaches her own data
 - **WHEN** a client with a `completed` subscription opens the portal
-- **THEN** she can reach her account, payment history, progress history and progress photos
+- **THEN** she can reach her account, payment history, progress history, progress photos and her messages
+
+#### Scenario: A training route added later is closed by default
+- **WHEN** a portal route that is not on the allow-list is requested by a `completed` client
+- **THEN** access is refused and she is directed to the graduated view
 
 #### Scenario: Completed client is offered the next program
 - **WHEN** a client with a `completed` subscription opens the portal

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Clock, MessageCircle, Sun, User, Layers } from "lucide-react";
+import { graduatedMayReachRoute } from "@/lib/middleware-utils";
 
 const BASE_ITEMS = [
   { href: "/portal/today", label: "Hoy", icon: Sun },
@@ -14,10 +15,17 @@ const BASE_ITEMS = [
 
 const PILARES_ITEM = { href: "/portal/pilares", label: "Pilares", icon: Layers } as const;
 
-// L2c — lo que le queda a una clienta graduada. Las pestañas de entrenamiento
+// L2c — lo que le queda a una cliente graduada. Las pestañas de entrenamiento
 // desaparecen porque la ruta ya no es suya: dejarlas sería ofrecerle puertas
 // que el middleware le cierra en la cara.
-const GRADUATED_ITEMS = [BASE_ITEMS[2], BASE_ITEMS[3], BASE_ITEMS[4]] as const;
+//
+// Se filtra por `href` contra la MISMA lista de permitidos que aplica el
+// middleware, no por posición: con índices, reordenar BASE_ITEMS —justo el tipo
+// de edición que recibe una barra de navegación— le devolvería "Hoy" en
+// silencio.
+export function graduatedNavItems<T extends { href: string }>(items: readonly T[]): T[] {
+  return items.filter((item) => graduatedMayReachRoute(item.href));
+}
 
 export function PortalNav({
   showPilares,
@@ -31,7 +39,7 @@ export function PortalNav({
   const pathname = usePathname();
 
   const items = graduated
-    ? [...GRADUATED_ITEMS]
+    ? graduatedNavItems(BASE_ITEMS)
     : showPilares
       ? [BASE_ITEMS[0], BASE_ITEMS[1], PILARES_ITEM, ...BASE_ITEMS.slice(2)]
       : [...BASE_ITEMS];
