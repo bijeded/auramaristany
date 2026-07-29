@@ -7,8 +7,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const calls: { op: string; table?: string; fn?: string; args?: unknown }[] = [];
 let rpcError: { code: string; message: string } | null = null;
 let adminOk = true;
-// Cuántas filas dice la función que tocó. `null` = "las que le pidieron", que
-// es el caso sano; los tests que prueban el desajuste lo fijan a mano.
+// Cuántas filas dice la base que tocó. `null` = "una por par", el caso sano;
+// los tests del desajuste lo fijan a mano.
 let rpcRowsUpdated: number | null = null;
 
 const fakeSupabase = {
@@ -22,16 +22,17 @@ const fakeSupabase = {
   }),
   rpc: (fn: string, args: unknown) => {
     calls.push({ op: "rpc", fn, args });
-    // La función de la base levanta si tocó menos filas de las esperadas, y la
-    // llamada entera se deshace. El fake imita eso: desajuste ⇒ error, nunca
-    // "ok con conteo raro", porque ese estado no existe del otro lado.
-    const { payload, expected } = args as { payload: unknown[]; expected: number };
+    // La función de la base deduce ella misma cuántas filas espera tocar y
+    // levanta si no coinciden, deshaciendo la llamada entera. El fake imita
+    // eso: desajuste ⇒ error, nunca "ok con conteo raro", porque ese estado no
+    // existe del otro lado.
+    const { payload } = args as { payload: unknown[] };
     const touched = rpcRowsUpdated ?? payload.length;
     if (rpcError) return Promise.resolve({ data: null, error: rpcError });
-    if (touched !== expected) {
+    if (touched !== payload.length) {
       return Promise.resolve({
         data: null,
-        error: { message: `orden parcial: ${touched} de ${expected} preguntas` },
+        error: { message: `orden parcial: ${touched} de ${payload.length} preguntas` },
       });
     }
     return Promise.resolve({ data: touched, error: null });
@@ -49,6 +50,11 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { reorderQuestions } from "@/lib/admin/onboardingActions";
 
+// Ids reales: la acción valida que sean uuid antes de tocar la base.
+const A = "11111111-1111-4111-8111-111111111111";
+const B = "22222222-2222-4222-8222-222222222222";
+const C = "33333333-3333-4333-8333-333333333333";
+
 beforeEach(() => {
   calls.length = 0;
   rpcError = null;
@@ -58,11 +64,8 @@ beforeEach(() => {
 
 describe("reorderQuestions", () => {
   it("guarda el orden completo en UNA sola escritura", async () => {
-    // Arrange
-    const ids = ["q-a", "q-b", "q-c"];
-
     // Act
-    const r = await reorderQuestions(ids);
+    const r = await reorderQuestions([A, B, C]);
 
     // Assert — una escritura, no una por pregunta. Con el bucle anterior esto
     // veía tres `update` y ningún `rpc`.
@@ -73,20 +76,17 @@ describe("reorderQuestions", () => {
 
   it("manda las posiciones que calcula reindexOrder, desde 0 y consecutivas", async () => {
     // Act
-    await reorderQuestions(["q-a", "q-b", "q-c"]);
+    await reorderQuestions([A, B, C]);
 
     // Assert
     const rpc = calls.find((c) => c.op === "rpc");
     expect(rpc?.fn).toBe("reorder_onboarding_questions");
     expect(rpc?.args).toEqual({
       payload: [
-        { id: "q-a", sort_order: 0 },
-        { id: "q-b", sort_order: 1 },
-        { id: "q-c", sort_order: 2 },
+        { id: A, sort_order: 0 },
+        { id: B, sort_order: 1 },
+        { id: C, sort_order: 2 },
       ],
-      // Cuántas filas debe tocar. Va en la misma llamada para que la propia
-      // función lo compruebe y se deshaga sola si no cuadra.
-      expected: 3,
     });
   });
 
@@ -94,9 +94,33 @@ describe("reorderQuestions", () => {
     // Act
     const r = await reorderQuestions([]);
 
-    // Assert — sin ids no hay orden que aplicar; llamar igualmente dejaría a la
-    // función de la base recorriendo un payload vacío sin motivo.
+    // Assert
     expect(r.error).toBeUndefined();
+    expect(calls).toHaveLength(0);
+  });
+
+  // Un server action es un endpoint: lo que llega del navegador se valida aquí,
+  // no se confía por venir del propio componente.
+  it("rechaza ids que no son uuid sin tocar la base", async () => {
+    // Act
+    const r = await reorderQuestions(["no-soy-un-uuid", B]);
+
+    // Assert
+    expect(r.error).toBeTruthy();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("rechaza una lista desproporcionada sin tocar la base", async () => {
+    // Arrange — el cuestionario no se acerca a 200 preguntas
+    const many = Array.from({ length: 201 }, (_, i) =>
+      `${String(i).padStart(8, "0")}-1111-4111-8111-111111111111`
+    );
+
+    // Act
+    const r = await reorderQuestions(many);
+
+    // Assert
+    expect(r.error).toBeTruthy();
     expect(calls).toHaveLength(0);
   });
 
@@ -105,7 +129,7 @@ describe("reorderQuestions", () => {
     rpcError = { code: "42883", message: "function reorder_onboarding_questions(jsonb) does not exist" };
 
     // Act
-    const r = await reorderQuestions(["q-a"]);
+    const r = await reorderQuestions([A]);
 
     // Assert
     expect(r.error).toBeTruthy();
@@ -114,16 +138,16 @@ describe("reorderQuestions", () => {
   });
 
   // Sin esta comprobación la acción devolvía éxito aunque la escritura no
-  // hubiera tocado nada: la admin veía su orden nuevo pintado y al recargar
-  // volvía el viejo. Pasa si una pregunta se borró en otra pestaña, o si RLS la
-  // filtra. La comprobación vive DENTRO de la función para que el update se
-  // deshaga: "error" tiene que seguir significando "no se escribió nada".
+  // hubiera tocado todo: la admin veía su orden nuevo pintado y al recargar
+  // volvía el viejo. Pasa si una pregunta se borró en otra pestaña, si va
+  // repetida, o si RLS la filtra. Vive DENTRO de la función para que el update
+  // se deshaga: "error" tiene que seguir significando "no se escribió nada".
   it("si no se actualizaron todas las preguntas, falla en vez de mentir", async () => {
     // Arrange — se piden 3, la base sólo tocó 2
     rpcRowsUpdated = 2;
 
     // Act
-    const r = await reorderQuestions(["q-a", "q-b", "q-c"]);
+    const r = await reorderQuestions([A, B, C]);
 
     // Assert
     expect(r.error).toBeTruthy();
@@ -134,7 +158,7 @@ describe("reorderQuestions", () => {
     rpcRowsUpdated = 0;
 
     // Act
-    const r = await reorderQuestions(["q-a"]);
+    const r = await reorderQuestions([A]);
 
     // Assert
     expect(r.error).toBeTruthy();
@@ -145,7 +169,7 @@ describe("reorderQuestions", () => {
     adminOk = false;
 
     // Act
-    const r = await reorderQuestions(["q-a", "q-b"]);
+    const r = await reorderQuestions([A, B]);
 
     // Assert — la autorización sigue siendo de requireAdmin; esta tarea cambia
     // cómo se escribe, no quién puede escribir.

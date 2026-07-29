@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { validateQuestion, reindexOrder, type QuestionInput } from "./onboarding-helpers";
 import { requireAdmin } from "./auth";
-import { logAndGeneric } from "./errors";
+import { logAndGeneric, ADMIN_GENERIC_ERROR } from "./errors";
+
+// Tope alineado con el de la función de la base (migración 018): más allá de
+// ahí no hay un cuestionario, hay un abuso del endpoint.
+const REORDER_IDS = z.array(z.string().uuid()).max(200);
 
 function revalidate() {
   revalidatePath("/admin/onboarding-settings");
@@ -55,7 +60,13 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  if (orderedIds.length === 0) return {};
+
+  // Un server action es un endpoint: los ids llegan del navegador y se validan
+  // aquí, no se confían por venir del propio componente. El tope acompaña al de
+  // la función de la base — el cuestionario no se acerca a 200 preguntas.
+  const parsed = REORDER_IDS.safeParse(orderedIds);
+  if (!parsed.success) return { error: ADMIN_GENERIC_ERROR };
+  if (parsed.data.length === 0) return {};
 
   // Las posiciones las calcula reindexOrder —su único hogar, con tests—; la
   // función de la base sólo las aplica, y las aplica de una sola vez. El bucle
@@ -69,16 +80,16 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
   // TODOS los selects con join del repo, no sólo éste. Se tipa el rpc aquí.
   const rpc = supabase.rpc as unknown as (
     fn: string,
-    args: { payload: { id: string; sort_order: number }[]; expected: number }
+    args: { payload: { id: string; sort_order: number }[] }
   ) => Promise<{ data: number | null; error: { message: string } | null }>;
 
-  // Se le manda cuántas filas debe tocar, y la función levanta si no coinciden.
-  // Comprobarlo aquí, con la respuesta ya en la mano, llegaría tarde: el update
-  // habría hecho commit y estaríamos devolviendo "error" sobre una base sí
-  // modificada, que es el orden a medias que este cambio viene a quitar.
+  // La función comprueba ella misma que tocó una fila por par y levanta si no,
+  // así que la llamada entera se deshace. Comprobarlo aquí, con la respuesta ya
+  // en la mano, llegaría tarde: el update habría hecho commit y estaríamos
+  // devolviendo "error" sobre una base sí modificada — el orden a medias que
+  // este cambio viene a quitar.
   const { error } = await rpc("reorder_onboarding_questions", {
-    payload: reindexOrder(orderedIds),
-    expected: orderedIds.length,
+    payload: reindexOrder(parsed.data),
   });
   if (error) return { error: logAndGeneric("reorderQuestions", error) };
 
