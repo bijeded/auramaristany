@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterClients, isInactive, type ClientListRow } from "@/lib/admin/clients-helpers";
+import { filterClients, isInactive, nextChargeCell, type ClientListRow } from "@/lib/admin/clients-helpers";
 
 const NOW = "2026-07-15";
 
@@ -14,7 +14,6 @@ const base: ClientListRow = {
   current_period_end: "2026-07-01",
   price_mxn: 999,
   status: "active",
-  completed_at: null,
   cancel_at_period_end: false,
   last_activity_date: NOW, // reciente por defecto
 };
@@ -186,7 +185,6 @@ describe("clientsToCSV", () => {
   });
 });
 
-import { nextChargeCell } from "@/lib/admin/clients-helpers";
 
 // Encontrado en la revisión visual de L2c: el listado de admin seguía
 // anunciando "Próximo cobro · 29 sep 2026 · $999" para una cliente en estado
@@ -194,16 +192,15 @@ import { nextChargeCell } from "@/lib/admin/clients-helpers";
 // detalle sí lo trataba bien; la tabla tenía su propia copia de la misma
 // decisión. Ahora las dos preguntan aquí.
 describe("nextChargeCell", () => {
-  const base = {
+  const sub = {
     status: "active" as const,
-    completed_at: null,
     cancel_at_period_end: false,
     current_period_end: "2026-09-29T00:00:00Z",
     price_mxn: 999,
   };
 
   it("una suscripción viva anuncia su próximo cobro con importe", () => {
-    expect(nextChargeCell(base)).toEqual({
+    expect(nextChargeCell(sub)).toEqual({
       kind: "charge",
       label: "Próximo cobro",
       value: "29 sep 2026 · $999",
@@ -211,29 +208,27 @@ describe("nextChargeCell", () => {
   });
 
   it("una terminada dice cuándo se le acaba el acceso, sin importe", () => {
-    expect(nextChargeCell({ ...base, status: "completed" })).toEqual({
+    expect(nextChargeCell({ ...sub, status: "completed" })).toEqual({
       kind: "ending",
-      label: "Acceso termina el",
+      label: "Acceso hasta",
       value: "29 sep 2026",
     });
   });
 
   it("una que está terminando su último mes tampoco anuncia cobro", () => {
-    expect(
-      nextChargeCell({ ...base, completed_at: "2026-08-29T00:00:00Z", cancel_at_period_end: true })
-    ).toEqual({ kind: "ending", label: "Acceso termina el", value: "29 sep 2026" });
+    expect(nextChargeCell({ ...sub, cancel_at_period_end: true })).toEqual({ kind: "ending", label: "Acceso hasta", value: "29 sep 2026" });
   });
 
   it("una baja voluntaria en su periodo de gracia, igual", () => {
-    expect(nextChargeCell({ ...base, cancel_at_period_end: true })).toEqual({
+    expect(nextChargeCell({ ...sub, cancel_at_period_end: true })).toEqual({
       kind: "ending",
-      label: "Acceso termina el",
+      label: "Acceso hasta",
       value: "29 sep 2026",
     });
   });
 
   it("sin fecha de periodo no se inventa nada", () => {
-    expect(nextChargeCell({ ...base, current_period_end: null }).value).toBe("—");
+    expect(nextChargeCell({ ...sub, current_period_end: null }).value).toBe("—");
   });
 
   // El mismo defecto, con otro estado: una cancelada conserva su
@@ -241,11 +236,11 @@ describe("nextChargeCell", () => {
   // anunciando el fantasma que este arreglo viene a quitar. Se cubre estado por
   // estado justo porque así fue como se coló la primera vez.
   it.each(["active", "trialing", "past_due"] as const)("%s sí anuncia cobro", (status) => {
-    expect(nextChargeCell({ ...base, status }).kind).toBe("charge");
+    expect(nextChargeCell({ ...sub, status }).kind).toBe("charge");
   });
 
   it.each(["completed", "canceled", "unpaid"] as const)("%s no anuncia ningún cobro", (status) => {
-    const cell = nextChargeCell({ ...base, status });
+    const cell = nextChargeCell({ ...sub, status });
     expect(cell.kind).toBe("ending");
     expect(cell.value).not.toContain("$");
   });

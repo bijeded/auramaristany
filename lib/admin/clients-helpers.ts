@@ -16,12 +16,18 @@ import { formatMXN } from "@/lib/admin/finance-helpers";
  * (dunning agotado)— y también la baja voluntaria que está agotando su periodo.
  * Se enumeran los estados que SÍ cobran, no los que no: un estado nuevo debe
  * nacer sin anunciar cobros, no anunciándolos hasta que alguien se acuerde.
+ *
+ * NO mira `completed_at`: a solas no prueba nada (ver `isCompletionScheduled`),
+ * y el caso que traería ya lo cubre `cancel_at_period_end`.
+ *
+ * "Acceso hasta" y no "termina el": una cancelada conserva su
+ * `current_period_end` viejo, así que la fecha puede ser de hace meses y el
+ * futuro sonaría a que todavía le queda.
  */
 const BILLING_STATUSES: readonly SubStatus[] = ["active", "trialing", "past_due"];
 
 export function nextChargeCell(sub: {
   status: SubStatus;
-  completed_at?: string | null;
   cancel_at_period_end?: boolean | null;
   current_period_end: string | null;
   price_mxn: number;
@@ -31,12 +37,12 @@ export function nextChargeCell(sub: {
   if (!sub.current_period_end) {
     return bills
       ? { kind: "charge", label: "Próximo cobro", value: "—" }
-      : { kind: "ending", label: "Acceso termina el", value: "—" };
+      : { kind: "ending", label: "Acceso hasta", value: "—" };
   }
   const date = dayLabel(sub.current_period_end.slice(0, 10));
   return bills
     ? { kind: "charge", label: "Próximo cobro", value: `${date} · ${formatMXN(sub.price_mxn)}` }
-    : { kind: "ending", label: "Acceso termina el", value: date };
+    : { kind: "ending", label: "Acceso hasta", value: date };
 }
 
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
@@ -57,8 +63,7 @@ export interface ClientListRow {
   current_period_end: string | null; // ISO
   price_mxn: number;
   status: SubStatus;
-  /** Las dos señales del final; sin ellas la tabla anunciaba cobros que no existen. */
-  completed_at: string | null;
+  /** Sin esto la tabla anunciaba cobros de suscripciones que ya no cobran. */
   cancel_at_period_end: boolean;
   last_activity_date: string | null; // max progress_logs.log_date (YYYY-MM-DD) o null
 }

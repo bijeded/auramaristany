@@ -132,7 +132,7 @@ export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string
                           return (
                             <>
                               {cell.kind === "ending" && (
-                                <div className="font-body" style={{ fontSize: 11.5, color: "var(--gris-suave)" }}>
+                                <div className="font-body" style={{ fontSize: 11.5, color: "var(--gris-texto)" }}>
                                   {cell.label}
                                 </div>
                               )}
