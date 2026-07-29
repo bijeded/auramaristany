@@ -134,9 +134,11 @@ export function filterClients(
     // suelta confundiría graduarse con irse, que es el error que L2c ya cazó
     // tres veces.
     if (opts.status === "Último mes" || opts.status === "En cancelación") {
-      // Sólo `active`, igual que el dashboard: sus tarjetas leen filas activas,
-      // y si aquí entrara además una `past_due` que está terminando, el número
-      // de la tarjeta y el de este listado dejarían de cuadrar.
+      // Este guard es CARGA, no adorno: el `kind` a solas no filtra por status.
+      // `deriveCancellationState` sólo cortocircuita en `completed` antes de
+      // `isCompletionScheduled`, así que con las dos señales puestas devuelve
+      // "completing" para cualquier otro status —incluida una `canceled` con una
+      // marca vieja— sin llegar a mirar ELIGIBLE_STATUSES. Dos pruebas lo fijan.
       if (r.status !== "active") return false;
       // La cohorte la nombra `deriveCancellationState`, la MISMA función que usa
       // el portal y de la que salen las tarjetas del dashboard. No se leen las

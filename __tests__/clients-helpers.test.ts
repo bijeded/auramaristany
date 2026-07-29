@@ -145,6 +145,31 @@ describe("filterClients", () => {
       expect(new Set(ids).size).toBe(ids.length);
     });
 
+    // El guard de `status === "active"` es CARGA, no cinturón y tirantes:
+    // `deriveCancellationState` sólo cortocircuita en `completed` antes de
+    // `isCompletionScheduled`, así que con las dos señales puestas devuelve
+    // "completing" para CUALQUIER otro status —trialing, past_due, canceled,
+    // unpaid, incomplete, paused— sin consultar ELIGIBLE_STATUSES. Sin estas dos
+    // pruebas el guard se puede borrar por "redundante" y los 49 tests siguen
+    // verdes; con ellas, borrarlo se cae.
+    it("una trialing que termina NO entra en 'Último mes' (sólo active)", () => {
+      const trialingTerminando = {
+        ...base, profile_id: "t1", status: "trialing" as const,
+        completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true,
+      };
+      const r = filterClients([trialingTerminando], { query: "", program: "Todas", status: "Último mes", now: NOW });
+      expect(r).toEqual([]);
+    });
+
+    it("una cancelada con marca vieja tampoco entra en 'Último mes'", () => {
+      const canceladaConMarca = {
+        ...base, profile_id: "t2", status: "canceled" as const,
+        completed_at: "2026-02-01T00:00:00Z", cancel_at_period_end: true,
+      };
+      const r = filterClients([canceladaConMarca], { query: "", program: "Todas", status: "Último mes", now: NOW });
+      expect(r).toEqual([]);
+    });
+
     it("los otros filtros siguen combinándose", () => {
       const r = filterClients(set, { query: "ana@", program: "CuarentaMás", status: "En cancelación", now: NOW });
       expect(r.map((x) => x.profile_id)).toEqual(["e2"]);
