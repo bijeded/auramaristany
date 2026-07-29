@@ -22,15 +22,15 @@
 
 ## 4. Client list: the completion marker
 
-- [ ] 4.1 Add `completed_at` to the `getClientsList` select and to `RawSubRow` in `lib/admin/clients-queries.ts`, and carry it onto the built `ClientListRow`
-- [ ] 4.2 Add `completed_at` to the `ClientListRow` interface in `lib/admin/clients-helpers.ts`
-- [ ] 4.3 Confirm `nextChargeCell` is unchanged and still ignores `completed_at`; add a test pinning that a stale `completed_at` with `cancel_at_period_end = false` still renders "Próximo cobro"
+- [x] 4.1 Add `completed_at` to the `getClientsList` select and to `RawSubRow` in `lib/admin/clients-queries.ts`, and carry it onto the built `ClientListRow`
+- [x] 4.2 Add `completed_at` to the `ClientListRow` interface in `lib/admin/clients-helpers.ts`
+- [x] 4.3 Confirm `nextChargeCell` is unchanged and still ignores `completed_at`; add a test pinning that a stale `completed_at` with `cancel_at_period_end = false` still renders "Próximo cobro"
 
 ## 5. Client list: the two new pills
 
-- [ ] 5.1 Write failing tests in `__tests__/clients-helpers.test.ts` for the new `StatusFilter` values: `Último mes` matches only `active` + `completed_at` + `cancel_at_period_end`; `En cancelación` matches only `active` + flag + no `completed_at`; `completed`/`canceled` rows match neither; a stale `completed_at` without the flag matches neither
-- [ ] 5.2 Extend the `StatusFilter` union and `filterClients` in `lib/admin/clients-helpers.ts`, deciding membership via the shared derivation (`isCompletionScheduled`) rather than inline flag checks
-- [ ] 5.3 Add the two pills to `components/admin/ClientsTable.tsx` in the existing exclusive group, verifying exclusivity and that "Limpiar filtros" resets them
+- [x] 5.1 Write failing tests in `__tests__/clients-helpers.test.ts` for the new `StatusFilter` values: `Último mes` matches only `active` + `completed_at` + `cancel_at_period_end`; `En cancelación` matches only `active` + flag + no `completed_at`; `completed`/`canceled` rows match neither; a stale `completed_at` without the flag matches neither
+- [x] 5.2 Extend the `StatusFilter` union and `filterClients` in `lib/admin/clients-helpers.ts`, deciding membership via the shared derivation (`deriveCancellationState`, per the code review) rather than inline flag checks
+- [x] 5.3 Add the two pills to `components/admin/ClientsTable.tsx` in the existing exclusive group, verifying exclusivity and that "Limpiar filtros" resets them
 - [ ] 5.4 Confirm the dashboard cards' links land with the corresponding pill already active
 
 ## 6. Gates and verification
