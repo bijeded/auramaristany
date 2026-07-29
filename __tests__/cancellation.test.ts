@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  isCompletionScheduled,
   CANCELLATION_REASON_OPTIONS,
   cancellationReasonLabel,
   reasonRequiresDetail,
@@ -73,5 +74,99 @@ describe("deriveCancellationState", () => {
   it("is 'none' for canceled or unpaid subscriptions", () => {
     expect(deriveCancellationState({ status: "canceled", cancelAtPeriodEnd: false }).kind).toBe("none");
     expect(deriveCancellationState({ status: "unpaid", cancelAtPeriodEnd: false }).kind).toBe("none");
+  });
+
+  // L2c — terminar NO es estar en la ventana de gracia. La completion programa
+  // la cancelación en Stripe, así que `cancel_at_period_end` también queda en
+  // true: si el estado no se mirara PRIMERO, a quien acaba de terminar le
+  // ofreceríamos "Reactivar" un programa que ya se acabó, reanudando el cobro.
+  it("es 'completed' cuando el estado es completed, aunque cancele a fin de periodo", () => {
+    const s = deriveCancellationState({
+      status: "completed",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: "2026-08-15T00:00:00Z",
+    });
+    expect(s.kind).toBe("completed");
+    if (s.kind === "completed") expect(s.endsAt).toBe("2026-08-15T00:00:00Z");
+  });
+
+  it("es 'completed' también antes de que Stripe marque la cancelación", () => {
+    expect(deriveCancellationState({ status: "completed", cancelAtPeriodEnd: false }).kind).toBe(
+      "completed"
+    );
+  });
+
+  // El agujero que abre mover la escritura del estado: durante el ÚLTIMO mes ya
+  // pagado la fila sigue en `active` con `cancel_at_period_end` en true, que es
+  // exactamente la forma de la ventana de gracia. Sin mirar `completed_at`, la
+  // pantalla le ofrece "Reactivar", que borra la cancelación en Stripe y le
+  // cobra un mes 7 que no existe: el defecto que este cambio viene a quitar.
+  it("es 'completing' en el último mes pagado, aunque el estado siga en active", () => {
+    const s = deriveCancellationState({
+      status: "active",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: "2026-08-15T00:00:00Z",
+      completedAt: "2026-07-15T00:00:00Z",
+    });
+    expect(s.kind).toBe("completing");
+    if (s.kind === "completing") expect(s.endsAt).toBe("2026-08-15T00:00:00Z");
+  });
+
+  it("'completing' no ofrece Reactivar: no es la ventana de gracia", () => {
+    expect(
+      deriveCancellationState({
+        status: "active",
+        cancelAtPeriodEnd: true,
+        completedAt: "2026-07-15T00:00:00Z",
+      }).kind
+    ).not.toBe("grace");
+  });
+
+  it("una cancelación voluntaria normal sigue siendo 'grace'", () => {
+    expect(
+      deriveCancellationState({ status: "active", cancelAtPeriodEnd: true, completedAt: null }).kind
+    ).toBe("grace");
+  });
+
+  it("terminada gana a programada cuando llegan las dos", () => {
+    expect(
+      deriveCancellationState({
+        status: "completed",
+        cancelAtPeriodEnd: true,
+        completedAt: "2026-07-15T00:00:00Z",
+      }).kind
+    ).toBe("completed");
+  });
+
+  it("no es ni 'grace' ni 'eligible': ni Reactivar ni Cancelar mi plan", () => {
+    const kind = deriveCancellationState({ status: "completed", cancelAtPeriodEnd: true }).kind;
+    expect(kind).not.toBe("grace");
+    expect(kind).not.toBe("eligible");
+  });
+});
+
+// Una sola derivación para un estado que viven dos columnas. Existe porque cada
+// lector que se lo dedujo por su cuenta se equivocó en un subconjunto distinto:
+// la ficha, las acciones de servidor y el admin llaman aquí.
+describe("isCompletionScheduled", () => {
+  it("hacen falta las dos señales", () => {
+    expect(isCompletionScheduled({ completedAt: "2026-07-01", cancelAtPeriodEnd: true })).toBe(true);
+  });
+
+  // El caso que importa: L2b escribía `completed_at` sin cancelar nada en
+  // Stripe. Esa fila SIGUE cobrando, así que tratarla como terminada le diría a
+  // la cliente que no se le cobrará justo el día que se le cobra —y le quitaría
+  // el botón de cancelar, su única forma de pararlo.
+  it("una marca vieja sin cancelación programada no cuenta", () => {
+    expect(isCompletionScheduled({ completedAt: "2026-07-01", cancelAtPeriodEnd: false })).toBe(false);
+  });
+
+  it("ni una cancelación voluntaria sin plazo cumplido", () => {
+    expect(isCompletionScheduled({ completedAt: null, cancelAtPeriodEnd: true })).toBe(false);
+  });
+
+  it("ni una suscripción corriente", () => {
+    expect(isCompletionScheduled({ completedAt: null, cancelAtPeriodEnd: false })).toBe(false);
+    expect(isCompletionScheduled({})).toBe(false);
   });
 });

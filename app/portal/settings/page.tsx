@@ -9,6 +9,7 @@ import { SubscriptionCard } from "@/components/portal/settings/SubscriptionCard"
 import { SecuritySection } from "@/components/portal/settings/SecuritySection";
 import { PaymentHistory } from "@/components/portal/settings/PaymentHistory";
 import { CancelSubscriptionSection } from "@/components/portal/settings/CancelSubscriptionSection";
+import { GraduatedCard } from "@/components/portal/settings/GraduatedCard";
 import { deriveCancellationState } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { serverToday } from "@/lib/content/server-today";
@@ -45,6 +46,7 @@ export default async function PortalSettingsPage({
         status: data.subscription.status as SubscriptionStatus,
         cancelAtPeriodEnd: data.subscription.cancel_at_period_end,
         currentPeriodEnd: data.subscription.current_period_end,
+        completedAt: data.subscription.completed_at,
       })
     : { kind: "none" as const };
 
@@ -61,8 +63,15 @@ export default async function PortalSettingsPage({
           avatarUrl={data.profile.avatar_url}
         />
 
+        {cancelState.kind === "completed" && data.subscription && (
+          <GraduatedCard
+            programName={data.subscription.program_name}
+            rungLevel={data.subscription.rung_level}
+          />
+        )}
+
         <SectionTitle>Mi suscripción</SectionTitle>
-        <SubscriptionCard subscription={data.subscription} />
+        <SubscriptionCard subscription={data.subscription} state={cancelState} />
 
         <SectionTitle>Seguridad</SectionTitle>
         <SecuritySection />

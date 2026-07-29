@@ -20,6 +20,8 @@ export interface ContentProgressInput {
   rungName: string | null;
   contentOrdinal: number;
   contentLoops: number;
+  /** El estado de la suscripción. Sólo `completed` cambia la etiqueta. */
+  status?: string;
 }
 
 export interface ContentProgress {
@@ -30,6 +32,12 @@ export interface ContentProgress {
 
 export function contentProgressLabel(input: ContentProgressInput): ContentProgress {
   const { billingModel, durationMonths, monthsElapsed } = input;
+
+  // Terminado es terminado: "Mes 6 de 6" es cierto pero no dice lo único que
+  // importa, y en rolling seguiría contando una posición que ya no avanza.
+  if (input.status === "completed") {
+    return { text: "Programa completado", percent: 100 };
+  }
 
   if (billingModel === "fixed_term_monthly" && durationMonths && durationMonths > 0) {
     return {

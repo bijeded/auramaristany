@@ -18,7 +18,27 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (state.kind === "none") return null;
+  // `completed` no ofrece nada aquí: ni Reactivar (reanudaría el cobro de un
+  // programa que ya terminó) ni Cancelar mi plan (invitaría a cancelar algo que
+  // ya se acabó). Lo que le toca a la graduada lo dice la GraduatedCard.
+  if (state.kind === "none" || state.kind === "completed") return null;
+
+  // Su último mes ya pagado. No hay nada que ofrecerle: "Reactivar" borraría la
+  // cancelación programada en Stripe y le cobraría un mes 7 que no existe, y
+  // "Cancelar mi plan" la invitaría a cancelar algo que ya está terminando.
+  if (state.kind === "completing") {
+    return (
+      <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
+        <p className="font-body text-sm" style={{ color: "var(--gris-texto)" }}>
+          Estás en tu último mes. Tu programa termina el{" "}
+          <span style={{ fontWeight: 600, color: "var(--negro)" }}>
+            {state.endsAt ? longDateLabel(state.endsAt) : "final del periodo"}
+          </span>
+          , y no se te hará ningún cobro después.
+        </p>
+      </div>
+    );
+  }
 
   async function reactivate() {
     setBusy(true);

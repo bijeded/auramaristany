@@ -7,6 +7,7 @@ import {
   type LadderPosition,
 } from "@/lib/content/ladder";
 import { firstOrdinal, type CurriculumEntry } from "@/lib/content/curriculum";
+import { isCompletionScheduled } from "@/lib/portal/cancellation";
 import {
   sendWelcomeEmail,
   sendPaymentFailedEmail,
@@ -198,7 +199,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const { data: rawSub, error } = await supabase
     .from("subscriptions")
     .select(
-      "id, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variant_id, program_variants!program_variant_id(programs(billing_model, duration_months))"
+      "id, months_elapsed, completed_at, content_variant_id, content_ordinal, content_loops, program_variant_id, program_variants!program_variant_id(programs(billing_model, duration_months))"
     )
     .eq("stripe_subscription_id", subscriptionId)
     .single();
@@ -212,6 +213,7 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   type SubWithVariant = {
     id: string;
     months_elapsed: number;
+    completed_at?: string | null;
     content_variant_id: string | null;
     content_ordinal: number;
     content_loops: number;
@@ -220,18 +222,43 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   };
   const sub = rawSub as SubWithVariant;
 
-  // GUARDA DE IDEMPOTENCIA. Todo lo que avanza va después de esta línea: si la
-  // factura ya estaba registrada, esta entrega es una redelivery de Stripe y no
-  // hay nada que contar. Antes el incremento del mes no estaba protegido.
-  const isNewInvoice = await recordInvoice(invoice, sub.id);
-  if (!isNewInvoice) return;
-
   const program = sub.program_variants?.programs;
   const { newMonthsElapsed, shouldComplete } = computeMonthsUpdate(
     sub.months_elapsed,
     program?.billing_model ?? "rolling_monthly",
     program?.duration_months ?? null
   );
+
+  // L2c — el final de un plazo fijo. Los diez precios son mensuales
+  // recurrentes, así que sin esta llamada a una cliente de CuarentaMás se le
+  // cobraba el mes 7, el 8 y los siguientes contra un contenido que se acabó en
+  // el 6: cobrar por un servicio que no se presta.
+  //
+  // `cancel_at_period_end` y no una cancelación inmediata: el mes 6 ya está
+  // pagado y se juega entero. Y va ANTES de la guarda de idempotencia a
+  // propósito —es idempotente en Stripe, ponerla dos veces es un no-op—,
+  // porque puesta después un fallo aquí sería definitivo: el reintento
+  // encontraría la factura ya registrada, volvería sin hacer nada, y la
+  // cancelación no se programaría nunca.
+  // Ya programada: no se vuelve a llamar. Un reenvío manual de la última
+  // factura después de que el periodo acabara pegaría contra una suscripción ya
+  // cancelada, Stripe devolvería 400, el handler relanzaría y ese evento no
+  // podría volver a responder 200 nunca.
+  const alreadyScheduled = !!(sub as SubWithVariant & { completed_at?: string | null }).completed_at;
+  if (shouldComplete && !alreadyScheduled) {
+    try {
+      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+    } catch (err) {
+      console.error("[webhook] no se pudo programar el fin del plazo fijo", err);
+      throw err;
+    }
+  }
+
+  // GUARDA DE IDEMPOTENCIA. Todo lo que avanza va después de esta línea: si la
+  // factura ya estaba registrada, esta entrega es una redelivery de Stripe y no
+  // hay nada que contar. Antes el incremento del mes no estaba protegido.
+  const isNewInvoice = await recordInvoice(invoice, sub.id);
+  if (!isNewInvoice) return;
 
   const position = await nextContentPosition(supabase, sub, {
     billing_model: program?.billing_model ?? "rolling_monthly",
@@ -243,7 +270,18 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // de Stripe; el peldaño en el que entrena es `content_variant_id`.
   const updatePayload = {
     months_elapsed: newMonthsElapsed,
-    ...(shouldComplete ? { completed_at: new Date().toISOString() } : {}),
+    // Sella que la completion queda PROGRAMADA. El `status` NO se toca aquí:
+    // es lo que retira el contenido, y escribirlo ahora le quitaría a la
+    // cliente el mes que acaba de pagar. Lo escribe el borrado, al terminar el
+    // periodo (Decisión 1, enmendada).
+    // Las DOS señales se escriben juntas. `completed_at` a solas no significa
+    // "no habrá más cobros" —así lo dejaba L2b, sin cancelar nada—, y los
+    // lectores exigen las dos: sin espejar aquí `cancel_at_period_end`, cada
+    // fila que termina pasaría por una ventana en la que la pantalla no sabe
+    // que ya está cancelada, hasta que llegara `customer.subscription.updated`.
+    ...(shouldComplete
+      ? { completed_at: new Date().toISOString(), cancel_at_period_end: true }
+      : {}),
     ...(position
       ? {
           content_variant_id: position.variantId,
@@ -431,17 +469,70 @@ async function nextContentPosition(
   });
 }
 
+type LocalSubscription = {
+  id: string;
+  profile_id: string;
+  status: string;
+  completed_at: string | null;
+  cancel_at_period_end: boolean | null;
+};
+
+/** La fila local, leída antes de decidir cómo termina. */
+async function readLocalSubscription(
+  supabase: ServiceClient,
+  stripeSubscriptionId: string
+): Promise<LocalSubscription | null> {
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("id, profile_id, status, completed_at, cancel_at_period_end")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
+  return (data as LocalSubscription | null) ?? null;
+}
+
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const supabase = createServiceClient();
   // Re-source the billing period from subscription items (Stripe API 2026+) so renewals stay fresh.
   const { current_period_start, current_period_end } = readPeriod(subscription);
+
+  // Terminar no se espeja como cancelar. Stripe emite `updated` con estado
+  // `canceled` A LA VEZ que el borrado, y el orden de entrega no está
+  // garantizado: si llega primero, la fila todavía está en `active` con
+  // `completed_at`, y copiar el estado a ciegas grabaría que se fue quien en
+  // realidad terminó —y le quitaría el portal graduado— hasta que llegase el
+  // borrado, o para siempre si no llega.
+  //
+  // La guarda es lo más estrecha posible a propósito: sólo bloquea el
+  // `canceled` sobre una fila que está terminando. Los demás estados se siguen
+  // espejando durante el último mes, que sigue siendo un mes normal.
+  const local = await readLocalSubscription(supabase, subscription.id);
+  const isCompleted =
+    local?.status === "completed" ||
+    (subscription.status === "canceled" &&
+      isCompletionScheduled({
+        completedAt: local?.completed_at,
+        cancelAtPeriodEnd: local?.cancel_at_period_end,
+      }));
+
   const { error } = await supabase
     .from("subscriptions")
     .update({
-      // keep: Stripe Subscription.Status includes statuses ("incomplete", "incomplete_expired")
-      // not in our SubscriptionStatus union; mapping via cast as the DB stores them as-is.
-      status: subscription.status as import("@/lib/supabase/types").SubscriptionStatus,
-      cancel_at_period_end: subscription.cancel_at_period_end,
+      ...(isCompleted
+        ? {}
+        : {
+            // keep: Stripe Subscription.Status includes statuses ("incomplete", "incomplete_expired")
+            // not in our SubscriptionStatus union; mapping via cast as the DB stores them as-is.
+            status: subscription.status as import("@/lib/supabase/types").SubscriptionStatus,
+          }),
+      // La bandera NO se baja mientras la fila lleve `completed_at`: es una de
+      // las dos señales de las que depende el veredicto del borrado, y
+      // espejarla a ciegas desde Stripe (un evento que la reporte en false, o
+      // una edición manual en el dashboard) volvería a partir en dos el estado
+      // que la derivación única existe para juntar — y grabaría que se fue
+      // quien terminó.
+      ...(local?.completed_at && !subscription.cancel_at_period_end
+        ? {}
+        : { cancel_at_period_end: subscription.cancel_at_period_end }),
       current_period_start,
       current_period_end,
     })
@@ -452,20 +543,49 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
 
 export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const supabase = createServiceClient();
-  const { data: subRow, error } = await supabase
-    .from("subscriptions")
-    .update({ status: "canceled" })
-    .eq("stripe_subscription_id", subscription.id)
-    .select("id, profile_id")
-    .maybeSingle();
 
-  if (error) console.error("[webhook] subscription.deleted error:", error);
+  // L2c — hay DOS finales, y este handler es quien los distingue. Una
+  // suscripción que traía `completed_at` llegó aquí porque su plazo terminó y
+  // la cancelación estaba programada: eso es haber TERMINADO. Cualquier otra es
+  // una baja. Escribir `canceled` sin mirar —como antes— dejaba grabado que se
+  // fue quien en realidad acabó, y le quitaba el portal graduado.
+  const local = await readLocalSubscription(supabase, subscription.id);
+  const finished =
+    local?.status === "completed" ||
+    isCompletionScheduled({
+      completedAt: local?.completed_at,
+      cancelAtPeriodEnd: local?.cancel_at_period_end,
+    });
+  const finalStatus = finished ? "completed" : "canceled";
+
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ status: finalStatus })
+    .eq("stripe_subscription_id", subscription.id);
+
+  const subRow = local ? { id: local.id, profile_id: local.profile_id } : null;
+
+  // Se relanza en vez de tragárselo. Mientras la migración 017 no esté
+  // aplicada, el CHECK de `status` rechaza `completed`: tragado, la fila se
+  // queda en `active` con la suscripción ya cancelada en Stripe y la cliente
+  // conserva TODO el contenido gratis y para siempre, sin que nada avise. Con
+  // el 500, Stripe reintenta y el handler es seguro ante reentregas.
+  if (error) {
+    console.error("[webhook] subscription.deleted error:", error);
+    throw new Error(`subscription.deleted status write failed: ${error.message}`);
+  }
 
   // A9 — involuntary cancellation: dunning exhausted retries. Stripe tags why on
   // the object itself. Voluntary deletions (cancellation_requested) already have
   // a survey row from the portal flow, so we only auto-log payment failures here.
   const cancelReason = subscription.cancellation_details?.reason;
-  if ((cancelReason === "payment_failed" || cancelReason === "payment_disputed") && subRow) {
+  // Quien terminó no se da de baja, ni siquiera si el último cobro se disputó:
+  // graduada y "churn" a la vez sería un dato de baja falso.
+  if (
+    finalStatus !== "completed" &&
+    (cancelReason === "payment_failed" || cancelReason === "payment_disputed") &&
+    subRow
+  ) {
     const row = subRow as { id: string; profile_id: string };
     // Idempotent: Stripe can redeliver customer.subscription.deleted. A subscription
     // is deleted once, so at most one involuntary row per subscription — skip if it
@@ -487,8 +607,14 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
     }
   }
 
-  const contact = await getContactBySubscription(supabase, subscription.id);
-  if (contact) await sendSubscriptionEndedEmail({ to: contact.email, name: contact.name });
+  // El correo de "tu suscripción terminó" lleva un CTA de Reactivar: mandárselo
+  // a quien acaba de COMPLETAR el programa es justo el marco que este cambio
+  // rechaza, y la invita a reactivar algo que la propia app le refusa. Su
+  // mensaje es el de la GraduatedCard.
+  if (finalStatus !== "completed") {
+    const contact = await getContactBySubscription(supabase, subscription.id);
+    if (contact) await sendSubscriptionEndedEmail({ to: contact.email, name: contact.name });
+  }
 }
 
 export async function handlePaymentFailed(invoice: Stripe.Invoice) {

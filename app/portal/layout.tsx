@@ -3,6 +3,10 @@ import { hasPillarsAccess } from "@/lib/content/pillars";
 import { getUnreadCount } from "@/lib/content/messages";
 import { PortalNav } from "@/components/portal/PortalNav";
 import { PaymentPendingBanner } from "@/components/portal/PaymentPendingBanner";
+import {
+  PORTAL_SHELL_STATES,
+  derivePortalTier,
+} from "@/lib/content/subscription-access";
 
 export default async function PortalLayout({
   children,
@@ -16,9 +20,24 @@ export default async function PortalLayout({
   const [showPilares, unreadMessages] = user
     ? await Promise.all([hasPillarsAccess(user.id), getUnreadCount(user.id)])
     : [false, 0];
-  const { data: pastDue } = user
-    ? await supabase.from("subscriptions").select("id").eq("profile_id", user.id).eq("status", "past_due").maybeSingle()
-    : { data: null };
+  // Una sola lectura para las dos preguntas de la cáscara: si hay un pago
+  // pendiente (banner) y en qué nivel está la cliente (qué pestañas ve).
+  const { data: subRows, error: subsError } = user
+    ? await supabase
+        .from("subscriptions")
+        .select("status")
+        .eq("profile_id", user.id)
+        .in("status", PORTAL_SHELL_STATES)
+    : { data: null, error: null };
+
+  const statuses = ((subRows ?? []) as { status: string }[]).map((s) => s.status);
+  const pastDue = statuses.includes("past_due");
+  // Ante un fallo de lectura se pinta la barra normal y manda el middleware,
+  // que hace su propia lectura y ES la frontera. Pintar la reducida le quitaría
+  // "Hoy" y "Semana" a una cliente que paga y a la que el middleware sí deja
+  // entrar: se quedaría en una pantalla sin pestaña de vuelta.
+  if (subsError) console.error("[portal/layout] no se pudo leer el nivel", subsError);
+  const graduated = derivePortalTier(statuses) === "graduated";
 
   return (
     <div style={{ background: "#e8e0e0", minHeight: "100dvh" }}>
@@ -29,7 +48,7 @@ export default async function PortalLayout({
         {pastDue ? <PaymentPendingBanner /> : null}
         <main className="flex-1 overflow-y-auto">{children}</main>
 
-        <PortalNav showPilares={showPilares} unreadMessages={unreadMessages} />
+        <PortalNav showPilares={showPilares} unreadMessages={unreadMessages} graduated={graduated} />
       </div>
     </div>
   );

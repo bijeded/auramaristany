@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { validatePhone } from "@/lib/auth/phone";
 import { stripe } from "@/lib/stripe";
 import { sanitizePlainText } from "@/lib/admin/sanitize-html";
-import { reasonRequiresDetail } from "@/lib/portal/cancellation";
+import { reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { createClient as createStatelessClient } from "@supabase/supabase-js";
 
@@ -29,7 +29,13 @@ const cancelInputSchema = z.object({
   detail: z.string().max(200).optional(),
 });
 
-type OwnedSub = { id: string; stripe_subscription_id: string; status: string };
+type OwnedSub = {
+  id: string;
+  stripe_subscription_id: string;
+  status: string;
+  completed_at: string | null;
+  cancel_at_period_end: boolean | null;
+};
 
 /** Resolve the caller's cancelable subscription from getUser() — never trust a
  *  client-sent id (INP-4/EDGE-5). Returns null if none is eligible. */
@@ -39,13 +45,25 @@ async function getOwnedCancelableSub(
 ): Promise<OwnedSub | null> {
   const { data } = await supabase
     .from("subscriptions")
-    .select("id, stripe_subscription_id, status")
+    .select("id, stripe_subscription_id, status, completed_at, cancel_at_period_end")
     .eq("profile_id", userId)
     .in("status", CANCELABLE_STATUSES)
-    .order("enrollment_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as OwnedSub | null) ?? null;
+    .order("enrollment_date", { ascending: false });
+
+  // El filtro se hace aquí y NO en SQL con `completed_at is null`: esa columna
+  // a solas no prueba que haya una cancelación programada (L2b la escribía sin
+  // cancelar nada), y descartar por ella dejaba a una cliente con una fila
+  // vieja cobrando y sin forma de pararlo desde el portal. Se descarta sólo lo
+  // que de verdad está terminando, y así una CuarentaMás en su último mes no
+  // le secuestra la acción a una Extra que sí paga.
+  const rows = (data as OwnedSub[] | null) ?? [];
+  // Se PREFIERE la que no está terminando, pero si no hay otra se devuelve la
+  // que sí: así las guardas de abajo llegan a ejecutarse y la cliente lee por
+  // qué no puede, en vez del genérico "no tienes ninguna suscripción".
+  const usable = rows.find(
+    (r) => !isCompletionScheduled({ completedAt: r.completed_at, cancelAtPeriodEnd: r.cancel_at_period_end })
+  );
+  return usable ?? rows[0] ?? null;
 }
 
 export async function cancelSubscription(input: { reason?: string; detail?: string }): Promise<ActionResult> {
@@ -67,6 +85,14 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
 
   const sub = await getOwnedCancelableSub(supabase, user.id);
   if (!sub) return { ok: false, error: "No tienes una suscripción activa que cancelar." };
+
+  // Simétrico al de `reactivateSubscription`: una suscripción que ya está
+  // terminando no se cancela. Su cancelación en Stripe ya está programada, así
+  // que lo único que añadiría es una fila de encuesta "voluntary" para una
+  // cliente que TERMINÓ en vez de irse — dato de baja falseado.
+  if (isCompletionScheduled({ completedAt: sub.completed_at, cancelAtPeriodEnd: sub.cancel_at_period_end })) {
+    return { ok: false, error: "Tu programa ya está por terminar; no hay nada que cancelar." };
+  }
 
   // Cancel in Stripe first — it is the primary action and the source of truth.
   try {
@@ -102,6 +128,15 @@ export async function reactivateSubscription(): Promise<ActionResult> {
 
   const sub = await getOwnedCancelableSub(supabase, user.id);
   if (!sub) return { ok: false, error: GENERIC_ERROR };
+
+  // L2c — una suscripción con la completion ya programada NO se reactiva. Está
+  // en su último mes de plazo fijo: quitarle `cancel_at_period_end` en Stripe le
+  // cobraría un mes 7 contra un programa que no lo tiene. La pantalla ya no
+  // ofrece el botón, pero esconder un botón no es una comprobación: la acción es
+  // invocable por sí sola.
+  if (isCompletionScheduled({ completedAt: sub.completed_at, cancelAtPeriodEnd: sub.cancel_at_period_end })) {
+    return { ok: false, error: "Tu programa ya terminó y no se puede reactivar." };
+  }
 
   try {
     await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: false });

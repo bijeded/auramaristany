@@ -26,7 +26,8 @@ export async function DELETE(
     .from("subscriptions")
     .select("status")
     .eq("profile_id", params.clientId);
-  // keep: SubStatus is narrower than SubscriptionStatus (missing "completed"); cast narrows.
+  // keep: SubStatus is narrower than SubscriptionStatus (it omits Stripe's
+  // intermediate states); the cast narrows.
   const subs = (rawSubs ?? []) as { status: SubStatus }[];
   const guard = canDeleteClient(subs);
   if (!guard.ok) {

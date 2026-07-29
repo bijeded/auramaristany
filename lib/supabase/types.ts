@@ -1,5 +1,18 @@
 export type UserRole = "client" | "admin";
-export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
+// Espeja el CHECK de `subscriptions.status` (migración 017). Los tres últimos
+// los escribe `handleSubscriptionUpdated` tal cual desde Stripe: modelarlos es
+// lo que evita que la escritura se rechace y la fila se quede contando otra
+// historia que la de Stripe.
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "unpaid"
+  | "completed"
+  | "incomplete"
+  | "incomplete_expired"
+  | "paused";
 export type BillingModel = "fixed_term_monthly" | "rolling_monthly";
 export type CancellationReason =
   | "precio_muy_caro"

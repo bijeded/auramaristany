@@ -1,6 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { ACCESS_STATES } from "@/lib/content/subscription-access";
+import {
+  PORTAL_SHELL_STATES,
+  subscriptionGrantsAccess,
+} from "@/lib/content/subscription-access";
 import {
   contentProgressLabel,
   type ContentProgress,
@@ -11,6 +14,8 @@ export type AccountSubscription = {
   variant_name: string;
   status: string;
   cancel_at_period_end: boolean;
+  /** Sellado cuando la completion queda programada, un mes antes del estado. */
+  completed_at: string | null;
   enrollment_date: string;
   current_period_end: string | null;
   price_mxn: number;
@@ -23,6 +28,8 @@ export type AccountSubscription = {
   content_loops: number;
   /** Nombre de la variante del puntero; se resuelve aparte del join. */
   rung_name: string | null;
+  /** Nivel de esa misma variante; decide a qué peldaño de Extra apunta el CTA. */
+  rung_level: string | null;
 };
 
 export type AccountInvoice = {
@@ -41,6 +48,7 @@ export type AccountData = {
 type RawSub = {
   status: string;
   cancel_at_period_end: boolean | null;
+  completed_at: string | null;
   enrollment_date: string;
   current_period_end: string | null;
   months_elapsed: number;
@@ -51,13 +59,18 @@ type RawSub = {
 };
 
 export function mapSubscription(rows: RawSub[] | null): AccountSubscription | null {
-  const r = (rows ?? []).find((x) => x.program_variants);
+  const usable = (rows ?? []).filter((x) => x.program_variants);
+  // La ficha lee también las terminadas —es donde vive el CTA para seguir con
+  // Extra—, así que pueden convivir dos filas. La que paga manda: enseñar
+  // "Programa completado" a quien acaba de comprar Extra sería mentirle.
+  const r = usable.find((x) => subscriptionGrantsAccess(x.status)) ?? usable[0];
   if (!r || !r.program_variants) return null;
   return {
     program_name: r.program_variants.programs?.name ?? "—",
     variant_name: r.program_variants.name,
     status: r.status,
     cancel_at_period_end: r.cancel_at_period_end ?? false,
+    completed_at: r.completed_at,
     enrollment_date: r.enrollment_date,
     current_period_end: r.current_period_end,
     price_mxn: r.program_variants.price_mxn,
@@ -68,6 +81,7 @@ export function mapSubscription(rows: RawSub[] | null): AccountSubscription | nu
     content_ordinal: r.content_ordinal,
     content_loops: r.content_loops,
     rung_name: null,
+    rung_level: null,
   };
 }
 
@@ -101,6 +115,7 @@ export function accountProgressLabel(sub: AccountSubscription): ContentProgress 
     rungName: sub.rung_name,
     contentOrdinal: sub.content_ordinal,
     contentLoops: sub.content_loops,
+    status: sub.status,
   });
 }
 
@@ -115,9 +130,11 @@ export async function getAccountData(userId: string): Promise<AccountData> {
 
   const { data: subRows } = await supabase
     .from("subscriptions")
-    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, duration_months, billing_model))")
+    .select("status, cancel_at_period_end, completed_at, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, duration_months, billing_model))")
     .eq("profile_id", userId)
-    .in("status", ACCESS_STATES)
+    // L2c — incluye las terminadas: esta pantalla es el aterrizaje de la
+    // cliente graduada y tiene que poder contarle que su programa acabó.
+    .in("status", PORTAL_SHELL_STATES)
     .order("enrollment_date", { ascending: false });
 
   const { data: invoiceRows } = await supabase
@@ -132,10 +149,12 @@ export async function getAccountData(userId: string): Promise<AccountData> {
   if (subscription?.content_variant_id) {
     const { data: rungRow } = await supabase
       .from("program_variants")
-      .select("name")
+      .select("name, level")
       .eq("id", subscription.content_variant_id)
       .maybeSingle();
-    subscription.rung_name = (rungRow as { name: string } | null)?.name ?? null;
+    const rung = rungRow as { name: string; level: string | null } | null;
+    subscription.rung_name = rung?.name ?? null;
+    subscription.rung_level = rung?.level ?? null;
   }
 
   const p = (profileRow ?? {}) as { full_name?: string; email?: string; phone?: string | null; avatar_url?: string | null };

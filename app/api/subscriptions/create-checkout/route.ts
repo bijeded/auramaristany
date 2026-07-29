@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
-import { checkPrerequisites } from "@/lib/subscriptions/prerequisites";
-import type { PrerequisiteRow, ClientSubscription } from "@/lib/subscriptions/prerequisites";
 
 interface VariantResult {
   id: string;
@@ -44,39 +42,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Variante no encontrada" }, { status: 404 });
   }
 
-  const { data: prereqRows } = await supabase
-    .from("program_variant_prerequisites")
-    .select("prerequisite_group, required_program_slug, required_variant_levels, required_status")
-    .eq("program_variant_id", variant.id);
-
-  if (prereqRows && prereqRows.length > 0) {
-    const { data: clientSubs } = await supabase
-      .from("subscriptions")
-      .select("status, program_variants!program_variant_id(level, programs(slug))")
-      .eq("profile_id", user.id)
-      .in("status", ["active", "completed"]);
-
-    // keep: subscriptions JOIN program_variants+programs — Supabase SDK with bespoke DB type
-    // (no Relationships) can't infer nested join shape; local interface cast is necessary.
-    type ClientSubRaw = {
-      status: string;
-      program_variants?: { level: string | null; programs?: { slug: string } | null } | null;
-    };
-    const clientSubsTyped = (clientSubs as ClientSubRaw[]) ?? [];
-    const mapped: ClientSubscription[] = clientSubsTyped.map((s) => ({
-      program_slug: s.program_variants?.programs?.slug ?? "",
-      variant_level: s.program_variants?.level ?? null,
-      status: s.status,
-    }));
-
-    const check = checkPrerequisites(prereqRows as PrerequisiteRow[], mapped);
-    if (!check.allowed) {
-      return NextResponse.json(
-        { error: "No cumples los prerequisitos para este programa" },
-        { status: 403 }
-      );
-    }
-  }
+  // L2c — aquí NO hay puerta de elegibilidad. Los prerequisitos sembrados
+  // codificaban una regla de CONTENIDO ("Extra va después de CuarentaMás")
+  // mientras Aura aplica una de JUICIO: evalúa a la cliente en su sitio y la
+  // manda al checkout del nivel que le corresponde. No se reconcilian —la regla
+  // de la base rechazaba justo a quien ella había aprobado, incluida una
+  // cliente sin ninguna suscripción previa mandada directa a Avanzado—. La
+  // puerta es el embudo; la migración 017 borra las filas.
+  //
+  // Contrapartida aceptada: cualquiera con la URL de un checkout puede
+  // suscribirse a cualquier nivel. Si la autoselección llega a ser un problema
+  // real —es fuerza para mujeres de 40+ y el nivel es seguridad—, el sustituto
+  // es un registro de aprobación que emita Aura, no volver a deducirlo del
+  // contenido.
 
   const { data: profileRaw } = await supabase
     .from("profiles")

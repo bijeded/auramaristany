@@ -13,6 +13,7 @@ import {
   type SubStatus,
 } from "@/lib/admin/clients-helpers";
 import { subscriptionGrantsAccess } from "@/lib/content/subscription-access";
+import { isCompletionScheduled } from "@/lib/portal/cancellation";
 import type { NoticeRule } from "@/lib/supabase/types";
 
 export interface NoticeCandidate {
@@ -21,6 +22,8 @@ export interface NoticeCandidate {
   full_name: string | null;
   status: SubStatus;
   cancel_at_period_end: boolean;
+  /** L2c — distingue "se va" de "está terminando su último mes pagado". */
+  completed_at?: string | null;
   /** timestamptz del inicio del periodo de facturación vigente. */
   current_period_start: string;
   /** date (YYYY-MM-DD); centinela de la clave cuando nunca hubo actividad. */
@@ -229,8 +232,15 @@ export function evaluateNotices(
     // Sin acceso al portal no hay nada que recordar ni a quién reenganchar.
     if (!subscriptionGrantsAccess(c.status)) continue;
     // Quien ya decidió irse no recibe ninguna de las dos reglas: el periodo de
-    // gracia no es una oportunidad de reenganche.
-    if (c.cancel_at_period_end) continue;
+    // gracia no es una oportunidad de reenganche. Pero terminar no es irse: una
+    // cliente en su último mes de plazo fijo lleva la misma bandera y SÍ sigue
+    // entrenando —es justo el mes en que más vale acompañarla—, así que se
+    // distingue por la derivación compartida en vez de por la bandera suelta.
+    const finishing = isCompletionScheduled({
+      completedAt: c.completed_at,
+      cancelAtPeriodEnd: c.cancel_at_period_end,
+    });
+    if (c.cancel_at_period_end && !finishing) continue;
 
     const push = (rule: NoticeRule, periodKey: string) => {
       const tpl = templates[rule];

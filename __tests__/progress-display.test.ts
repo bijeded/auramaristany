@@ -65,6 +65,25 @@ describe("contentProgressLabel", () => {
 
     expect(label.text).toBe("Mes 4 de 6");
   });
+
+  // L2c — una suscripción terminada no sigue contando meses. "Mes 6 de 6" es
+  // cierto pero no dice lo único que importa: que ya acabó.
+  it("una suscripción terminada se anuncia terminada, no como una fracción", () => {
+    const label = contentProgressLabel({ ...fixed, monthsElapsed: 6, status: "completed" });
+
+    expect(label.text).toBe("Programa completado");
+    expect(label.percent).toBe(100);
+  });
+
+  it("terminada manda también sobre la etiqueta rolling", () => {
+    expect(contentProgressLabel({ ...rolling, status: "completed" }).text).toBe(
+      "Programa completado"
+    );
+  });
+
+  it("un estado que no es completed no cambia nada", () => {
+    expect(contentProgressLabel({ ...fixed, status: "active" }).text).toBe("Mes 3 de 6");
+  });
 });
 
 describe("repeatMarker", () => {

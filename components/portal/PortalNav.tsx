@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Clock, MessageCircle, Sun, User, Layers } from "lucide-react";
+import { graduatedNavItems } from "@/lib/middleware-utils";
 
 const BASE_ITEMS = [
   { href: "/portal/today", label: "Hoy", icon: Sun },
@@ -14,12 +15,27 @@ const BASE_ITEMS = [
 
 const PILARES_ITEM = { href: "/portal/pilares", label: "Pilares", icon: Layers } as const;
 
-export function PortalNav({ showPilares, unreadMessages = 0 }: { showPilares: boolean; unreadMessages?: number }) {
+// L2c — a una cliente graduada las pestañas de entrenamiento le desaparecen:
+// la ruta ya no es suya y dejarlas sería ofrecerle puertas que el middleware le
+// cierra en la cara. La selección vive en `lib/middleware-utils`, junto a la
+// lista de permitidos que aplica el propio middleware.
+
+export function PortalNav({
+  showPilares,
+  unreadMessages = 0,
+  graduated = false,
+}: {
+  showPilares: boolean;
+  unreadMessages?: number;
+  graduated?: boolean;
+}) {
   const pathname = usePathname();
 
-  const items = showPilares
-    ? [BASE_ITEMS[0], BASE_ITEMS[1], PILARES_ITEM, ...BASE_ITEMS.slice(2)]
-    : [...BASE_ITEMS];
+  const items = graduated
+    ? graduatedNavItems(BASE_ITEMS)
+    : showPilares
+      ? [BASE_ITEMS[0], BASE_ITEMS[1], PILARES_ITEM, ...BASE_ITEMS.slice(2)]
+      : [...BASE_ITEMS];
 
   return (
     <nav

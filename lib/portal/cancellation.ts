@@ -37,9 +37,32 @@ export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationRea
 
 const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", "past_due"];
 
+/**
+ * ¿Está PROGRAMADO el final de esta suscripción?
+ *
+ * Única derivación de un estado que viven DOS columnas, y la razón de que sea
+ * una sola función: `completed_at` por sí solo no prueba nada. L2b lo escribía
+ * al llegar al último mes sin cancelar nada en Stripe, así que una fila vieja
+ * puede traerlo puesto y seguir cobrando tan campante. Hacen falta las dos
+ * señales: que el plazo se haya cumplido Y que la cancelación exista de verdad.
+ *
+ * Cada lector que se la deduzca por su cuenta se equivoca en un subconjunto
+ * distinto —ya pasó tres veces en este mismo cambio—, así que la pantalla, las
+ * acciones de servidor y el admin llaman aquí.
+ */
+export function isCompletionScheduled(row: {
+  completedAt?: string | null;
+  cancelAtPeriodEnd?: boolean | null;
+}): boolean {
+  return !!row.completedAt && row.cancelAtPeriodEnd === true;
+}
+
 export type CancellationState =
   | { kind: "eligible" }
   | { kind: "grace"; endsAt: string | null }
+  /** Último mes ya pagado: la completion está programada, aún hay contenido. */
+  | { kind: "completing"; endsAt: string | null }
+  | { kind: "completed"; endsAt: string | null }
   | { kind: "none" };
 
 /** Derive how the SubscriptionCard should present cancellation, from the
@@ -48,7 +71,31 @@ export function deriveCancellationState(input: {
   status: SubscriptionStatus;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd?: string | null;
+  /** Sellado cuando la completion queda PROGRAMADA, un mes antes del estado. */
+  completedAt?: string | null;
 }): CancellationState {
+  // L2c — terminar no es la ventana de gracia, y hay que mirarlo antes que la
+  // bandera. Un programa de plazo fijo pasa por DOS momentos, y los dos dejan
+  // `cancel_at_period_end` en true:
+  //
+  //   1. `completing` — empieza su último mes ya pagado. Sigue entrenando, pero
+  //      ofrecerle "Reactivar" aquí borraría la cancelación en Stripe y le
+  //      cobraría un mes 7 que no existe: exactamente el defecto que este
+  //      cambio viene a quitar.
+  //   2. `completed`  — terminó el periodo. Ni Reactivar ni Cancelar: no queda
+  //      nada que reactivar ni que cancelar.
+  if (input.status === "completed") {
+    return { kind: "completed", endsAt: input.currentPeriodEnd ?? null };
+  }
+  // Se exigen las DOS señales. `completed_at` por sí solo no basta: es una
+  // columna que ya existía y que L2b escribía sin cancelar nada en Stripe, así
+  // que una fila vieja lo trae puesto sin que haya ninguna cancelación
+  // programada. Prometerle "no habrá más cobros" a partir de esa marca sería
+  // mentirle justo sobre el cobro.
+  if (isCompletionScheduled(input)) {
+    return { kind: "completing", endsAt: input.currentPeriodEnd ?? null };
+  }
+
   if (input.cancelAtPeriodEnd && ELIGIBLE_STATUSES.includes(input.status)) {
     return { kind: "grace", endsAt: input.currentPeriodEnd ?? null };
   }

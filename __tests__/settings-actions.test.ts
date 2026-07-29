@@ -11,8 +11,19 @@ function makeQuery(table: string) {
     select: () => q,
     eq: () => q,
     in: () => q,
+    is: () => q,
     order: () => q,
     limit: () => q,
+    // La resolución de la suscripción ya no termina en maybeSingle(): pide la
+    // lista y filtra en JS, así que la cadena tiene que ser awaitable.
+    then: (
+      resolve: (v: { data: unknown[]; error: null }) => unknown,
+      reject?: (e: unknown) => unknown
+    ) => {
+      const raw = queryResults[table];
+      const rows = raw == null ? [] : Array.isArray(raw) ? raw : [raw];
+      return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+    },
     maybeSingle: () => Promise.resolve({ data: queryResults[table] ?? null, error: null }),
     single: () => Promise.resolve({ data: queryResults[table] ?? null, error: null }),
     insert: (payload: unknown) => { calls.push({ table, op: "insert", payload }); return Promise.resolve({ error: insertError }); },

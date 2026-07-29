@@ -11,13 +11,16 @@ import { paginate } from "@/lib/admin/pagination";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Sin actividad"];
+const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Completadas", "Sin actividad"];
 const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
   past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
   unpaid: { label: "Impaga", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
   canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
+  // L2c — terminó el programa completo. Es un logro, no una baja: verde como
+  // la activa, para que Aura no la lea de un vistazo como una cliente perdida.
+  completed: { label: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
 };
 
 export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string }) {

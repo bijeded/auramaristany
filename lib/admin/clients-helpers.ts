@@ -1,8 +1,8 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
 
-export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid";
+export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
 
-export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Sin actividad" | null;
+export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Completadas" | "Sin actividad" | null;
 
 /** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
 export const INACTIVITY_THRESHOLD_DAYS = 10;
@@ -56,6 +56,9 @@ export function filterClients(
     if (opts.status === "Activas" && r.status !== "active") return false;
     if (opts.status === "Vencidas" && r.status !== "past_due" && r.status !== "unpaid") return false;
     if (opts.status === "Canceladas" && r.status !== "canceled") return false;
+    // L2c — terminar no es cancelar. Tiene su propio filtro para que Aura
+    // pueda ver de un vistazo a quién ofrecerle Extra.
+    if (opts.status === "Completadas" && r.status !== "completed") return false;
     if (opts.status === "Sin actividad") {
       const paying = r.status === "active" || r.status === "trialing";
       if (!paying || !isInactive(r.last_activity_date, opts.now, INACTIVITY_THRESHOLD_DAYS)) return false;
@@ -97,6 +100,7 @@ export function subscriptionProgressLabel(
     content_ordinal: number;
     content_loops: number;
     rung_name: string | null;
+    status?: string;
   },
   program: { billing_model: string; duration_months: number | null }
 ): string {
@@ -107,13 +111,18 @@ export function subscriptionProgressLabel(
     rungName: sub.rung_name,
     contentOrdinal: sub.content_ordinal,
     contentLoops: sub.content_loops,
+    status: sub.status,
   }).text;
 }
 
 export function canDeleteClient(
   subs: { status: SubStatus }[]
 ): { ok: boolean; reason?: string } {
-  const live = subs.some((s) => s.status !== "canceled");
+  // L2c — `completed` es terminal y su cobro ya está cancelado a fin de
+  // periodo, así que no es una suscripción viva: contarla como tal dejaría a la
+  // cliente imposible de borrar para siempre, porque nunca pasará a `canceled`.
+  const DEAD: readonly SubStatus[] = ["canceled", "completed"];
+  const live = subs.some((s) => !DEAD.includes(s.status));
   if (live) {
     return { ok: false, reason: "Tiene una suscripción activa. Cancélala en Stripe antes de eliminar." };
   }
@@ -126,6 +135,7 @@ const STATUS_ES: Record<SubStatus, string> = {
   past_due: "Pago fallido",
   unpaid: "Impaga",
   canceled: "Cancelada",
+  completed: "Completada",
 };
 
 function csvCell(value: string): string {
