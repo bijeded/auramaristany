@@ -60,8 +60,13 @@ export function OnboardingBuilder({ questions }: { questions: OnboardingQuestion
   const [creating, setCreating] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
 
-  // Re-sincroniza cuando el server revalida tras una acción.
-  useEffect(() => setItems(questions), [questions]);
+  // Re-sincroniza cuando el server revalida tras una acción. Si llega lista
+  // nueva, el aviso de reorden fallido ya no describe lo que se ve: se quita,
+  // o se quedaría colgado mientras la admin edita o activa otras preguntas.
+  useEffect(() => {
+    setItems(questions);
+    setReorderError(null);
+  }, [questions]);
 
   async function onDragEnd(e: { active: { id: string | number }; over: { id: string | number } | null }) {
     if (!e.over || e.active.id === e.over.id) return;
@@ -120,12 +125,16 @@ export function OnboardingBuilder({ questions }: { questions: OnboardingQuestion
             marginBottom: 12,
             padding: "10px 14px",
             borderRadius: 10,
-            background: "#fdecea",
+            background: "var(--error-tint)",
+            borderLeft: "3px solid var(--error)",
+            // El texto NO usa var(--error): #e05c5c sobre el tint queda en ~3.2:1,
+            // por debajo del 4.5:1 que pide un texto de 14px. El token se queda
+            // en el fondo y el borde, que es donde sí cumple.
             color: "#8a2a20",
             fontSize: 14,
           }}
         >
-          {reorderError} El orden se quedó como estaba.
+          El orden se quedó como estaba. {reorderError}
         </div>
       ) : null}
 
