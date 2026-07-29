@@ -11,7 +11,7 @@ import { paginate } from "@/lib/admin/pagination";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Sin actividad"];
+const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Completadas", "Sin actividad"];
 const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },

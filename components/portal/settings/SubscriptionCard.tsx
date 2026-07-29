@@ -43,6 +43,8 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
   // de periodo. Anunciar un "Próximo cobro" le diría que le van a volver a
   // cobrar justo debajo del cartel que celebra que terminó.
   const isCompleted = subscription.status === "completed";
+  // Programada pero aún corriendo: sigue entrenando y ya no se le cobrará.
+  const isCompleting = !isCompleted && !!subscription.completed_at;
   const progress = accountProgressLabel(subscription);
   const repeat = repeatMarker(subscription.content_loops, subscription.content_ordinal);
 
@@ -68,7 +70,11 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
       <Row label="Fecha de inicio">{longDateLabel(subscription.enrollment_date)}</Row>
       {subscription.current_period_end && (
         isCompleted ? (
-          <Row label="Tu acceso termina el">
+          <Row label="Tu acceso terminó el">
+            {longDateLabel(subscription.current_period_end)}
+          </Row>
+        ) : isCompleting ? (
+          <Row label="Tu último mes termina el">
             {longDateLabel(subscription.current_period_end)}
           </Row>
         ) : (

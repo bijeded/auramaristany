@@ -29,7 +29,7 @@ const cancelInputSchema = z.object({
   detail: z.string().max(200).optional(),
 });
 
-type OwnedSub = { id: string; stripe_subscription_id: string; status: string };
+type OwnedSub = { id: string; stripe_subscription_id: string; status: string; completed_at: string | null };
 
 /** Resolve the caller's cancelable subscription from getUser() — never trust a
  *  client-sent id (INP-4/EDGE-5). Returns null if none is eligible. */
@@ -39,7 +39,7 @@ async function getOwnedCancelableSub(
 ): Promise<OwnedSub | null> {
   const { data } = await supabase
     .from("subscriptions")
-    .select("id, stripe_subscription_id, status")
+    .select("id, stripe_subscription_id, status, completed_at")
     .eq("profile_id", userId)
     .in("status", CANCELABLE_STATUSES)
     .order("enrollment_date", { ascending: false })
@@ -102,6 +102,15 @@ export async function reactivateSubscription(): Promise<ActionResult> {
 
   const sub = await getOwnedCancelableSub(supabase, user.id);
   if (!sub) return { ok: false, error: GENERIC_ERROR };
+
+  // L2c — una suscripción con la completion ya programada NO se reactiva. Está
+  // en su último mes de plazo fijo: quitarle `cancel_at_period_end` en Stripe le
+  // cobraría un mes 7 contra un programa que no lo tiene. La pantalla ya no
+  // ofrece el botón, pero esconder un botón no es una comprobación: la acción es
+  // invocable por sí sola.
+  if (sub.completed_at) {
+    return { ok: false, error: "Tu programa ya terminó y no se puede reactivar." };
+  }
 
   try {
     await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: false });

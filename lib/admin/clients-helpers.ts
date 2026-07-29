@@ -2,7 +2,7 @@ import { contentProgressLabel } from "@/lib/portal/progress-display";
 
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
 
-export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Sin actividad" | null;
+export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Completadas" | "Sin actividad" | null;
 
 /** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
 export const INACTIVITY_THRESHOLD_DAYS = 10;
@@ -56,6 +56,9 @@ export function filterClients(
     if (opts.status === "Activas" && r.status !== "active") return false;
     if (opts.status === "Vencidas" && r.status !== "past_due" && r.status !== "unpaid") return false;
     if (opts.status === "Canceladas" && r.status !== "canceled") return false;
+    // L2c — terminar no es cancelar. Tiene su propio filtro para que Aura
+    // pueda ver de un vistazo a quién ofrecerle Extra.
+    if (opts.status === "Completadas" && r.status !== "completed") return false;
     if (opts.status === "Sin actividad") {
       const paying = r.status === "active" || r.status === "trialing";
       if (!paying || !isInactive(r.last_activity_date, opts.now, INACTIVITY_THRESHOLD_DAYS)) return false;

@@ -4,14 +4,14 @@ import { mapSubscription, mapInvoices, accountProgressLabel } from "@/lib/portal
 describe("mapSubscription", () => {
   it("aplana los joins a un objeto plano", () => {
     const raw = [{
-      status: "active", cancel_at_period_end: false, enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
+      status: "active", cancel_at_period_end: false, completed_at: null, enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
       months_elapsed: 3,
       content_variant_id: "var-2", content_ordinal: 2, content_loops: 0,
       program_variants: { name: "Intermedio", price_mxn: 999, programs: { name: "Fuerza", duration_months: 6, billing_model: "fixed_term_monthly" } },
     }];
     expect(mapSubscription(raw)).toEqual({
       program_name: "Fuerza", variant_name: "Intermedio", status: "active",
-      cancel_at_period_end: false,
+      cancel_at_period_end: false, completed_at: null,
       enrollment_date: "2026-01-10", current_period_end: "2026-07-10T00:00:00Z",
       price_mxn: 999, months_elapsed: 3, duration_months: 6,
       billing_model: "fixed_term_monthly",
@@ -32,7 +32,7 @@ describe("mapSubscription", () => {
   it("prefiere la suscripción que paga sobre la terminada, venga en el orden que venga", () => {
     const variants = { name: "Intermedio", price_mxn: 999, programs: { name: "Fuerza", duration_months: null, billing_model: "rolling_monthly" } };
     const completed = {
-      status: "completed", cancel_at_period_end: true, enrollment_date: "2026-06-01", current_period_end: null,
+      status: "completed", cancel_at_period_end: true, completed_at: "2026-06-01T00:00:00Z", enrollment_date: "2026-06-01", current_period_end: null,
       months_elapsed: 6, content_variant_id: "var-1", content_ordinal: 6, content_loops: 0, program_variants: variants,
     };
     const active = { ...completed, status: "active", enrollment_date: "2026-01-01", months_elapsed: 2, content_ordinal: 2 };
@@ -43,7 +43,7 @@ describe("mapSubscription", () => {
 
   it("si la única que hay terminó, es la que se muestra", () => {
     const completed = [{
-      status: "completed", cancel_at_period_end: true, enrollment_date: "2026-06-01", current_period_end: null,
+      status: "completed", cancel_at_period_end: true, completed_at: "2026-06-01T00:00:00Z", enrollment_date: "2026-06-01", current_period_end: null,
       months_elapsed: 6, content_variant_id: "var-1", content_ordinal: 6, content_loops: 0,
       program_variants: { name: "Intermedio", price_mxn: 999, programs: { name: "CuarentaMás", duration_months: 6, billing_model: "fixed_term_monthly" } },
     }];
@@ -72,7 +72,7 @@ describe("mapInvoices", () => {
 describe("accountProgressLabel", () => {
   const base = {
     program_name: "Fuerza", variant_name: "Principiante", status: "active",
-    cancel_at_period_end: false, enrollment_date: "2026-01-10",
+    cancel_at_period_end: false, completed_at: null, enrollment_date: "2026-01-10",
     current_period_end: null, price_mxn: 999,
     months_elapsed: 3, duration_months: 6, billing_model: "fixed_term_monthly",
     content_variant_id: "var-1", content_ordinal: 3, content_loops: 0,

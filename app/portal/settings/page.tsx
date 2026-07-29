@@ -46,6 +46,7 @@ export default async function PortalSettingsPage({
         status: data.subscription.status as SubscriptionStatus,
         cancelAtPeriodEnd: data.subscription.cancel_at_period_end,
         currentPeriodEnd: data.subscription.current_period_end,
+        completedAt: data.subscription.completed_at,
       })
     : { kind: "none" as const };
 

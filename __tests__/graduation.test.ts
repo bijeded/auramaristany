@@ -26,3 +26,18 @@ describe("extraCheckoutSlugForLevel", () => {
     expect(EXTRA_ENTRY_VARIANT_SLUG).toBe("cuarenta-mas-extra-intermedio");
   });
 });
+
+import { readFileSync } from "node:fs";
+
+// El CTA cuelga de dos slugs literales. Un rename en el seed los rompería con
+// TODAS las pruebas en verde, porque aquí no hay nada que consulte el catálogo.
+describe("los slugs del CTA existen en el catálogo sembrado", () => {
+  const seed = readFileSync("supabase/migrations/002_seed_programs_variants.sql", "utf8");
+
+  it.each(["cuarenta-mas-extra-intermedio", "cuarenta-mas-extra-avanzado"])(
+    "%s está sembrado",
+    (slug) => {
+      expect(seed).toContain(slug);
+    }
+  );
+});

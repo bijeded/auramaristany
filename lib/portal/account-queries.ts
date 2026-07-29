@@ -14,6 +14,8 @@ export type AccountSubscription = {
   variant_name: string;
   status: string;
   cancel_at_period_end: boolean;
+  /** Sellado cuando la completion queda programada, un mes antes del estado. */
+  completed_at: string | null;
   enrollment_date: string;
   current_period_end: string | null;
   price_mxn: number;
@@ -46,6 +48,7 @@ export type AccountData = {
 type RawSub = {
   status: string;
   cancel_at_period_end: boolean | null;
+  completed_at: string | null;
   enrollment_date: string;
   current_period_end: string | null;
   months_elapsed: number;
@@ -67,6 +70,7 @@ export function mapSubscription(rows: RawSub[] | null): AccountSubscription | nu
     variant_name: r.program_variants.name,
     status: r.status,
     cancel_at_period_end: r.cancel_at_period_end ?? false,
+    completed_at: r.completed_at,
     enrollment_date: r.enrollment_date,
     current_period_end: r.current_period_end,
     price_mxn: r.program_variants.price_mxn,
@@ -126,7 +130,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
 
   const { data: subRows } = await supabase
     .from("subscriptions")
-    .select("status, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, duration_months, billing_model))")
+    .select("status, cancel_at_period_end, completed_at, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, duration_months, billing_model))")
     .eq("profile_id", userId)
     // L2c — incluye las terminadas: esta pantalla es el aterrizaje de la
     // clienta graduada y tiene que poder contarle que su programa acabó.

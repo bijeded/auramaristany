@@ -95,6 +95,48 @@ describe("deriveCancellationState", () => {
     );
   });
 
+  // El agujero que abre mover la escritura del estado: durante el ÚLTIMO mes ya
+  // pagado la fila sigue en `active` con `cancel_at_period_end` en true, que es
+  // exactamente la forma de la ventana de gracia. Sin mirar `completed_at`, la
+  // pantalla le ofrece "Reactivar", que borra la cancelación en Stripe y le
+  // cobra un mes 7 que no existe: el defecto que este cambio viene a quitar.
+  it("es 'completing' en el último mes pagado, aunque el estado siga en active", () => {
+    const s = deriveCancellationState({
+      status: "active",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: "2026-08-15T00:00:00Z",
+      completedAt: "2026-07-15T00:00:00Z",
+    });
+    expect(s.kind).toBe("completing");
+    if (s.kind === "completing") expect(s.endsAt).toBe("2026-08-15T00:00:00Z");
+  });
+
+  it("'completing' no ofrece Reactivar: no es la ventana de gracia", () => {
+    expect(
+      deriveCancellationState({
+        status: "active",
+        cancelAtPeriodEnd: true,
+        completedAt: "2026-07-15T00:00:00Z",
+      }).kind
+    ).not.toBe("grace");
+  });
+
+  it("una cancelación voluntaria normal sigue siendo 'grace'", () => {
+    expect(
+      deriveCancellationState({ status: "active", cancelAtPeriodEnd: true, completedAt: null }).kind
+    ).toBe("grace");
+  });
+
+  it("terminada gana a programada cuando llegan las dos", () => {
+    expect(
+      deriveCancellationState({
+        status: "completed",
+        cancelAtPeriodEnd: true,
+        completedAt: "2026-07-15T00:00:00Z",
+      }).kind
+    ).toBe("completed");
+  });
+
   it("no es ni 'grace' ni 'eligible': ni Reactivar ni Cancelar mi plan", () => {
     const kind = deriveCancellationState({ status: "completed", cancelAtPeriodEnd: true }).kind;
     expect(kind).not.toBe("grace");

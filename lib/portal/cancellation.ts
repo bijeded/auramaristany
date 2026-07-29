@@ -40,6 +40,8 @@ const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", 
 export type CancellationState =
   | { kind: "eligible" }
   | { kind: "grace"; endsAt: string | null }
+  /** Último mes ya pagado: la completion está programada, aún hay contenido. */
+  | { kind: "completing"; endsAt: string | null }
   | { kind: "completed"; endsAt: string | null }
   | { kind: "none" };
 
@@ -49,13 +51,24 @@ export function deriveCancellationState(input: {
   status: SubscriptionStatus;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd?: string | null;
+  /** Sellado cuando la completion queda PROGRAMADA, un mes antes del estado. */
+  completedAt?: string | null;
 }): CancellationState {
-  // L2c — el ESTADO se mira primero. Terminar el programa también deja
-  // `cancel_at_period_end` en true (la completion programa la cancelación en
-  // Stripe), así que mirar sólo la bandera le ofrecería "Reactivar" a quien
-  // acaba de terminar: reanudar el cobro de un contenido que ya se acabó.
+  // L2c — terminar no es la ventana de gracia, y hay que mirarlo antes que la
+  // bandera. Un programa de plazo fijo pasa por DOS momentos, y los dos dejan
+  // `cancel_at_period_end` en true:
+  //
+  //   1. `completing` — empieza su último mes ya pagado. Sigue entrenando, pero
+  //      ofrecerle "Reactivar" aquí borraría la cancelación en Stripe y le
+  //      cobraría un mes 7 que no existe: exactamente el defecto que este
+  //      cambio viene a quitar.
+  //   2. `completed`  — terminó el periodo. Ni Reactivar ni Cancelar: no queda
+  //      nada que reactivar ni que cancelar.
   if (input.status === "completed") {
     return { kind: "completed", endsAt: input.currentPeriodEnd ?? null };
+  }
+  if (input.completedAt) {
+    return { kind: "completing", endsAt: input.currentPeriodEnd ?? null };
   }
 
   if (input.cancelAtPeriodEnd && ELIGIBLE_STATUSES.includes(input.status)) {
