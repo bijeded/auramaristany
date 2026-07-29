@@ -1,4 +1,5 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
+import { deriveCancellationState } from "@/lib/portal/cancellation";
 import { dayLabel } from "@/lib/admin/date-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
@@ -47,7 +48,22 @@ export function nextChargeCell(sub: {
 
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
 
-export type StatusFilter = "Activas" | "Vencidas" | "Canceladas" | "Completadas" | "Sin actividad" | null;
+/**
+ * D17 — "Último mes" y "En cancelación" son las dos cohortes que siguen
+ * ACTIVAS: una termina su plazo y la otra se va por su cuenta, y hasta ahora
+ * ninguna se distinguía de "Activas". Deliberadamente NO se llaman
+ * "Completadas"/"Canceladas": ésas ya terminaron, y con nombres parecidos la
+ * fila de pills leería como cuatro sinónimos de lo mismo.
+ */
+export type StatusFilter =
+  | "Activas"
+  | "Vencidas"
+  | "Canceladas"
+  | "Completadas"
+  | "Último mes"
+  | "En cancelación"
+  | "Sin actividad"
+  | null;
 
 /** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
 export const INACTIVITY_THRESHOLD_DAYS = 10;
@@ -65,6 +81,12 @@ export interface ClientListRow {
   status: SubStatus;
   /** Sin esto la tabla anunciaba cobros de suscripciones que ya no cobran. */
   cancel_at_period_end: boolean;
+  /**
+   * D17 — hace falta junto con la bandera para saber si el final está
+   * PROGRAMADO. `cancel_at_period_end` a solas no distingue graduarse de irse:
+   * las dos lo traen puesto. Lo consume `isCompletionScheduled`, no `nextChargeCell`.
+   */
+  completed_at: string | null;
   last_activity_date: string | null; // max progress_logs.log_date (YYYY-MM-DD) o null
 }
 
@@ -106,6 +128,30 @@ export function filterClients(
     // L2c — terminar no es cancelar. Tiene su propio filtro para que Aura
     // pueda ver de un vistazo a quién ofrecerle Extra.
     if (opts.status === "Completadas" && r.status !== "completed") return false;
+    // D17 — las dos cohortes que siguen activas. La pertenencia se decide con la
+    // MISMA derivación que el portal y el dashboard: `completed_at` a solas no
+    // prueba nada (L2b lo escribía sin cancelar en Stripe), y leer la bandera
+    // suelta confundiría graduarse con irse, que es el error que L2c ya cazó
+    // tres veces.
+    if (opts.status === "Último mes" || opts.status === "En cancelación") {
+      // Este guard es CARGA, no adorno: el `kind` a solas no filtra por status.
+      // `deriveCancellationState` sólo cortocircuita en `completed` antes de
+      // `isCompletionScheduled`, así que con las dos señales puestas devuelve
+      // "completing" para cualquier otro status —incluida una `canceled` con una
+      // marca vieja— sin llegar a mirar ELIGIBLE_STATUSES. Dos pruebas lo fijan.
+      if (r.status !== "active") return false;
+      // La cohorte la nombra `deriveCancellationState`, la MISMA función que usa
+      // el portal y de la que salen las tarjetas del dashboard. No se leen las
+      // banderas aquí: el orden importa —`cancel_at_period_end` también lo trae
+      // quien se gradúa— y ése es justo el error que L2c cazó tres veces.
+      const kind = deriveCancellationState({
+        status: r.status,
+        cancelAtPeriodEnd: r.cancel_at_period_end,
+        completedAt: r.completed_at,
+      }).kind;
+      const wanted = opts.status === "Último mes" ? "completing" : "grace";
+      if (kind !== wanted) return false;
+    }
     if (opts.status === "Sin actividad") {
       const paying = r.status === "active" || r.status === "trialing";
       if (!paying || !isInactive(r.last_activity_date, opts.now, INACTIVITY_THRESHOLD_DAYS)) return false;

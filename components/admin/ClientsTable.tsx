@@ -11,7 +11,18 @@ import {
 import { paginate } from "@/lib/admin/pagination";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-const STATE_FILTERS: Exclude<StatusFilter, null>[] = ["Activas", "Vencidas", "Canceladas", "Completadas", "Sin actividad"];
+// D17 — "Último mes" y "En cancelación" van junto a "Completadas"/"Canceladas"
+// a propósito, y por eso NO se llaman igual: estas dos siguen activas y
+// entrenando; aquéllas ya terminaron.
+const STATE_FILTERS: Exclude<StatusFilter, null>[] = [
+  "Activas",
+  "Vencidas",
+  "Canceladas",
+  "Completadas",
+  "Último mes",
+  "En cancelación",
+  "Sin actividad",
+];
 const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
