@@ -1,0 +1,41 @@
+-- 017_rolling_billing_extra.sql
+-- L2c — CuarentaMás Extra se cobra como lo que se vende, y un plazo fijo puede
+-- por fin terminar de verdad.
+--
+-- Tres cosas, las tres de datos o de constraints:
+--
+--   1. `cuarenta-mas-extra` pasa a `rolling_monthly`. Se sembró como plazo fijo
+--      de 6 meses, pero se vende como suscripción mensual abierta: la cliente
+--      termina CuarentaMás, se suscribe a Extra en el nivel que le toca y sigue
+--      mientras quiera. Sólo se había corregido la etiqueta del admin.
+--
+--   2. El CHECK de `subscriptions.status` acepta `completed` y `trialing`. Los
+--      dos están en `SubscriptionStatus` desde siempre y ninguno se podía
+--      escribir: por eso la ruta de completion nunca pudo funcionar, ni aunque
+--      lo hubiera intentado. Regla del proyecto: el enum de la app y el CHECK
+--      que lo refleja se migran juntos.
+--
+--   3. Se borran los prerequisitos de las variantes de Extra. Codifican una
+--      regla de CONTENIDO ("Extra va después de CuarentaMás") mientras Aura
+--      aplica una de JUICIO ("la evalué y está lista para Avanzado") y manda
+--      desde su sitio al checkout de ese nivel. No se reconcilian: la regla de
+--      la base rechaza justo a las clientes que ella aprobó. La puerta se mueve
+--      al embudo.
+
+-- 1 · Extra deja de tener final
+update programs
+   set billing_model = 'rolling_monthly',
+       duration_months = null
+ where slug = 'cuarenta-mas-extra';
+
+-- 2 · el CHECK se reemplaza entero (no se edita en sitio)
+alter table subscriptions drop constraint if exists subscriptions_status_check;
+alter table subscriptions add constraint subscriptions_status_check
+  check (status in ('active','trialing','past_due','canceled','unpaid','completed'));
+
+-- 3 · fuera la puerta de prerequisitos de Extra
+delete from program_variant_prerequisites
+ where program_variant_id in (
+   select id from program_variants
+    where program_id = (select id from programs where slug = 'cuarenta-mas-extra')
+ );

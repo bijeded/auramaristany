@@ -220,18 +220,38 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   };
   const sub = rawSub as SubWithVariant;
 
-  // GUARDA DE IDEMPOTENCIA. Todo lo que avanza va después de esta línea: si la
-  // factura ya estaba registrada, esta entrega es una redelivery de Stripe y no
-  // hay nada que contar. Antes el incremento del mes no estaba protegido.
-  const isNewInvoice = await recordInvoice(invoice, sub.id);
-  if (!isNewInvoice) return;
-
   const program = sub.program_variants?.programs;
   const { newMonthsElapsed, shouldComplete } = computeMonthsUpdate(
     sub.months_elapsed,
     program?.billing_model ?? "rolling_monthly",
     program?.duration_months ?? null
   );
+
+  // L2c — el final de un plazo fijo. Los diez precios son mensuales
+  // recurrentes, así que sin esta llamada a una cliente de CuarentaMás se le
+  // cobraba el mes 7, el 8 y los siguientes contra un contenido que se acabó en
+  // el 6: cobrar por un servicio que no se presta.
+  //
+  // `cancel_at_period_end` y no una cancelación inmediata: el mes 6 ya está
+  // pagado y se juega entero. Y va ANTES de la guarda de idempotencia a
+  // propósito —es idempotente en Stripe, ponerla dos veces es un no-op—,
+  // porque puesta después un fallo aquí sería definitivo: el reintento
+  // encontraría la factura ya registrada, volvería sin hacer nada, y la
+  // cancelación no se programaría nunca.
+  if (shouldComplete) {
+    try {
+      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+    } catch (err) {
+      console.error("[webhook] no se pudo programar el fin del plazo fijo", err);
+      throw err;
+    }
+  }
+
+  // GUARDA DE IDEMPOTENCIA. Todo lo que avanza va después de esta línea: si la
+  // factura ya estaba registrada, esta entrega es una redelivery de Stripe y no
+  // hay nada que contar. Antes el incremento del mes no estaba protegido.
+  const isNewInvoice = await recordInvoice(invoice, sub.id);
+  if (!isNewInvoice) return;
 
   const position = await nextContentPosition(supabase, sub, {
     billing_model: program?.billing_model ?? "rolling_monthly",
@@ -243,6 +263,10 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // de Stripe; el peldaño en el que entrena es `content_variant_id`.
   const updatePayload = {
     months_elapsed: newMonthsElapsed,
+    // Sella que la completion queda PROGRAMADA. El `status` NO se toca aquí:
+    // es lo que retira el contenido, y escribirlo ahora le quitaría a la
+    // cliente el mes que acaba de pagar. Lo escribe el borrado, al terminar el
+    // periodo (Decisión 1, enmendada).
     ...(shouldComplete ? { completed_at: new Date().toISOString() } : {}),
     ...(position
       ? {
@@ -431,16 +455,42 @@ async function nextContentPosition(
   });
 }
 
+/** La fila local, leída antes de decidir cómo termina. */
+async function readLocalSubscription(
+  supabase: ServiceClient,
+  stripeSubscriptionId: string
+): Promise<{ id: string; profile_id: string; status: string; completed_at: string | null } | null> {
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("id, profile_id, status, completed_at")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
+  return (data as { id: string; profile_id: string; status: string; completed_at: string | null } | null) ?? null;
+}
+
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const supabase = createServiceClient();
   // Re-source the billing period from subscription items (Stripe API 2026+) so renewals stay fresh.
   const { current_period_start, current_period_end } = readPeriod(subscription);
+
+  // `completed` es terminal y NO se espeja desde Stripe. Stripe manda
+  // `canceled` en el update que acompaña al borrado; copiarlo sin mirar
+  // borraría el `completed` recién escrito y convertiría "terminó" en "se fue",
+  // llevándose por delante el portal graduado de la cliente. El periodo sí se
+  // refresca: eso es información, no una degradación.
+  const local = await readLocalSubscription(supabase, subscription.id);
+  const isCompleted = local?.status === "completed";
+
   const { error } = await supabase
     .from("subscriptions")
     .update({
-      // keep: Stripe Subscription.Status includes statuses ("incomplete", "incomplete_expired")
-      // not in our SubscriptionStatus union; mapping via cast as the DB stores them as-is.
-      status: subscription.status as import("@/lib/supabase/types").SubscriptionStatus,
+      ...(isCompleted
+        ? {}
+        : {
+            // keep: Stripe Subscription.Status includes statuses ("incomplete", "incomplete_expired")
+            // not in our SubscriptionStatus union; mapping via cast as the DB stores them as-is.
+            status: subscription.status as import("@/lib/supabase/types").SubscriptionStatus,
+          }),
       cancel_at_period_end: subscription.cancel_at_period_end,
       current_period_start,
       current_period_end,
@@ -452,12 +502,21 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
 
 export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const supabase = createServiceClient();
-  const { data: subRow, error } = await supabase
+
+  // L2c — hay DOS finales, y este handler es quien los distingue. Una
+  // suscripción que traía `completed_at` llegó aquí porque su plazo terminó y
+  // la cancelación estaba programada: eso es haber TERMINADO. Cualquier otra es
+  // una baja. Escribir `canceled` sin mirar —como antes— dejaba grabado que se
+  // fue quien en realidad acabó, y le quitaba el portal graduado.
+  const local = await readLocalSubscription(supabase, subscription.id);
+  const finalStatus = local?.completed_at || local?.status === "completed" ? "completed" : "canceled";
+
+  const { error } = await supabase
     .from("subscriptions")
-    .update({ status: "canceled" })
-    .eq("stripe_subscription_id", subscription.id)
-    .select("id, profile_id")
-    .maybeSingle();
+    .update({ status: finalStatus })
+    .eq("stripe_subscription_id", subscription.id);
+
+  const subRow = local ? { id: local.id, profile_id: local.profile_id } : null;
 
   if (error) console.error("[webhook] subscription.deleted error:", error);
 
