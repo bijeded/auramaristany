@@ -22,11 +22,19 @@ const fakeSupabase = {
   }),
   rpc: (fn: string, args: unknown) => {
     calls.push({ op: "rpc", fn, args });
-    const sent = (args as { payload: unknown[] }).payload.length;
-    return Promise.resolve({
-      data: rpcRowsUpdated ?? sent,
-      error: rpcError,
-    });
+    // La función de la base levanta si tocó menos filas de las esperadas, y la
+    // llamada entera se deshace. El fake imita eso: desajuste ⇒ error, nunca
+    // "ok con conteo raro", porque ese estado no existe del otro lado.
+    const { payload, expected } = args as { payload: unknown[]; expected: number };
+    const touched = rpcRowsUpdated ?? payload.length;
+    if (rpcError) return Promise.resolve({ data: null, error: rpcError });
+    if (touched !== expected) {
+      return Promise.resolve({
+        data: null,
+        error: { message: `orden parcial: ${touched} de ${expected} preguntas` },
+      });
+    }
+    return Promise.resolve({ data: touched, error: null });
   },
 };
 
@@ -76,6 +84,9 @@ describe("reorderQuestions", () => {
         { id: "q-b", sort_order: 1 },
         { id: "q-c", sort_order: 2 },
       ],
+      // Cuántas filas debe tocar. Va en la misma llamada para que la propia
+      // función lo compruebe y se deshaga sola si no cuadra.
+      expected: 3,
     });
   });
 
@@ -102,9 +113,11 @@ describe("reorderQuestions", () => {
     expect(r.error).not.toContain("does not exist");
   });
 
-  // Sin este chequeo la acción devolvía éxito aunque la escritura no hubiera
-  // tocado nada: la admin veía su orden nuevo pintado y al recargar volvía el
-  // viejo. Pasa si una pregunta se borró en otra pestaña, o si RLS la filtra.
+  // Sin esta comprobación la acción devolvía éxito aunque la escritura no
+  // hubiera tocado nada: la admin veía su orden nuevo pintado y al recargar
+  // volvía el viejo. Pasa si una pregunta se borró en otra pestaña, o si RLS la
+  // filtra. La comprobación vive DENTRO de la función para que el update se
+  // deshaga: "error" tiene que seguir significando "no se escribió nada".
   it("si no se actualizaron todas las preguntas, falla en vez de mentir", async () => {
     // Arrange — se piden 3, la base sólo tocó 2
     rpcRowsUpdated = 2;

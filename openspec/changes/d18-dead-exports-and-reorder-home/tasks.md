@@ -10,6 +10,7 @@
 - [ ] 2.2 Mantener el contrato de error del action (`{ error }` vía `logAndGeneric`) y `requireAdmin()` + `revalidate()` exactamente como están: esta tarea cambia **cómo se escribe**, no quién puede escribir.
 - [ ] 2.3 Test: `reindexOrder` numera desde `0` y de forma consecutiva (fija el comportamiento que el bucle tenía, para que el cambio de escritura no lo mueva).
 - [ ] 2.4 Confirmar que ya no queda ninguna derivación de `sort_order` fuera de `reindexOrder` (grep de `sort_order:` en `lib/admin/`).
+- [ ] 2.5 **Añadida en revisión.** `OnboardingBuilder.onDragEnd` tiene que consumir el error: hoy lo descarta, así que un reorden fallido deja pintado el orden optimista y no le dice nada a la admin. Revertir a la lista anterior y mostrar el aviso. Sin esto el contrato de error nuevo no tiene lector — exactamente la enfermedad que D18 viene a curar.
 
 ## 3. Retirar los dos exports huérfanos
 

@@ -69,25 +69,18 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
   // TODOS los selects con join del repo, no sólo éste. Se tipa el rpc aquí.
   const rpc = supabase.rpc as unknown as (
     fn: string,
-    args: { payload: { id: string; sort_order: number }[] }
+    args: { payload: { id: string; sort_order: number }[]; expected: number }
   ) => Promise<{ data: number | null; error: { message: string } | null }>;
 
-  const { data: updated, error } = await rpc("reorder_onboarding_questions", {
+  // Se le manda cuántas filas debe tocar, y la función levanta si no coinciden.
+  // Comprobarlo aquí, con la respuesta ya en la mano, llegaría tarde: el update
+  // habría hecho commit y estaríamos devolviendo "error" sobre una base sí
+  // modificada, que es el orden a medias que este cambio viene a quitar.
+  const { error } = await rpc("reorder_onboarding_questions", {
     payload: reindexOrder(orderedIds),
+    expected: orderedIds.length,
   });
   if (error) return { error: logAndGeneric("reorderQuestions", error) };
-
-  // La función devuelve cuántas filas tocó. Si no son todas, alguna pregunta ya
-  // no existe o RLS la filtró: el orden guardado NO es el que la admin acaba de
-  // ver, y devolver éxito le pintaría uno que se deshace al recargar.
-  if (updated !== orderedIds.length) {
-    return {
-      error: logAndGeneric(
-        "reorderQuestions",
-        new Error(`orden parcial: ${updated} de ${orderedIds.length} preguntas`)
-      ),
-    };
-  }
 
   revalidate();
   return {};
