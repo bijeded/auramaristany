@@ -26,9 +26,11 @@ export async function DELETE(
     .from("subscriptions")
     .select("status")
     .eq("profile_id", params.clientId);
-  // keep: SubStatus is narrower than SubscriptionStatus (it omits Stripe's
-  // intermediate states); the cast narrows.
-  const subs = (rawSubs ?? []) as { status: SubStatus }[];
+  // El cast que había aquí se justificaba diciendo que `SubStatus` era "más
+  // estrecho" que el status real — y lo era, ahí estaba el defecto: tapaba que
+  // por aquí pasan también los estados intermedios de Stripe. Ya son el mismo
+  // tipo, así que no hace falta afirmar nada.
+  const subs: { status: SubStatus }[] = rawSubs ?? [];
   const guard = canDeleteClient(subs);
   if (!guard.ok) {
     return NextResponse.json({ error: guard.reason }, { status: 409 });

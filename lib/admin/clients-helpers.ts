@@ -1,5 +1,6 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
 import { deriveCancellationState } from "@/lib/portal/cancellation";
+import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { dayLabel } from "@/lib/admin/date-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
@@ -46,7 +47,21 @@ export function nextChargeCell(sub: {
     : { kind: "ending", label: "Acceso hasta", value: date };
 }
 
-export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";
+/**
+ * Los status de suscripción que el admin puede recibir — TODOS los que la base
+ * acepta, no los que a esta pantalla le gustaría que existieran.
+ *
+ * Era una lista propia de seis mientras el CHECK de `subscriptions.status`
+ * (migración 017) admitía nueve, y `handleSubscriptionUpdated` espeja el de
+ * Stripe tal cual. La diferencia no era teórica: había un cast `// keep:` en la
+ * ruta de borrado que se sabía "más estrecho" y lo tapaba, y un mapa indexado
+ * sin salida que tiraba el listado completo con un `paused`.
+ *
+ * Ahora es un alias: la lista vive en un solo sitio y no puede volver a
+ * separarse de la base sin que `tsc` lo note. No cambia ningún comportamiento en
+ * ejecución —esas filas ya llegaban aquí—, sólo deja de mentir el tipo.
+ */
+export type SubStatus = SubscriptionStatus;
 
 /**
  * D17 — "Último mes" y "En cancelación" son las dos cohortes que siguen
@@ -222,14 +237,51 @@ export function canDeleteClient(
   return { ok: true };
 }
 
-const STATUS_ES: Record<SubStatus, string> = {
-  active: "Activa",
-  trialing: "Prueba",
-  past_due: "Pago fallido",
-  unpaid: "Impaga",
-  canceled: "Cancelada",
-  completed: "Completada",
+/**
+ * Cómo se pinta un status de suscripción: etiqueta en español y colores.
+ *
+ * La clave es `string`, NO `SubStatus`, y eso es el arreglo entero. La migración
+ * 017 ensanchó el CHECK de `subscriptions.status` a NUEVE valores a propósito
+ * —para que espejar el status de Stripe no fuera rechazado y la fila no se
+ * quedara contando otra historia—, pero la UI siguió modelando seis. Había DOS
+ * mapas de esto (uno aquí para el CSV y otro dentro de ClientsTable), copias de
+ * la misma tabla, y por eso a los dos les faltaban exactamente los mismos tres:
+ * `incomplete`, `incomplete_expired` y `paused`. El de la tabla se indexaba sin
+ * salida, así que un `paused` devolvía undefined y `badge.label` tiraba el
+ * render: no esa fila, el listado COMPLETO. Bastaba con que Aura pausara una
+ * suscripción desde el dashboard de Stripe.
+ *
+ * El fallback no es paranoia: el CHECK puede volver a ensancharse sin que nadie
+ * se acuerde de esta pantalla, y entonces un status nuevo debe verse raro, no
+ * borrar la lista de clientes de Aura.
+ */
+const STATUS_PRESENTATION: Record<string, { label: string; bg: string; color: string }> = {
+  active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
+  trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
+  past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
+  unpaid: { label: "Impaga", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
+  // L2c — terminó el programa completo. Es un logro, no una baja: verde como
+  // la activa, para que Aura no la lea de un vistazo como una cliente perdida.
+  completed: { label: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
+  // Los tres que la base ya aceptaba y aquí no existían. Ámbar los dos que
+  // pueden volver a cobrar; gris el que murió sin llegar a cobrar nunca.
+  paused: { label: "Pausada", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  incomplete: { label: "Incompleta", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  incomplete_expired: { label: "Expirada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
 };
+
+export function statusBadge(status: string): { label: string; bg: string; color: string } {
+  return (
+    STATUS_PRESENTATION[status] ?? {
+      // Se muestra el valor crudo: es feo a propósito, y es infinitamente mejor
+      // que una tabla en blanco. Mismo criterio que la celda de pagos de la ficha.
+      label: status,
+      bg: "var(--gris-claro)",
+      color: "var(--gris-texto)",
+    }
+  );
+}
 
 function csvCell(value: string): string {
   if (/[",\n]/.test(value)) {
@@ -241,7 +293,7 @@ function csvCell(value: string): string {
 export function clientsToCSV(rows: ClientListRow[]): string {
   const header = "Nombre,Email,Programa,Variante,Estado,Inscripción";
   const lines = rows.map((r) =>
-    [r.full_name, r.email, r.program_name, r.variant_name, STATUS_ES[r.status], r.enrollment_date]
+    [r.full_name, r.email, r.program_name, r.variant_name, statusBadge(r.status).label, r.enrollment_date]
       .map(csvCell)
       .join(",")
   );

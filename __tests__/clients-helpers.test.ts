@@ -252,7 +252,39 @@ describe("canDeleteClient", () => {
   });
 });
 
-import { clientsToCSV } from "@/lib/admin/clients-helpers";
+import { clientsToCSV, statusBadge } from "@/lib/admin/clients-helpers";
+
+// La base acepta NUEVE status desde la migración 017 —se ensanchó a propósito,
+// para que espejar a Stripe no fuera rechazado— y la UI sólo modelaba seis. Los
+// tres de más (`incomplete`, `incomplete_expired`, `paused`) los escribe
+// `handleSubscriptionUpdated` tal cual. `STATUS_BADGE` se indexaba sin salida y
+// `badge.label` reventaba: no la fila, la TABLA entera. Basta con que Aura le dé
+// a "pausar" en el dashboard de Stripe para quedarse sin listado de clientes.
+describe("statusBadge", () => {
+  it("los tres status que la base permite y la UI no modelaba tienen etiqueta", () => {
+    expect(statusBadge("paused").label).toBe("Pausada");
+    expect(statusBadge("incomplete").label).toBe("Incompleta");
+    expect(statusBadge("incomplete_expired").label).toBe("Expirada");
+  });
+
+  it("los seis de siempre no cambian", () => {
+    expect(statusBadge("active").label).toBe("Activa");
+    expect(statusBadge("trialing").label).toBe("Prueba");
+    expect(statusBadge("past_due").label).toBe("Pago fallido");
+    expect(statusBadge("unpaid").label).toBe("Impaga");
+    expect(statusBadge("canceled").label).toBe("Cancelada");
+    expect(statusBadge("completed").label).toBe("Completada");
+  });
+
+  // El CHECK puede volver a ensancharse sin que nadie se acuerde de esta tabla,
+  // así que un status desconocido tiene que pintarse, no reventar.
+  it("un status que nadie previó se pinta con su propio nombre, sin tirar la tabla", () => {
+    const badge = statusBadge("algo_que_stripe_invente_en_2027");
+    expect(badge.label).toBe("algo_que_stripe_invente_en_2027");
+    expect(badge.bg).toBeTruthy();
+    expect(badge.color).toBeTruthy();
+  });
+});
 
 describe("clientsToCSV", () => {
   it("incluye encabezado y una fila por cliente", () => {
@@ -272,6 +304,15 @@ describe("clientsToCSV", () => {
   it("la suscripción terminada tiene su propia etiqueta", () => {
     const csv = clientsToCSV([{ ...base, status: "completed" }]);
     expect(csv.split("\n")[1]).toContain("Completada");
+  });
+
+  // El mismo agujero que en el badge, con consecuencia más callada: aquí no
+  // revienta, deja la columna Estado VACÍA (csvCell recibe undefined y join lo
+  // convierte en cadena vacía), así que el CSV sale plausible y equivocado.
+  it("un status que la base permite pero la UI no modelaba no deja la celda vacía", () => {
+    const csv = clientsToCSV([{ ...base, status: "paused" }]);
+    const estado = csv.split("\n")[1].split(",")[4];
+    expect(estado).toBe("Pausada");
   });
 });
 

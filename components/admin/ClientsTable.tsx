@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
   filterClients, clientsToCSV, canDeleteClient,
-  nextChargeCell,
+  nextChargeCell, statusBadge,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
 import { paginate } from "@/lib/admin/pagination";
@@ -23,16 +23,6 @@ const STATE_FILTERS: Exclude<StatusFilter, null>[] = [
   "En cancelación",
   "Sin actividad",
 ];
-const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string; color: string }> = {
-  active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
-  past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
-  unpaid: { label: "Impaga", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
-  canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
-  // L2c — terminó el programa completo. Es un logro, no una baja: verde como
-  // la activa, para que Aura no la lea de un vistazo como una cliente perdida.
-  completed: { label: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-};
 
 export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string }) {
   const router = useRouter();
@@ -123,7 +113,7 @@ export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string
               </tr></thead>
               <tbody>
                 {items.map((c) => {
-                  const badge = STATUS_BADGE[c.status];
+                  const badge = statusBadge(c.status);
                   const canDel = canDeleteClient([{ status: c.status }]).ok;
                   return (
                     <tr key={c.profile_id} style={{ borderTop: "1px solid var(--gris-linea)", cursor: "pointer" }}
