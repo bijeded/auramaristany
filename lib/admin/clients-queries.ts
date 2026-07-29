@@ -16,6 +16,7 @@ interface RawSubRow {
   profile_id: string;
   status: SubStatus;
   current_period_end: string | null;
+  cancel_at_period_end: boolean | null;
   enrollment_date: string;
   created_at: string;
   profiles: {
@@ -34,7 +35,7 @@ export async function getClientsList(): Promise<ClientListRow[]> {
   const { data } = await supabase
     .from("subscriptions")
     .select(
-      "profile_id, status, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone, progress_logs(log_date)), program_variants!program_variant_id(name, price_mxn, programs(name))"
+      "profile_id, status, cancel_at_period_end, current_period_end, enrollment_date, created_at, profiles(full_name, email, phone, progress_logs(log_date)), program_variants!program_variant_id(name, price_mxn, programs(name))"
     );
 
   // keep: subscriptions JOIN profiles (+ progress_logs) JOIN program_variants JOIN programs — nested join not inferred.
@@ -68,6 +69,7 @@ export async function getClientsList(): Promise<ClientListRow[]> {
       variant_name: primary.program_variants!.name,
       enrollment_date: primary.enrollment_date,
       current_period_end: primary.current_period_end,
+      cancel_at_period_end: primary.cancel_at_period_end ?? false,
       price_mxn: primary.program_variants!.price_mxn,
       status: primary.status,
       last_activity_date: lastActivity,

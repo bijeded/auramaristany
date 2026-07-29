@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
+import { subscriptionProgressLabel, nextChargeCell } from "@/lib/admin/clients-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
-import { subscriptionProgressLabel } from "@/lib/admin/clients-helpers";
 import { dayLabel, monthLabel, monthKey } from "@/lib/admin/date-helpers";
 import { normalizeWhatsappNumber, whatsappUrl } from "@/lib/admin/message-helpers";
 import { ClientPhotosTab } from "./ClientPhotosTab";
@@ -74,7 +74,9 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
             {detail.subscriptions.length === 0 && (
               <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 14 }}>Sin suscripciones.</p>
             )}
-            {detail.subscriptions.map((s, i) => (
+            {detail.subscriptions.map((s, i) => {
+              const charge = nextChargeCell(s);
+              return (
               <div key={s.id} style={{ marginBottom: i < detail.subscriptions.length - 1 ? 18 : 0 }}>
                 <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{s.program_name} · {s.variant_name}</h3>
                 {[
@@ -83,13 +85,9 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
                   // el nivel que ESTÁ HACIENDO, que puede haber subido desde entonces.
                   ["Progreso", subscriptionProgressLabel(s, { billing_model: s.billing_model, duration_months: s.duration_months })],
                   ...(s.content_loops > 0 ? [["Repeticiones", `${s.content_loops}ª vuelta al nivel`] as [string, string]] : []),
-                  // Nada de lo que tiene fecha de final vuelve a cobrar: ni la
-                  // terminada, ni la que está terminando, ni la que se dio de
-                  // baja y está en su periodo de gracia. Anunciarles un
-                  // "Próximo cobro" le haría creer a Aura que siguen pagando.
-                  s.status === "completed" || s.cancel_at_period_end
-                    ? (["Acceso termina el", s.current_period_end ? dayLabel(s.current_period_end.slice(0, 10)) : "—"] as [string, string])
-                    : (["Próximo cobro", s.current_period_end ? `${dayLabel(s.current_period_end.slice(0, 10))} · ${formatMXN(s.price_mxn)}` : "—"] as [string, string]),
+                  // Misma pregunta que el listado, misma respuesta: la decisión
+                  // vive en `nextChargeCell`, no duplicada aquí.
+                  [charge.label, charge.value] as [string, string],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between" style={{ marginBottom: 10 }}>
                     <span className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>{k}</span>
@@ -97,7 +95,8 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
                   </div>
                 ))}
               </div>
-            ))}
+              );
+            })}
           </Card>
           <Card style={{ width: 240, display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center", gap: 12 }}>
             <p className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>Envía un mensaje directo a {detail.profile.full_name.split(" ")[0]}.</p>
