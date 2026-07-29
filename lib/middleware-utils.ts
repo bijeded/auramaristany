@@ -44,12 +44,22 @@ export function graduatedMayReachRoute(pathname: string): boolean {
   // Se decodifica UNA vez y luego se buscan los segmentos de punto, en vez de
   // rechazar todo lo que lleve un `%`: una ruta permitida puede llevar un id
   // escapado legítimo. Un escape malformado no se interpreta: se rechaza.
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(pathname);
-  } catch {
-    return false;
+  // Se decodifica HASTA QUE deja de cambiar: con una sola pasada,
+  // `%252e%252e` se queda en `%2e%2e`, que no parece un segmento de punto y
+  // pasa. La lista de permitidos no debe depender de cuántas veces decodifique
+  // el router.
+  let decoded = pathname;
+  for (let i = 0; i < 4; i++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return false;
+    }
+    if (next === decoded) break;
+    decoded = next;
   }
+  if (decoded.includes("%")) return false;
   const normalized = decoded.replace(/\/{2,}/g, "/");
   if (normalized.split("/").some((s) => s === "." || s === "..")) return false;
 
@@ -80,7 +90,7 @@ export function getRedirectPath(params: RedirectParams): string | null {
   // puerta que se abre escribiendo dos barras no debería existir.
   const pathname = params.pathname.replace(/\/{2,}/g, "/");
   // Sólo cuenta cuando no hay ninguna que pague: si compró Extra después de
-  // terminar CuarentaMás, es clienta de pleno derecho otra vez.
+  // terminar CuarentaMás, es cliente de pleno derecho otra vez.
   const isGraduated = !hasActiveSubscription && params.hasGraduatedSubscription === true;
 
   const isProtectedRoute =
@@ -102,7 +112,7 @@ export function getRedirectPath(params: RedirectParams): string | null {
 
   // Ya autenticado: no permitir re-login desde /auth/login|register; mandar a su home.
   // /auth/callback (confirmación de correo) y /auth/reset-password quedan fuera a propósito.
-  // El hogar de la clienta: quien se graduó aterriza en su cuenta, no en Hoy —
+  // El hogar de la cliente: quien se graduó aterriza en su cuenta, no en Hoy —
   // mandarla a Hoy sólo para rebotarla es un parpadeo que no hace falta.
   const clientHome = isGraduated ? GRADUATED_HOME : "/portal/today";
 

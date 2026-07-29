@@ -802,6 +802,59 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
     expect(statuses).not.toContain("canceled");
   });
 
+  // Sin el 500, un CHECK que rechace `completed` —el caso mientras la migración
+  // 017 no esté aplicada— dejaría la fila en `active` con la suscripción ya
+  // cancelada en Stripe: contenido completo, gratis y para siempre, en silencio.
+  it("si la escritura del estado falla, se relanza para que Stripe reintente", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+      error: null,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updateEqMock.mockImplementation((() => ({ error: { message: "check violado" } })) as any);
+
+    await expect(handleSubscriptionDeleted(deletedEvent())).rejects.toThrow();
+  });
+
+  it("a quien termina no se le manda el correo de 'tu suscripción terminó'", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      error: null,
+    });
+
+    await handleSubscriptionDeleted(deletedEvent());
+
+    const { sendSubscriptionEndedEmail } = await import("@/lib/email/send");
+    expect(sendSubscriptionEndedEmail).not.toHaveBeenCalled();
+  });
+
+  it("a quien se da de baja sí", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+      error: null,
+    });
+    // El correo cuelga de resolver el contacto por la suscripción.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue({ data: { profiles: { email: "ana@example.com", full_name: "Ana" } } } as any);
+
+    await handleSubscriptionDeleted(deletedEvent());
+
+    const { sendSubscriptionEndedEmail } = await import("@/lib/email/send");
+    expect(sendSubscriptionEndedEmail).toHaveBeenCalled();
+  });
+
+  // Graduada y "churn" a la vez sería un dato de baja falso.
+  it("terminar no escribe encuesta ni con un cobro disputado", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      error: null,
+    });
+
+    await handleSubscriptionDeleted(deletedEvent("payment_disputed"));
+
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
   it("terminar no escribe encuesta de baja involuntaria", async () => {
     subLookupRow.mockReturnValue({
       data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
@@ -844,6 +897,44 @@ describe("handleSubscriptionUpdated — no degrada una terminada", () => {
     expect(payload?.status).toBeUndefined();
     // El periodo sí se refresca: es información, no una degradación.
     expect(payload?.current_period_end).toBeTruthy();
+  });
+
+  // Stripe emite `updated` (status canceled) a la vez que el borrado y no
+  // garantiza el orden. Si llega primero, la fila aún está en `active` con
+  // `completed_at`: espejar ahí grabaría que se fue quien terminó, y le quitaría
+  // el portal graduado hasta que llegara el borrado —o para siempre si no llega.
+  it("no graba canceled sobre una fila que está terminando, aunque llegue antes que el borrado", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      error: null,
+    });
+
+    await handleSubscriptionUpdated({
+      id: "sub_123",
+      status: "canceled",
+      cancel_at_period_end: true,
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+    } as unknown as Stripe.Subscription);
+
+    expect(updateMock.mock.calls[0][0].status).toBeUndefined();
+  });
+
+  // La guarda es estrecha a propósito: el último mes sigue siendo un mes normal
+  // y sus otros estados se espejan igual.
+  it("durante el último mes los demás estados sí se espejan", async () => {
+    subLookupRow.mockReturnValue({
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      error: null,
+    });
+
+    await handleSubscriptionUpdated({
+      id: "sub_123",
+      status: "past_due",
+      cancel_at_period_end: true,
+      items: { data: [{ current_period_start: 1749340800, current_period_end: 1751932800 }] },
+    } as unknown as Stripe.Subscription);
+
+    expect(updateMock.mock.calls[0][0].status).toBe("past_due");
   });
 
   it("una fila normal sí espeja el estado", async () => {

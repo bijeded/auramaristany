@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
 
   // L2c — aquí NO hay puerta de elegibilidad. Los prerequisitos sembrados
   // codificaban una regla de CONTENIDO ("Extra va después de CuarentaMás")
-  // mientras Aura aplica una de JUICIO: evalúa a la clienta en su sitio y la
+  // mientras Aura aplica una de JUICIO: evalúa a la cliente en su sitio y la
   // manda al checkout del nivel que le corresponde. No se reconcilian —la regla
   // de la base rechazaba justo a quien ella había aprobado, incluida una
-  // clienta sin ninguna suscripción previa mandada directa a Avanzado—. La
+  // cliente sin ninguna suscripción previa mandada directa a Avanzado—. La
   // puerta es el embudo; la migración 017 borra las filas.
   //
   // Contrapartida aceptada: cualquiera con la URL de un checkout puede

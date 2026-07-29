@@ -11,6 +11,7 @@ function makeQuery(table: string) {
     select: () => q,
     eq: () => q,
     in: () => q,
+    is: () => q,
     order: () => q,
     limit: () => q,
     maybeSingle: () => Promise.resolve({ data: queryResults[table] ?? null, error: null }),

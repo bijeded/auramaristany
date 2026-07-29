@@ -32,9 +32,12 @@ export default async function PortalLayout({
 
   const statuses = ((subRows ?? []) as { status: string }[]).map((s) => s.status);
   const pastDue = statuses.includes("past_due");
-  // Si la lectura falla se pinta la barra reducida, no la completa: enseñar
-  // pestañas que el middleware cierra es peor que enseñar de menos.
-  const graduated = subsError ? true : derivePortalTier(statuses) === "graduated";
+  // Ante un fallo de lectura se pinta la barra normal y manda el middleware,
+  // que hace su propia lectura y ES la frontera. Pintar la reducida le quitaría
+  // "Hoy" y "Semana" a una cliente que paga y a la que el middleware sí deja
+  // entrar: se quedaría en una pantalla sin pestaña de vuelta.
+  if (subsError) console.error("[portal/layout] no se pudo leer el nivel", subsError);
+  const graduated = derivePortalTier(statuses) === "graduated";
 
   return (
     <div style={{ background: "#e8e0e0", minHeight: "100dvh" }}>

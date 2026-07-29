@@ -40,7 +40,7 @@ export function subscriptionIsGraduated(status: string): boolean {
 export type PortalTier = "paying" | "graduated" | "none";
 
 /**
- * El nivel de una clienta a partir de TODAS sus suscripciones.
+ * El nivel de una cliente a partir de TODAS sus suscripciones.
  *
  * Existe porque las filas conviven: terminar CuarentaMás y comprar Extra deja
  * dos, y quedarse con la terminada le quitaría el contenido que acaba de

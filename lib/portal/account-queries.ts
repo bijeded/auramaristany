@@ -133,7 +133,7 @@ export async function getAccountData(userId: string): Promise<AccountData> {
     .select("status, cancel_at_period_end, completed_at, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, duration_months, billing_model))")
     .eq("profile_id", userId)
     // L2c — incluye las terminadas: esta pantalla es el aterrizaje de la
-    // clienta graduada y tiene que poder contarle que su programa acabó.
+    // cliente graduada y tiene que poder contarle que su programa acabó.
     .in("status", PORTAL_SHELL_STATES)
     .order("enrollment_date", { ascending: false });
 

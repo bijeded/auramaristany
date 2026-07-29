@@ -1,5 +1,5 @@
 /**
- * L2c — a dónde sigue una clienta que terminó su programa.
+ * L2c — a dónde sigue una cliente que terminó su programa.
  *
  * CuarentaMás acaba en el mes 6 y su continuación es CuarentaMás Extra, que
  * sólo tiene dos peldaños: intermedio y avanzado. El CTA la lleva al que le

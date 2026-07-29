@@ -71,7 +71,7 @@ export default async function PortalSettingsPage({
         )}
 
         <SectionTitle>Mi suscripción</SectionTitle>
-        <SubscriptionCard subscription={data.subscription} />
+        <SubscriptionCard subscription={data.subscription} state={cancelState} />
 
         <SectionTitle>Seguridad</SectionTitle>
         <SecuritySection />

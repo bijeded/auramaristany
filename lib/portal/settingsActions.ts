@@ -42,6 +42,11 @@ async function getOwnedCancelableSub(
     .select("id, stripe_subscription_id, status, completed_at")
     .eq("profile_id", userId)
     .in("status", CANCELABLE_STATUSES)
+    // Las que están terminando no se resuelven aquí: su cancelación ya está
+    // programada. Sin esto, una CuarentaMás terminando más reciente que una
+    // Extra que sí paga secuestraba la acción y la cliente no podía tocar la
+    // Extra. Las guardas de abajo siguen, por si la fila cambia entre medias.
+    .is("completed_at", null)
     .order("enrollment_date", { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -120,7 +120,7 @@ export function canDeleteClient(
 ): { ok: boolean; reason?: string } {
   // L2c — `completed` es terminal y su cobro ya está cancelado a fin de
   // periodo, así que no es una suscripción viva: contarla como tal dejaría a la
-  // clienta imposible de borrar para siempre, porque nunca pasará a `canceled`.
+  // cliente imposible de borrar para siempre, porque nunca pasará a `canceled`.
   const DEAD: readonly SubStatus[] = ["canceled", "completed"];
   const live = subs.some((s) => !DEAD.includes(s.status));
   if (live) {

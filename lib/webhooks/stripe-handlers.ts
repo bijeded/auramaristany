@@ -473,13 +473,20 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
   // Re-source the billing period from subscription items (Stripe API 2026+) so renewals stay fresh.
   const { current_period_start, current_period_end } = readPeriod(subscription);
 
-  // `completed` es terminal y NO se espeja desde Stripe. Stripe manda
-  // `canceled` en el update que acompaña al borrado; copiarlo sin mirar
-  // borraría el `completed` recién escrito y convertiría "terminó" en "se fue",
-  // llevándose por delante el portal graduado de la cliente. El periodo sí se
-  // refresca: eso es información, no una degradación.
+  // Terminar no se espeja como cancelar. Stripe emite `updated` con estado
+  // `canceled` A LA VEZ que el borrado, y el orden de entrega no está
+  // garantizado: si llega primero, la fila todavía está en `active` con
+  // `completed_at`, y copiar el estado a ciegas grabaría que se fue quien en
+  // realidad terminó —y le quitaría el portal graduado— hasta que llegase el
+  // borrado, o para siempre si no llega.
+  //
+  // La guarda es lo más estrecha posible a propósito: sólo bloquea el
+  // `canceled` sobre una fila que está terminando. Los demás estados se siguen
+  // espejando durante el último mes, que sigue siendo un mes normal.
   const local = await readLocalSubscription(supabase, subscription.id);
-  const isCompleted = local?.status === "completed";
+  const isCompleted =
+    local?.status === "completed" ||
+    (!!local?.completed_at && subscription.status === "canceled");
 
   const { error } = await supabase
     .from("subscriptions")
@@ -518,13 +525,27 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
 
   const subRow = local ? { id: local.id, profile_id: local.profile_id } : null;
 
-  if (error) console.error("[webhook] subscription.deleted error:", error);
+  // Se relanza en vez de tragárselo. Mientras la migración 017 no esté
+  // aplicada, el CHECK de `status` rechaza `completed`: tragado, la fila se
+  // queda en `active` con la suscripción ya cancelada en Stripe y la cliente
+  // conserva TODO el contenido gratis y para siempre, sin que nada avise. Con
+  // el 500, Stripe reintenta y el handler es seguro ante reentregas.
+  if (error) {
+    console.error("[webhook] subscription.deleted error:", error);
+    throw new Error(`subscription.deleted status write failed: ${error.message}`);
+  }
 
   // A9 — involuntary cancellation: dunning exhausted retries. Stripe tags why on
   // the object itself. Voluntary deletions (cancellation_requested) already have
   // a survey row from the portal flow, so we only auto-log payment failures here.
   const cancelReason = subscription.cancellation_details?.reason;
-  if ((cancelReason === "payment_failed" || cancelReason === "payment_disputed") && subRow) {
+  // Quien terminó no se da de baja, ni siquiera si el último cobro se disputó:
+  // graduada y "churn" a la vez sería un dato de baja falso.
+  if (
+    finalStatus !== "completed" &&
+    (cancelReason === "payment_failed" || cancelReason === "payment_disputed") &&
+    subRow
+  ) {
     const row = subRow as { id: string; profile_id: string };
     // Idempotent: Stripe can redeliver customer.subscription.deleted. A subscription
     // is deleted once, so at most one involuntary row per subscription — skip if it
@@ -546,8 +567,14 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
     }
   }
 
-  const contact = await getContactBySubscription(supabase, subscription.id);
-  if (contact) await sendSubscriptionEndedEmail({ to: contact.email, name: contact.name });
+  // El correo de "tu suscripción terminó" lleva un CTA de Reactivar: mandárselo
+  // a quien acaba de COMPLETAR el programa es justo el marco que este cambio
+  // rechaza, y la invita a reactivar algo que la propia app le refusa. Su
+  // mensaje es el de la GraduatedCard.
+  if (finalStatus !== "completed") {
+    const contact = await getContactBySubscription(supabase, subscription.id);
+    if (contact) await sendSubscriptionEndedEmail({ to: contact.email, name: contact.name });
+  }
 }
 
 export async function handlePaymentFailed(invoice: Stripe.Invoice) {

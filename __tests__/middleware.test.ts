@@ -302,6 +302,9 @@ describe("graduatedMayReachRoute", () => {
     expect(graduatedMayReachRoute("/portal/%74oday")).toBe(false);
     expect(graduatedMayReachRoute("/portal/settings/..%2ftoday")).toBe(false);
     expect(graduatedMayReachRoute("/portal/%ZZ")).toBe(false);
+    // Con una sola pasada, `%252e%252e` se queda en `%2e%2e`: no parece un
+    // segmento de punto y colaba bajo un prefijo permitido.
+    expect(graduatedMayReachRoute("/portal/settings/%252e%252e/today")).toBe(false);
     expect(graduatedMayReachRoute("/portal/history/%2e%2e/today")).toBe(false);
   });
 

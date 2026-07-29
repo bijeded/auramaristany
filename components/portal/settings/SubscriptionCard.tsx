@@ -2,6 +2,7 @@ import type { AccountSubscription } from "@/lib/portal/account-queries";
 import { accountProgressLabel } from "@/lib/portal/account-queries";
 import { repeatMarker } from "@/lib/portal/progress-display";
 import { longDateLabel } from "@/lib/admin/date-helpers";
+import type { CancellationState } from "@/lib/portal/cancellation";
 
 const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> = {
   active: { text: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
@@ -27,7 +28,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function SubscriptionCard({ subscription }: { subscription: AccountSubscription | null }) {
+export function SubscriptionCard({
+  subscription,
+  state,
+}: {
+  subscription: AccountSubscription | null;
+  // El estado YA derivado. La tarjeta no vuelve a deducirlo: `completed_at` por
+  // sí solo no significa "no habrá más cobros" —L2b lo escribía sin cancelar
+  // nada en Stripe—, y dos deducciones distintas en la misma pantalla acaban
+  // diciéndole a la cliente que no se le cobrará justo el día que se le cobra.
+  state: CancellationState;
+}) {
   if (!subscription) {
     return (
       <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -42,9 +53,9 @@ export function SubscriptionCard({ subscription }: { subscription: AccountSubscr
   // Una suscripción terminada ya no cobra: su cancelación está programada a fin
   // de periodo. Anunciar un "Próximo cobro" le diría que le van a volver a
   // cobrar justo debajo del cartel que celebra que terminó.
-  const isCompleted = subscription.status === "completed";
+  const isCompleted = state.kind === "completed";
   // Programada pero aún corriendo: sigue entrenando y ya no se le cobrará.
-  const isCompleting = !isCompleted && !!subscription.completed_at;
+  const isCompleting = state.kind === "completing";
   const progress = accountProgressLabel(subscription);
   const repeat = repeatMarker(subscription.content_loops, subscription.content_ordinal);
 

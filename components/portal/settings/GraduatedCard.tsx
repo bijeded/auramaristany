@@ -2,7 +2,7 @@ import Link from "next/link";
 import { extraCheckoutSlugForLevel } from "@/lib/portal/graduation";
 
 /**
- * Lo que ve una clienta que terminó su programa.
+ * Lo que ve una cliente que terminó su programa.
  *
  * Celebra el logro y le dice qué sigue, en el mismo sitio donde ya están su
  * cuenta, sus pagos y su historial: terminar no es quedarse fuera.
