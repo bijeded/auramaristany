@@ -1,5 +1,4 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
-import { isCompletionScheduled } from "@/lib/portal/cancellation";
 import { dayLabel } from "@/lib/admin/date-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
@@ -9,32 +8,35 @@ import { formatMXN } from "@/lib/admin/finance-helpers";
  * Existe porque estaban duplicadas: la ficha aprendió que una suscripción
  * terminada ya no cobra y la tabla no, así que el listado le anunciaba a Aura un
  * "Próximo cobro" de una cliente cuya suscripción llevaba días cancelada en
- * Stripe. Nada que tenga fecha de final vuelve a cobrar —ni la terminada, ni la
- * que está terminando, ni la que se dio de baja y agota su periodo—, así que la
- * pregunta se contesta UNA vez.
+ * Stripe. La pregunta se contesta UNA vez.
+ *
+ * Es deliberadamente MÁS ancha que `isCompletionScheduled`: aquí no se trata de
+ * distinguir terminar de irse, sino de no anunciar un cobro que no va a
+ * ocurrir. Eso incluye los estados terminales —terminada, cancelada, impaga
+ * (dunning agotado)— y también la baja voluntaria que está agotando su periodo.
+ * Se enumeran los estados que SÍ cobran, no los que no: un estado nuevo debe
+ * nacer sin anunciar cobros, no anunciándolos hasta que alguien se acuerde.
  */
+const BILLING_STATUSES: readonly SubStatus[] = ["active", "trialing", "past_due"];
+
 export function nextChargeCell(sub: {
-  status: string;
+  status: SubStatus;
   completed_at?: string | null;
   cancel_at_period_end?: boolean | null;
   current_period_end: string | null;
   price_mxn: number;
-}): { label: string; value: string } {
-  const ending =
-    sub.status === "completed" ||
-    sub.cancel_at_period_end === true ||
-    isCompletionScheduled({
-      completedAt: sub.completed_at,
-      cancelAtPeriodEnd: sub.cancel_at_period_end,
-    });
+}): { kind: "charge" | "ending"; label: string; value: string } {
+  const bills = BILLING_STATUSES.includes(sub.status) && sub.cancel_at_period_end !== true;
 
   if (!sub.current_period_end) {
-    return { label: ending ? "Acceso termina el" : "Próximo cobro", value: "—" };
+    return bills
+      ? { kind: "charge", label: "Próximo cobro", value: "—" }
+      : { kind: "ending", label: "Acceso termina el", value: "—" };
   }
   const date = dayLabel(sub.current_period_end.slice(0, 10));
-  return ending
-    ? { label: "Acceso termina el", value: date }
-    : { label: "Próximo cobro", value: `${date} · ${formatMXN(sub.price_mxn)}` };
+  return bills
+    ? { kind: "charge", label: "Próximo cobro", value: `${date} · ${formatMXN(sub.price_mxn)}` }
+    : { kind: "ending", label: "Acceso termina el", value: date };
 }
 
 export type SubStatus = "active" | "trialing" | "past_due" | "canceled" | "unpaid" | "completed";

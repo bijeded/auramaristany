@@ -106,7 +106,7 @@ export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string
           <div style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 14, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: "var(--gris-claro)" }}>
-                {["Cliente", "Programa", "Inscripción", "Próximo cobro", "Estado", ""].map((h, i) => (
+                {["Cliente", "Programa", "Inscripción", "Cobro / acceso", "Estado", ""].map((h, i) => (
                   <th key={i} style={{ textAlign: "left", padding: "12px 20px", fontFamily: "var(--font-body)", fontWeight: 600, fontSize: 12, color: "var(--gris-texto)" }}>{h}</th>
                 ))}
               </tr></thead>
@@ -131,12 +131,12 @@ export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string
                           const cell = nextChargeCell(c);
                           return (
                             <>
-                              {cell.value}
-                              {cell.label !== "Próximo cobro" && (
+                              {cell.kind === "ending" && (
                                 <div className="font-body" style={{ fontSize: 11.5, color: "var(--gris-suave)" }}>
-                                  {cell.label.toLowerCase()}
+                                  {cell.label}
                                 </div>
                               )}
+                              {cell.value}
                             </>
                           );
                         })()}

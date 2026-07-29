@@ -204,6 +204,7 @@ describe("nextChargeCell", () => {
 
   it("una suscripción viva anuncia su próximo cobro con importe", () => {
     expect(nextChargeCell(base)).toEqual({
+      kind: "charge",
       label: "Próximo cobro",
       value: "29 sep 2026 · $999",
     });
@@ -211,6 +212,7 @@ describe("nextChargeCell", () => {
 
   it("una terminada dice cuándo se le acaba el acceso, sin importe", () => {
     expect(nextChargeCell({ ...base, status: "completed" })).toEqual({
+      kind: "ending",
       label: "Acceso termina el",
       value: "29 sep 2026",
     });
@@ -219,11 +221,12 @@ describe("nextChargeCell", () => {
   it("una que está terminando su último mes tampoco anuncia cobro", () => {
     expect(
       nextChargeCell({ ...base, completed_at: "2026-08-29T00:00:00Z", cancel_at_period_end: true })
-    ).toEqual({ label: "Acceso termina el", value: "29 sep 2026" });
+    ).toEqual({ kind: "ending", label: "Acceso termina el", value: "29 sep 2026" });
   });
 
   it("una baja voluntaria en su periodo de gracia, igual", () => {
     expect(nextChargeCell({ ...base, cancel_at_period_end: true })).toEqual({
+      kind: "ending",
       label: "Acceso termina el",
       value: "29 sep 2026",
     });
@@ -231,5 +234,19 @@ describe("nextChargeCell", () => {
 
   it("sin fecha de periodo no se inventa nada", () => {
     expect(nextChargeCell({ ...base, current_period_end: null }).value).toBe("—");
+  });
+
+  // El mismo defecto, con otro estado: una cancelada conserva su
+  // `current_period_end`, así que sin enumerar los que SÍ cobran seguía
+  // anunciando el fantasma que este arreglo viene a quitar. Se cubre estado por
+  // estado justo porque así fue como se coló la primera vez.
+  it.each(["active", "trialing", "past_due"] as const)("%s sí anuncia cobro", (status) => {
+    expect(nextChargeCell({ ...base, status }).kind).toBe("charge");
+  });
+
+  it.each(["completed", "canceled", "unpaid"] as const)("%s no anuncia ningún cobro", (status) => {
+    const cell = nextChargeCell({ ...base, status });
+    expect(cell.kind).toBe("ending");
+    expect(cell.value).not.toContain("$");
   });
 });
