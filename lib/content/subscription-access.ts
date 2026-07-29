@@ -26,12 +26,17 @@ export function subscriptionGrantsAccess(status: string): boolean {
 /** Estados que conservan el portal sin dar contenido nuevo. */
 export const GRADUATED_STATES = ["completed"] as const;
 
-/** Quién entra al portal, pague o haya terminado. */
+/**
+ * Quién entra al portal, pague o haya terminado.
+ *
+ * Es un CONJUNTO y no un predicado a propósito (D18). Los tres lectores de la
+ * cáscara —middleware, el layout del portal y account-queries— lo empujan a SQL
+ * con `.in(...)`, así que el filtro ocurre en la base y toda fila que llega a
+ * memoria ya es de la cáscara. Un predicado sobre una fila ya filtrada
+ * contestaría `true` siempre: no protegería nada y, peor, se leería como el
+ * hermano de `subscriptionGrantsAccess` al que también hay que preguntar.
+ */
 export const PORTAL_SHELL_STATES = [...ACCESS_STATES, ...GRADUATED_STATES] as const;
-
-export function subscriptionGrantsPortalShell(status: string): boolean {
-  return (PORTAL_SHELL_STATES as readonly string[]).includes(status);
-}
 
 export function subscriptionIsGraduated(status: string): boolean {
   return (GRADUATED_STATES as readonly string[]).includes(status);

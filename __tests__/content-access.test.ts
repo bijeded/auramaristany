@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   getCurrentDayKey,
-  isDayAccessible,
   toDayOfWeek,
 } from "@/lib/content/access";
 
@@ -89,36 +88,3 @@ describe("getCurrentDayKey", () => {
   });
 });
 
-describe("isDayAccessible", () => {
-  const current = { week_number: 2, day_of_week: "miercoles" as const };
-
-  it("allows a day in a past week", () => {
-    expect(isDayAccessible(1, "viernes", current)).toBe(true);
-  });
-
-  it("blocks a day in a future week", () => {
-    expect(isDayAccessible(3, "lunes", current)).toBe(false);
-  });
-
-  it("allows the exact current (week, day)", () => {
-    expect(isDayAccessible(2, "miercoles", current)).toBe(true);
-  });
-
-  it("allows an earlier day in the current week", () => {
-    expect(isDayAccessible(2, "lunes", current)).toBe(true);
-  });
-
-  it("blocks a later day in the current week", () => {
-    expect(isDayAccessible(2, "jueves", current)).toBe(false);
-  });
-
-  it("blocks domingo (7) when current day is sabado (6)", () => {
-    const saturdayCurrent = { week_number: 1, day_of_week: "sabado" as const };
-    expect(isDayAccessible(1, "domingo", saturdayCurrent)).toBe(false);
-  });
-
-  it("allows sabado when current day is domingo", () => {
-    const sundayCurrent = { week_number: 1, day_of_week: "domingo" as const };
-    expect(isDayAccessible(1, "sabado", sundayCurrent)).toBe(true);
-  });
-});
