@@ -15,6 +15,7 @@ const base: ClientListRow = {
   price_mxn: 999,
   status: "active",
   cancel_at_period_end: false,
+  completed_at: null,
   last_activity_date: NOW, // reciente por defecto
 };
 
@@ -83,6 +84,70 @@ describe("filterClients", () => {
     it("excluye activos con actividad reciente", () => {
       const r = filterClients(set, { query: "", program: "Todas", status: "Sin actividad", now: NOW });
       expect(r.map((x) => x.profile_id)).not.toContain("q3");
+    });
+  });
+
+  // D17 — las dos cohortes que siguen ACTIVAS y entrenando, y que por eso no se
+  // distinguían de "Activas": la que termina su plazo y la que se va por su
+  // cuenta. Aura hace lo contrario con cada una (ofrecerle Extra / intentar
+  // retenerla), así que tienen filtro propio. La pertenencia se decide con la
+  // misma derivación que usa el dashboard, no leyendo las banderas a mano.
+  describe("cohortes que están terminando", () => {
+    const ultimoMes = {
+      ...base, profile_id: "e1", status: "active" as const,
+      completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true,
+    };
+    const enCancelacion = {
+      ...base, profile_id: "e2", status: "active" as const,
+      completed_at: null, cancel_at_period_end: true,
+    };
+    const viva = { ...base, profile_id: "e3", status: "active" as const };
+    const yaCompletada = { ...base, profile_id: "e4", status: "completed" as const, completed_at: "2026-06-01T00:00:00Z", cancel_at_period_end: true };
+    const yaCancelada = { ...base, profile_id: "e5", status: "canceled" as const, cancel_at_period_end: true };
+    // `completed_at` a solas no prueba nada: L2b lo escribía sin cancelar nada
+    // en Stripe, así que una fila vieja lo trae puesto y sigue cobrando.
+    const marcaHuerfana = { ...base, profile_id: "e6", status: "active" as const, completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: false };
+    const set = [ultimoMes, enCancelacion, viva, yaCompletada, yaCancelada, marcaHuerfana];
+
+    it("'Último mes' sólo trae las que tienen su final PROGRAMADO", () => {
+      const r = filterClients(set, { query: "", program: "Todas", status: "Último mes", now: NOW });
+      expect(r.map((x) => x.profile_id)).toEqual(["e1"]);
+    });
+
+    it("'En cancelación' sólo trae las bajas voluntarias en gracia", () => {
+      const r = filterClients(set, { query: "", program: "Todas", status: "En cancelación", now: NOW });
+      expect(r.map((x) => x.profile_id)).toEqual(["e2"]);
+    });
+
+    it("una marca de completado sin cancelación no califica en ninguna", () => {
+      const ultimo = filterClients(set, { query: "", program: "Todas", status: "Último mes", now: NOW });
+      const cancel = filterClients(set, { query: "", program: "Todas", status: "En cancelación", now: NOW });
+      expect(ultimo.map((x) => x.profile_id)).not.toContain("e6");
+      expect(cancel.map((x) => x.profile_id)).not.toContain("e6");
+    });
+
+    it("las que ya terminaron o ya se fueron no entran en las nuevas cohortes", () => {
+      const ultimo = filterClients(set, { query: "", program: "Todas", status: "Último mes", now: NOW });
+      const cancel = filterClients(set, { query: "", program: "Todas", status: "En cancelación", now: NOW });
+      expect(ultimo.map((x) => x.profile_id)).not.toContain("e4");
+      expect(cancel.map((x) => x.profile_id)).not.toContain("e5");
+    });
+
+    it("siguen contando como 'Activas': tienen acceso y están entrenando", () => {
+      const r = filterClients(set, { query: "", program: "Todas", status: "Activas", now: NOW });
+      expect(r.map((x) => x.profile_id)).toEqual(["e1", "e2", "e3", "e6"]);
+    });
+
+    it("las dos cohortes son disjuntas", () => {
+      const ultimo = filterClients(set, { query: "", program: "Todas", status: "Último mes", now: NOW });
+      const cancel = filterClients(set, { query: "", program: "Todas", status: "En cancelación", now: NOW });
+      const ids = [...ultimo, ...cancel].map((x) => x.profile_id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("los otros filtros siguen combinándose", () => {
+      const r = filterClients(set, { query: "ana@", program: "CuarentaMás", status: "En cancelación", now: NOW });
+      expect(r.map((x) => x.profile_id)).toEqual(["e2"]);
     });
   });
 });
@@ -243,5 +308,31 @@ describe("nextChargeCell", () => {
     const cell = nextChargeCell({ ...sub, status });
     expect(cell.kind).toBe("ending");
     expect(cell.value).not.toContain("$");
+  });
+
+  // D17 — `completed_at` ya viaja en la fila (lo necesitan los filtros nuevos),
+  // y esta celda sigue sin mirarlo A PROPÓSITO. A solas no prueba nada: una fila
+  // vieja de L2b lo trae puesto sin que exista cancelación en Stripe, así que
+  // callar el cobro por esa marca sería mentirle a Aura justo sobre el cobro. El
+  // caso que traería ya lo cubre `cancel_at_period_end`.
+  // Se liga a una variable antes de pasarla —como hacen los llamadores reales,
+  // que le entregan una `ClientListRow` entera— justo para que `completed_at`
+  // llegue de verdad a la función sin tener que declararlo en su firma.
+  it("una marca de completado huérfana NO silencia el cobro", () => {
+    const conMarcaHuerfana = { ...sub, completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: false };
+    expect(nextChargeCell(conMarcaHuerfana)).toEqual({
+      kind: "charge",
+      label: "Próximo cobro",
+      value: "29 sep 2026 · $999",
+    });
+  });
+
+  it("con la cancelación de verdad programada sí calla el cobro", () => {
+    const conCancelacionReal = { ...sub, completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true };
+    expect(nextChargeCell(conCancelacionReal)).toEqual({
+      kind: "ending",
+      label: "Acceso hasta",
+      value: "29 sep 2026",
+    });
   });
 });
