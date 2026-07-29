@@ -1,5 +1,5 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
-import { isCompletionScheduled } from "@/lib/portal/cancellation";
+import { deriveCancellationState } from "@/lib/portal/cancellation";
 import { dayLabel } from "@/lib/admin/date-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
@@ -134,20 +134,21 @@ export function filterClients(
     // suelta confundiría graduarse con irse, que es el error que L2c ya cazó
     // tres veces.
     if (opts.status === "Último mes" || opts.status === "En cancelación") {
+      // Sólo `active`, igual que el dashboard: sus tarjetas leen filas activas,
+      // y si aquí entrara además una `past_due` que está terminando, el número
+      // de la tarjeta y el de este listado dejarían de cuadrar.
       if (r.status !== "active") return false;
-      // Se nombra la cohorte UNA vez, en el mismo orden que el dashboard: primero
-      // si el final está programado, y sólo después la bandera suelta. Al revés,
-      // toda graduación se archivaría como baja.
-      const scheduled = isCompletionScheduled({
-        completedAt: r.completed_at,
+      // La cohorte la nombra `deriveCancellationState`, la MISMA función que usa
+      // el portal y de la que salen las tarjetas del dashboard. No se leen las
+      // banderas aquí: el orden importa —`cancel_at_period_end` también lo trae
+      // quien se gradúa— y ése es justo el error que L2c cazó tres veces.
+      const kind = deriveCancellationState({
+        status: r.status,
         cancelAtPeriodEnd: r.cancel_at_period_end,
-      });
-      const cohort: StatusFilter = scheduled
-        ? "Último mes"
-        : r.cancel_at_period_end
-          ? "En cancelación"
-          : null;
-      if (cohort !== opts.status) return false;
+        completedAt: r.completed_at,
+      }).kind;
+      const wanted = opts.status === "Último mes" ? "completing" : "grace";
+      if (kind !== wanted) return false;
     }
     if (opts.status === "Sin actividad") {
       const paying = r.status === "active" || r.status === "trialing";
