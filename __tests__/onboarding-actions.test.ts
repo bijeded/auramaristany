@@ -20,7 +20,18 @@ const fakeSupabase = {
       },
     }),
   }),
-  rpc: (fn: string, args: unknown) => {
+  // Función normal, NO arrow, y comprueba su receptor a propósito. supabase-js
+  // lee `this.rest` dentro de rpc, así que sacar el método a una variable lo
+  // rompe en producción mientras compila y pasa los tests. Un fake con arrow
+  // function nunca puede fallar por eso: no mira `this`.
+  rpc(this: unknown, fn: string, args: unknown) {
+    if (this !== fakeSupabase) {
+      calls.push({ op: "rpc-sin-receptor", fn });
+      return Promise.resolve({
+        data: null,
+        error: { message: "rpc llamada sin su receptor: this.rest sería undefined" },
+      });
+    }
     calls.push({ op: "rpc", fn, args });
     // La función de la base deduce ella misma cuántas filas espera tocar y
     // levanta si no coinciden, deshaciendo la llamada entera. El fake imita
@@ -88,6 +99,18 @@ describe("reorderQuestions", () => {
         { id: C, sort_order: 2 },
       ],
     });
+  });
+
+  // El smoke de D18 falló exactamente aquí: el action sacaba `supabase.rpc` a
+  // una variable, y supabase-js lee `this.rest` dentro del método. tsc, lint,
+  // 641 tests y el build pasaron; en el navegador daba 500.
+  it("llama a rpc COMO MÉTODO del cliente, sin perder el receptor", async () => {
+    // Act
+    const r = await reorderQuestions([A, B]);
+
+    // Assert
+    expect(calls.some((c) => c.op === "rpc-sin-receptor")).toBe(false);
+    expect(r.error).toBeUndefined();
   });
 
   it("una lista vacía no escribe nada", async () => {

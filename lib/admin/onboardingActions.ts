@@ -78,17 +78,23 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
   // se puebla, pasa a resolverlos contra `Relationships`, que en este proyecto
   // están a `[]` a propósito (types.ts se mantiene a mano) — y entonces revientan
   // TODOS los selects con join del repo, no sólo éste. Se tipa el rpc aquí.
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    args: { payload: { id: string; sort_order: number }[] }
-  ) => Promise<{ data: number | null; error: { message: string } | null }>;
+  // El cast va sobre el CLIENTE, no sobre el método. Sacar `supabase.rpc` a una
+  // variable lo desliga de su receptor, y dentro de supabase-js `rpc` lee
+  // `this.rest` → "Cannot read properties of undefined". Compila, pasa los
+  // tests (un fake con arrow function no usa `this`) y revienta en producción.
+  const client = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: { payload: { id: string; sort_order: number }[] }
+    ) => Promise<{ data: number | null; error: { message: string } | null }>;
+  };
 
   // La función comprueba ella misma que tocó una fila por par y levanta si no,
   // así que la llamada entera se deshace. Comprobarlo aquí, con la respuesta ya
   // en la mano, llegaría tarde: el update habría hecho commit y estaríamos
   // devolviendo "error" sobre una base sí modificada — el orden a medias que
   // este cambio viene a quitar.
-  const { error } = await rpc("reorder_onboarding_questions", {
+  const { error } = await client.rpc("reorder_onboarding_questions", {
     payload: reindexOrder(parsed.data),
   });
   if (error) return { error: logAndGeneric("reorderQuestions", error) };
