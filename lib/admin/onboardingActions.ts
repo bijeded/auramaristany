@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { validateQuestion, type QuestionInput } from "./onboarding-helpers";
+import { validateQuestion, reindexOrder, type QuestionInput } from "./onboarding-helpers";
 import { requireAdmin } from "./auth";
 import { logAndGeneric } from "./errors";
 
@@ -55,13 +55,28 @@ export async function reorderQuestions(orderedIds: string[]): Promise<{ error?: 
   const auth = await requireAdmin();
   if (!auth.ok) return { error: auth.error };
   const supabase = auth.supabase;
-  for (let i = 0; i < orderedIds.length; i++) {
-    const { error } = await supabase
-      .from("onboarding_questions")
-      .update({ sort_order: i })
-      .eq("id", orderedIds[i]);
-    if (error) return { error: logAndGeneric("reorderQuestions", error) };
-  }
+  if (orderedIds.length === 0) return {};
+
+  // Las posiciones las calcula reindexOrder —su único hogar, con tests—; la
+  // función de la base sólo las aplica, y las aplica de una sola vez. El bucle
+  // de `update` que había aquí repetía esa regla sin tests y, al salir al
+  // primer error, podía dejar el cuestionario renumerado a medias.
+  //
+  // keep: declarar la función en `Database["public"]["Functions"]` NO es opción.
+  // Con Functions vacío supabase-js resuelve los embeds de forma laxa; en cuanto
+  // se puebla, pasa a resolverlos contra `Relationships`, que en este proyecto
+  // están a `[]` a propósito (types.ts se mantiene a mano) — y entonces revientan
+  // TODOS los selects con join del repo, no sólo éste. Se tipa el rpc aquí.
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: { payload: { id: string; sort_order: number }[] }
+  ) => Promise<{ error: unknown }>;
+
+  const { error } = await rpc("reorder_onboarding_questions", {
+    payload: reindexOrder(orderedIds),
+  });
+  if (error) return { error: logAndGeneric("reorderQuestions", error) };
+
   revalidate();
   return {};
 }
