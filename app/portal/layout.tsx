@@ -21,7 +21,7 @@ export default async function PortalLayout({
     ? await Promise.all([hasPillarsAccess(user.id), getUnreadCount(user.id)])
     : [false, 0];
   // Una sola lectura para las dos preguntas de la cáscara: si hay un pago
-  // pendiente (banner) y en qué nivel está la clienta (qué pestañas ve).
+  // pendiente (banner) y en qué nivel está la cliente (qué pestañas ve).
   const { data: subRows, error: subsError } = user
     ? await supabase
         .from("subscriptions")

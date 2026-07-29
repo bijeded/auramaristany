@@ -51,7 +51,18 @@ drop policy if exists subscriptions_admin_write on subscriptions;
 create policy subscriptions_admin_write on subscriptions
   for all using (is_admin()) with check (is_admin());
 
--- 4 · fuera la puerta de prerequisitos de Extra
+-- 4 · se limpia cualquier `completed_at` huérfano. L2b lo escribía al llegar al
+--     último mes SIN cancelar nada en Stripe, así que una fila así no significa
+--     "esto va a terminar": significa que se contó mal. A partir de aquí las dos
+--     señales van juntas, y una marca vieja sin cancelación programada haría que
+--     el portal le dijera a una cliente que sigue pagando que no se le cobrará.
+--     Hoy en producción no hay ninguna (verificado); queda como red.
+update subscriptions
+   set completed_at = null
+ where completed_at is not null
+   and cancel_at_period_end = false;
+
+-- 5 · fuera la puerta de prerequisitos de Extra
 delete from program_variant_prerequisites
  where program_variant_id in (
    select id from program_variants

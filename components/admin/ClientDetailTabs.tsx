@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { subscriptionProgressLabel } from "@/lib/admin/clients-helpers";
+import { isCompletionScheduled } from "@/lib/portal/cancellation";
 import { dayLabel, monthLabel, monthKey } from "@/lib/admin/date-helpers";
 import { normalizeWhatsappNumber, whatsappUrl } from "@/lib/admin/message-helpers";
 import { ClientPhotosTab } from "./ClientPhotosTab";
@@ -83,11 +84,14 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
                   // el nivel que ESTÁ HACIENDO, que puede haber subido desde entonces.
                   ["Progreso", subscriptionProgressLabel(s, { billing_model: s.billing_model, duration_months: s.duration_months })],
                   ...(s.content_loops > 0 ? [["Repeticiones", `${s.content_loops}ª vuelta al nivel`] as [string, string]] : []),
-                  // Una suscripción terminada ya no cobra: su cancelación está
-                  // programada a fin de periodo. Anunciar un "Próximo cobro" le
-                  // haría creer a Aura que la cliente sigue pagando.
-                  s.status === "completed"
-                    ? (["Acceso terminado", s.current_period_end ? dayLabel(s.current_period_end.slice(0, 10)) : "—"] as [string, string])
+                  // Una suscripción terminada —o que ya tiene su final
+                  // programado— no vuelve a cobrar. Anunciar un "Próximo cobro"
+                  // le haría creer a Aura que la cliente sigue pagando. Se
+                  // pregunta por la MISMA derivación que usa el portal, no por
+                  // una columna suelta.
+                  s.status === "completed" ||
+                  isCompletionScheduled({ completedAt: s.completed_at, cancelAtPeriodEnd: s.cancel_at_period_end })
+                    ? (["Acceso termina el", s.current_period_end ? dayLabel(s.current_period_end.slice(0, 10)) : "—"] as [string, string])
                     : (["Próximo cobro", s.current_period_end ? `${dayLabel(s.current_period_end.slice(0, 10))} · ${formatMXN(s.price_mxn)}` : "—"] as [string, string]),
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between" style={{ marginBottom: 10 }}>

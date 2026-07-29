@@ -37,6 +37,26 @@ export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationRea
 
 const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", "past_due"];
 
+/**
+ * ¿Está PROGRAMADO el final de esta suscripción?
+ *
+ * Única derivación de un estado que viven DOS columnas, y la razón de que sea
+ * una sola función: `completed_at` por sí solo no prueba nada. L2b lo escribía
+ * al llegar al último mes sin cancelar nada en Stripe, así que una fila vieja
+ * puede traerlo puesto y seguir cobrando tan campante. Hacen falta las dos
+ * señales: que el plazo se haya cumplido Y que la cancelación exista de verdad.
+ *
+ * Cada lector que se la deduzca por su cuenta se equivoca en un subconjunto
+ * distinto —ya pasó tres veces en este mismo cambio—, así que la pantalla, las
+ * acciones de servidor y el admin llaman aquí.
+ */
+export function isCompletionScheduled(row: {
+  completedAt?: string | null;
+  cancelAtPeriodEnd?: boolean | null;
+}): boolean {
+  return !!row.completedAt && row.cancelAtPeriodEnd === true;
+}
+
 export type CancellationState =
   | { kind: "eligible" }
   | { kind: "grace"; endsAt: string | null }
@@ -72,7 +92,7 @@ export function deriveCancellationState(input: {
   // que una fila vieja lo trae puesto sin que haya ninguna cancelación
   // programada. Prometerle "no habrá más cobros" a partir de esa marca sería
   // mentirle justo sobre el cobro.
-  if (input.completedAt && input.cancelAtPeriodEnd) {
+  if (isCompletionScheduled(input)) {
     return { kind: "completing", endsAt: input.currentPeriodEnd ?? null };
   }
 

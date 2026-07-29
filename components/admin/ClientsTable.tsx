@@ -19,7 +19,7 @@ const STATUS_BADGE: Record<ClientListRow["status"], { label: string; bg: string;
   unpaid: { label: "Impaga", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
   canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
   // L2c — terminó el programa completo. Es un logro, no una baja: verde como
-  // la activa, para que Aura no la lea de un vistazo como una clienta perdida.
+  // la activa, para que Aura no la lea de un vistazo como una cliente perdida.
   completed: { label: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
 };
 

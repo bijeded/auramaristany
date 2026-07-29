@@ -7,6 +7,7 @@ import {
   type LadderPosition,
 } from "@/lib/content/ladder";
 import { firstOrdinal, type CurriculumEntry } from "@/lib/content/curriculum";
+import { isCompletionScheduled } from "@/lib/portal/cancellation";
 import {
   sendWelcomeEmail,
   sendPaymentFailedEmail,
@@ -267,7 +268,14 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
     // es lo que retira el contenido, y escribirlo ahora le quitaría a la
     // cliente el mes que acaba de pagar. Lo escribe el borrado, al terminar el
     // periodo (Decisión 1, enmendada).
-    ...(shouldComplete ? { completed_at: new Date().toISOString() } : {}),
+    // Las DOS señales se escriben juntas. `completed_at` a solas no significa
+    // "no habrá más cobros" —así lo dejaba L2b, sin cancelar nada—, y los
+    // lectores exigen las dos: sin espejar aquí `cancel_at_period_end`, cada
+    // fila que termina pasaría por una ventana en la que la pantalla no sabe
+    // que ya está cancelada, hasta que llegara `customer.subscription.updated`.
+    ...(shouldComplete
+      ? { completed_at: new Date().toISOString(), cancel_at_period_end: true }
+      : {}),
     ...(position
       ? {
           content_variant_id: position.variantId,
@@ -455,17 +463,25 @@ async function nextContentPosition(
   });
 }
 
+type LocalSubscription = {
+  id: string;
+  profile_id: string;
+  status: string;
+  completed_at: string | null;
+  cancel_at_period_end: boolean | null;
+};
+
 /** La fila local, leída antes de decidir cómo termina. */
 async function readLocalSubscription(
   supabase: ServiceClient,
   stripeSubscriptionId: string
-): Promise<{ id: string; profile_id: string; status: string; completed_at: string | null } | null> {
+): Promise<LocalSubscription | null> {
   const { data } = await supabase
     .from("subscriptions")
-    .select("id, profile_id, status, completed_at")
+    .select("id, profile_id, status, completed_at, cancel_at_period_end")
     .eq("stripe_subscription_id", stripeSubscriptionId)
     .maybeSingle();
-  return (data as { id: string; profile_id: string; status: string; completed_at: string | null } | null) ?? null;
+  return (data as LocalSubscription | null) ?? null;
 }
 
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -486,7 +502,11 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
   const local = await readLocalSubscription(supabase, subscription.id);
   const isCompleted =
     local?.status === "completed" ||
-    (!!local?.completed_at && subscription.status === "canceled");
+    (subscription.status === "canceled" &&
+      isCompletionScheduled({
+        completedAt: local?.completed_at,
+        cancelAtPeriodEnd: local?.cancel_at_period_end,
+      }));
 
   const { error } = await supabase
     .from("subscriptions")
@@ -516,7 +536,13 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
   // una baja. Escribir `canceled` sin mirar —como antes— dejaba grabado que se
   // fue quien en realidad acabó, y le quitaba el portal graduado.
   const local = await readLocalSubscription(supabase, subscription.id);
-  const finalStatus = local?.completed_at || local?.status === "completed" ? "completed" : "canceled";
+  const finished =
+    local?.status === "completed" ||
+    isCompletionScheduled({
+      completedAt: local?.completed_at,
+      cancelAtPeriodEnd: local?.cancel_at_period_end,
+    });
+  const finalStatus = finished ? "completed" : "canceled";
 
   const { error } = await supabase
     .from("subscriptions")

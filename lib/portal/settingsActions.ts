@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { validatePhone } from "@/lib/auth/phone";
 import { stripe } from "@/lib/stripe";
 import { sanitizePlainText } from "@/lib/admin/sanitize-html";
-import { reasonRequiresDetail } from "@/lib/portal/cancellation";
+import { reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { createClient as createStatelessClient } from "@supabase/supabase-js";
 
@@ -29,7 +29,13 @@ const cancelInputSchema = z.object({
   detail: z.string().max(200).optional(),
 });
 
-type OwnedSub = { id: string; stripe_subscription_id: string; status: string; completed_at: string | null };
+type OwnedSub = {
+  id: string;
+  stripe_subscription_id: string;
+  status: string;
+  completed_at: string | null;
+  cancel_at_period_end: boolean | null;
+};
 
 /** Resolve the caller's cancelable subscription from getUser() — never trust a
  *  client-sent id (INP-4/EDGE-5). Returns null if none is eligible. */
@@ -39,18 +45,22 @@ async function getOwnedCancelableSub(
 ): Promise<OwnedSub | null> {
   const { data } = await supabase
     .from("subscriptions")
-    .select("id, stripe_subscription_id, status, completed_at")
+    .select("id, stripe_subscription_id, status, completed_at, cancel_at_period_end")
     .eq("profile_id", userId)
     .in("status", CANCELABLE_STATUSES)
-    // Las que están terminando no se resuelven aquí: su cancelación ya está
-    // programada. Sin esto, una CuarentaMás terminando más reciente que una
-    // Extra que sí paga secuestraba la acción y la cliente no podía tocar la
-    // Extra. Las guardas de abajo siguen, por si la fila cambia entre medias.
-    .is("completed_at", null)
-    .order("enrollment_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as OwnedSub | null) ?? null;
+    .order("enrollment_date", { ascending: false });
+
+  // El filtro se hace aquí y NO en SQL con `completed_at is null`: esa columna
+  // a solas no prueba que haya una cancelación programada (L2b la escribía sin
+  // cancelar nada), y descartar por ella dejaba a una cliente con una fila
+  // vieja cobrando y sin forma de pararlo desde el portal. Se descarta sólo lo
+  // que de verdad está terminando, y así una CuarentaMás en su último mes no
+  // le secuestra la acción a una Extra que sí paga.
+  const rows = (data as OwnedSub[] | null) ?? [];
+  const usable = rows.find(
+    (r) => !isCompletionScheduled({ completedAt: r.completed_at, cancelAtPeriodEnd: r.cancel_at_period_end })
+  );
+  return usable ?? null;
 }
 
 export async function cancelSubscription(input: { reason?: string; detail?: string }): Promise<ActionResult> {
@@ -74,10 +84,10 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
   if (!sub) return { ok: false, error: "No tienes una suscripción activa que cancelar." };
 
   // Simétrico al de `reactivateSubscription`: una suscripción que ya está
-  // terminando no se cancela. La cancelación en Stripe ya está programada, así
+  // terminando no se cancela. Su cancelación en Stripe ya está programada, así
   // que lo único que añadiría es una fila de encuesta "voluntary" para una
   // cliente que TERMINÓ en vez de irse — dato de baja falseado.
-  if (sub.completed_at) {
+  if (isCompletionScheduled({ completedAt: sub.completed_at, cancelAtPeriodEnd: sub.cancel_at_period_end })) {
     return { ok: false, error: "Tu programa ya está por terminar; no hay nada que cancelar." };
   }
 
@@ -121,7 +131,7 @@ export async function reactivateSubscription(): Promise<ActionResult> {
   // cobraría un mes 7 contra un programa que no lo tiene. La pantalla ya no
   // ofrece el botón, pero esconder un botón no es una comprobación: la acción es
   // invocable por sí sola.
-  if (sub.completed_at) {
+  if (isCompletionScheduled({ completedAt: sub.completed_at, cancelAtPeriodEnd: sub.cancel_at_period_end })) {
     return { ok: false, error: "Tu programa ya terminó y no se puede reactivar." };
   }
 

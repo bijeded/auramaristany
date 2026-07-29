@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  isCompletionScheduled,
   CANCELLATION_REASON_OPTIONS,
   cancellationReasonLabel,
   reasonRequiresDetail,
@@ -141,5 +142,31 @@ describe("deriveCancellationState", () => {
     const kind = deriveCancellationState({ status: "completed", cancelAtPeriodEnd: true }).kind;
     expect(kind).not.toBe("grace");
     expect(kind).not.toBe("eligible");
+  });
+});
+
+// Una sola derivación para un estado que viven dos columnas. Existe porque cada
+// lector que se lo dedujo por su cuenta se equivocó en un subconjunto distinto:
+// la ficha, las acciones de servidor y el admin llaman aquí.
+describe("isCompletionScheduled", () => {
+  it("hacen falta las dos señales", () => {
+    expect(isCompletionScheduled({ completedAt: "2026-07-01", cancelAtPeriodEnd: true })).toBe(true);
+  });
+
+  // El caso que importa: L2b escribía `completed_at` sin cancelar nada en
+  // Stripe. Esa fila SIGUE cobrando, así que tratarla como terminada le diría a
+  // la cliente que no se le cobrará justo el día que se le cobra —y le quitaría
+  // el botón de cancelar, su única forma de pararlo.
+  it("una marca vieja sin cancelación programada no cuenta", () => {
+    expect(isCompletionScheduled({ completedAt: "2026-07-01", cancelAtPeriodEnd: false })).toBe(false);
+  });
+
+  it("ni una cancelación voluntaria sin plazo cumplido", () => {
+    expect(isCompletionScheduled({ completedAt: null, cancelAtPeriodEnd: true })).toBe(false);
+  });
+
+  it("ni una suscripción corriente", () => {
+    expect(isCompletionScheduled({ completedAt: null, cancelAtPeriodEnd: false })).toBe(false);
+    expect(isCompletionScheduled({})).toBe(false);
   });
 });

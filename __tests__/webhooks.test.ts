@@ -57,7 +57,7 @@ const selectMock = vi.fn(() => selectChain);
 // La fila de la suscripción que lee `handleSubscriptionDeleted` ANTES de
 // decidir el final: terminó o se fue.
 const subLookupRow = vi.fn((): { data: unknown; error: unknown } => ({
-  data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+  data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null, cancel_at_period_end: false },
   error: null,
 }));
 
@@ -684,6 +684,35 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
     expect(stripeUpdateMock).toHaveBeenCalledWith("sub_123", { cancel_at_period_end: true });
   });
 
+  // Las dos señales se escriben juntas. Sin espejar aquí la bandera, cada fila
+  // que termina pasaría por una ventana en la que la pantalla aún no sabe que
+  // está cancelada, y los lectores exigen las dos.
+  it("espeja también cancel_at_period_end, sin dejar ventana", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue(fixedTermSub(5) as any);
+
+    await handleInvoicePaid(renewalInvoice());
+
+    expect(updateMock.mock.calls[0][0].cancel_at_period_end).toBe(true);
+  });
+
+  it("una marca vieja de L2b (sin cancelación) no cuenta como final programado", async () => {
+    subLookupRow.mockReturnValue({
+      data: {
+        id: "db-sub-1", profile_id: "p-1", status: "active",
+        completed_at: "2026-01-01T00:00:00Z", cancel_at_period_end: false,
+      },
+      error: null,
+    });
+
+    await handleSubscriptionDeleted({
+      id: "sub_stripe_1",
+      cancellation_details: { reason: "cancellation_requested" },
+    } as unknown as Stripe.Subscription);
+
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ status: "canceled" }));
+  });
+
   it("y sella completed_at, sin tocar todavía el estado", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectEqSingleMock.mockReturnValue(fixedTermSub(5) as any);
@@ -768,7 +797,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
 
   it("una suscripción que traía completed_at termina COMPLETADA, no cancelada", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -779,7 +808,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
 
   it("una baja normal sigue siendo cancelada", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null, cancel_at_period_end: false },
       error: null,
     });
 
@@ -792,7 +821,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
   // fue" a quien terminó, y con ello le quitaría el portal graduado.
   it("un estado ya completed no se degrada en una redelivery", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "completed", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "completed", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -807,7 +836,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
   // cancelada en Stripe: contenido completo, gratis y para siempre, en silencio.
   it("si la escritura del estado falla, se relanza para que Stripe reintente", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null, cancel_at_period_end: false },
       error: null,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -818,7 +847,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
 
   it("a quien termina no se le manda el correo de 'tu suscripción terminó'", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -830,7 +859,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
 
   it("a quien se da de baja sí", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null, cancel_at_period_end: false },
       error: null,
     });
     // El correo cuelga de resolver el contacto por la suscripción.
@@ -846,7 +875,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
   // Graduada y "churn" a la vez sería un dato de baja falso.
   it("terminar no escribe encuesta ni con un cobro disputado", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -857,7 +886,7 @@ describe("handleSubscriptionDeleted — terminar no es irse", () => {
 
   it("terminar no escribe encuesta de baja involuntaria", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -882,7 +911,7 @@ describe("handleSubscriptionUpdated — no degrada una terminada", () => {
   // él el portal graduado de la cliente.
   it("no espeja el estado de Stripe sobre una fila ya completed", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "completed", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "completed", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -905,7 +934,7 @@ describe("handleSubscriptionUpdated — no degrada una terminada", () => {
   // el portal graduado hasta que llegara el borrado —o para siempre si no llega.
   it("no graba canceled sobre una fila que está terminando, aunque llegue antes que el borrado", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -923,7 +952,7 @@ describe("handleSubscriptionUpdated — no degrada una terminada", () => {
   // y sus otros estados se espejan igual.
   it("durante el último mes los demás estados sí se espejan", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z" },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
       error: null,
     });
 
@@ -939,7 +968,7 @@ describe("handleSubscriptionUpdated — no degrada una terminada", () => {
 
   it("una fila normal sí espeja el estado", async () => {
     subLookupRow.mockReturnValue({
-      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null },
+      data: { id: "db-sub-1", profile_id: "p-1", status: "active", completed_at: null, cancel_at_period_end: false },
       error: null,
     });
 

@@ -95,6 +95,9 @@ export interface ClientSubscription {
   content_ordinal: number;
   content_loops: number;
   status: SubStatus;
+  /** Las DOS señales del final programado; la ficha no deduce de una sola. */
+  completed_at: string | null;
+  cancel_at_period_end: boolean;
   enrollment_date: string;
   current_period_end: string | null;
   price_mxn: number;
@@ -135,13 +138,14 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   const { data: rawSubs } = await supabase
     .from("subscriptions")
     .select(
-      "id, status, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, billing_model, duration_months))"
+      "id, status, completed_at, cancel_at_period_end, enrollment_date, current_period_end, months_elapsed, content_variant_id, content_ordinal, content_loops, program_variants!program_variant_id(name, price_mxn, programs(name, billing_model, duration_months))"
     )
     .eq("profile_id", clientId)
     .order("enrollment_date", { ascending: false });
 
   type RawSub = {
-    id: string; status: SubStatus; enrollment_date: string; current_period_end: string | null; months_elapsed: number;
+    id: string; status: SubStatus; completed_at: string | null; cancel_at_period_end: boolean | null;
+    enrollment_date: string; current_period_end: string | null; months_elapsed: number;
     content_variant_id: string | null; content_ordinal: number; content_loops: number;
     program_variants: { name: string; price_mxn: number; programs: { name: string; billing_model: string; duration_months: number | null } | null } | null;
   };
@@ -176,6 +180,8 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       content_ordinal: s.content_ordinal,
       content_loops: s.content_loops,
       status: s.status,
+      completed_at: s.completed_at,
+      cancel_at_period_end: s.cancel_at_period_end ?? false,
       enrollment_date: s.enrollment_date,
       current_period_end: s.current_period_end,
       price_mxn: s.program_variants!.price_mxn,
