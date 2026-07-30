@@ -7,6 +7,15 @@
   --rosa: #eddbd8;
   --rosa-soft: #f6ecea;
   --rosa-deep: #e0c8c3;
+  /* Rosa de RELLENO de barra, no de fondo. Los tres rosas de arriba son colores
+     de fondo — es su trabajo — y ninguno sirve para pintar una barra: sobre la
+     pista --gris-claro dan 1.22:1, 1.06:1 y 1.46:1, contra el 3:1 que pide
+     WCAG 1.4.11 para objetos gráficos. Éste da 3.35:1 sobre esa pista.
+     Se mide contra la PISTA, no contra la tarjeta blanca: la pista es el color
+     adyacente a la parte llena de la barra, y medir contra el blanco es lo que
+     dejó pasar al relleno anterior (--lavanda, 2.81:1 sobre pista) durante meses.
+     Cuesta parecerse menos al rosa de marca; es el precio de que se vea. */
+  --rosa-bar: #b8746a;
   --lavanda: #9982f4;
   --lavanda-dark: #7a63d4;
   --lavanda-soft: #efeafe;

@@ -4,7 +4,8 @@ import {
   computeMRR,
   groupRevenueByMonth,
   groupClientsByVariant,
-  groupRevenueByProgram,
+  groupRevenueByVariant,
+  orderRevenueByClientsOrder,
   computeRenewalsWithinDays,
   partitionByOutcome,
   type FinanceSubRow,
@@ -89,23 +90,130 @@ describe("groupClientsByVariant", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5: groupRevenueByProgram
+// dashboard-revenue-by-variant: groupRevenueByVariant
 // ---------------------------------------------------------------------------
 
-describe("groupRevenueByProgram", () => {
-  it("suma amount_paid por programa, orden descendente", () => {
+describe("groupRevenueByVariant", () => {
+  it("suma amount_paid por variante, orden descendente", () => {
     const invoices = [
-      { amount_paid: 990, invoice_date: "2026-06-01T00:00:00Z", program_name: "CuarentaMás" },
-      { amount_paid: 990, invoice_date: "2026-06-01T00:00:00Z", program_name: "CuarentaMás" },
-      { amount_paid: 1490, invoice_date: "2026-06-01T00:00:00Z", program_name: "Strong & Fit" },
+      { amount_paid: 990, variant_name: "CuarentaMás Principiante Poco Tiempo" },
+      { amount_paid: 990, variant_name: "CuarentaMás Principiante Poco Tiempo" },
+      { amount_paid: 1490, variant_name: "Strong & Fit Intermedio" },
     ];
-    expect(groupRevenueByProgram(invoices)).toEqual([
-      { program: "CuarentaMás", total: 1980 },
-      { program: "Strong & Fit", total: 1490 },
+
+    expect(groupRevenueByVariant(invoices)).toEqual([
+      { variant: "CuarentaMás Principiante Poco Tiempo", total: 1980 },
+      { variant: "Strong & Fit Intermedio", total: 1490 },
     ]);
   });
+
   it("devuelve [] sin invoices", () => {
-    expect(groupRevenueByProgram([])).toEqual([]);
+    expect(groupRevenueByVariant([])).toEqual([]);
+  });
+
+  it("colapsa varias invoices de una misma variante en una sola fila", () => {
+    const invoices = [
+      { amount_paid: 100, variant_name: "X" },
+      { amount_paid: 200, variant_name: "X" },
+      { amount_paid: 300, variant_name: "X" },
+    ];
+
+    expect(groupRevenueByVariant(invoices)).toEqual([{ variant: "X", total: 600 }]);
+  });
+
+  // La tarjeta muestra sólo filas con ingreso: una variante que suma 0 no es
+  // "ingreso cero", es una fila vacía con una barra invisible.
+  it("omite variantes cuyo total es 0", () => {
+    const invoices = [
+      { amount_paid: 0, variant_name: "Sin ingreso" },
+      { amount_paid: 500, variant_name: "Con ingreso" },
+    ];
+
+    expect(groupRevenueByVariant(invoices)).toEqual([{ variant: "Con ingreso", total: 500 }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dashboard-revenue-by-variant: orderRevenueByClientsOrder
+//
+// Las dos tarjetas comparten eje y orden para que se puedan leer una contra
+// otra; NO comparten membresía (una variante puede tener clientes sin ingreso
+// todavía, u ingreso histórico sin ningún cliente activo).
+// ---------------------------------------------------------------------------
+
+describe("orderRevenueByClientsOrder", () => {
+  it("respeta el orden de la tarjeta de clientes aunque los totales digan otra cosa", () => {
+    const revenue = [
+      { variant: "B", total: 9000 },
+      { variant: "A", total: 100 },
+    ];
+    const clientsOrder = [
+      { variant: "A", count: 5 },
+      { variant: "B", count: 3 },
+    ];
+
+    expect(orderRevenueByClientsOrder(revenue, clientsOrder)).toEqual([
+      { variant: "A", total: 100 },
+      { variant: "B", total: 9000 },
+    ]);
+  });
+
+  it("omite una variante con clientes pero sin ingreso", () => {
+    const revenue = [{ variant: "A", total: 100 }];
+    const clientsOrder = [
+      { variant: "A", count: 5 },
+      { variant: "SinIngreso", count: 2 },
+    ];
+
+    expect(orderRevenueByClientsOrder(revenue, clientsOrder)).toEqual([{ variant: "A", total: 100 }]);
+  });
+
+  it("agrega al final las variantes con ingreso pero sin clientes activos, por total descendente", () => {
+    const revenue = [
+      { variant: "Churn chico", total: 300 },
+      { variant: "A", total: 100 },
+      { variant: "Churn grande", total: 800 },
+    ];
+    const clientsOrder = [{ variant: "A", count: 5 }];
+
+    expect(orderRevenueByClientsOrder(revenue, clientsOrder)).toEqual([
+      { variant: "A", total: 100 },
+      { variant: "Churn grande", total: 800 },
+      { variant: "Churn chico", total: 300 },
+    ]);
+  });
+
+  it("sin clientes activos devuelve todo el ingreso por total descendente", () => {
+    const revenue = [
+      { variant: "A", total: 100 },
+      { variant: "B", total: 900 },
+    ];
+
+    expect(orderRevenueByClientsOrder(revenue, [])).toEqual([
+      { variant: "B", total: 900 },
+      { variant: "A", total: 100 },
+    ]);
+  });
+
+  it("sin ingreso devuelve []", () => {
+    expect(orderRevenueByClientsOrder([], [{ variant: "A", count: 5 }])).toEqual([]);
+  });
+
+  it("no pierde ni duplica filas", () => {
+    const revenue = [
+      { variant: "A", total: 100 },
+      { variant: "B", total: 200 },
+      { variant: "C", total: 300 },
+    ];
+    const clientsOrder = [
+      { variant: "B", count: 9 },
+      { variant: "Z", count: 1 },
+    ];
+
+    const result = orderRevenueByClientsOrder(revenue, clientsOrder);
+
+    expect(result).toHaveLength(3);
+    expect(new Set(result.map((r) => r.variant))).toEqual(new Set(["A", "B", "C"]));
   });
 });
 

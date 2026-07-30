@@ -1,9 +1,11 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { logAndGeneric } from "./errors";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import type {
   FinanceSubRow,
   FinanceInvoiceRow,
+  FinanceVariantInvoiceRow,
   RecentPaymentRow,
   PaymentRow,
 } from "./finance-helpers";
@@ -62,6 +64,54 @@ export async function getPaidInvoices(monthsBack = 12): Promise<FinanceInvoiceRo
     amount_paid: r.amount_paid,
     invoice_date: r.invoice_date,
     program_name: r.subscriptions?.program_variants?.programs?.name ?? "—",
+  }));
+}
+
+/**
+ * Ingreso histórico por variante — TODA la vida del negocio, sin corte de fecha.
+ *
+ * Consulta aparte y no un `getPaidInvoices(null)`: esa función tiene un solo
+ * consumidor ("Ingresos por mes") que necesita exactamente 12 meses, y volver
+ * opcional su ventana le daría dos significados a la misma función y dos
+ * llamadas que jamás deben separarse. Una cifra de dinero declara su alcance
+ * (regla 14); un corte nullable lo esconde.
+ *
+ * Se agrega en memoria y no con una función de Postgres a propósito: un RPC
+ * obligaría a poblar `Database["public"]["Functions"]`, que la regla 10 prohíbe
+ * — cambia la resolución de embeds de PostgREST al `Relationships: []` que se
+ * mantiene a mano y rompe `tsc` en TODOS los joins del repo. Revisar si el
+ * volumen de invoices llega a hacer medible el viaje de ida y vuelta; queda
+ * aislado detrás de esta función, así que el cambio sería local.
+ */
+export async function getRevenueByVariantAllTime(): Promise<FinanceVariantInvoiceRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("invoices")
+    // OJO — `!program_variant_id` NO es decorativo: subscriptions tiene dos FKs
+    // hacia program_variants y sin desambiguar PostgREST devuelve un error, no
+    // filas (regla 9).
+    .select("amount_paid, subscriptions(program_variants!program_variant_id(name))")
+    .eq("status", "paid");
+
+  // Por eso se lee `error` y no sólo `data`: el modo de falla de la regla 9 es
+  // un error de PostgREST, no un resultado vacío. Mirando sólo `data`, una
+  // regresión del embed se vería como "todavía no hay ingresos" — la tarjeta en
+  // blanco y ni una línea en el log.
+  if (error) {
+    logAndGeneric("getRevenueByVariantAllTime", error);
+    return [];
+  }
+
+  // keep: invoices JOIN subscriptions JOIN program_variants — nested join not inferred.
+  type Raw = {
+    amount_paid: number;
+    subscriptions: { program_variants: { name: string } | null } | null;
+  };
+  return ((data ?? []) as Raw[]).map((r) => ({
+    amount_paid: r.amount_paid,
+    // Etiqueta y no "—": esta fila lleva barra propia y agrupa las invoices
+    // huérfanas. Un guion se lee como el nombre de una variante.
+    variant_name: r.subscriptions?.program_variants?.name ?? "Sin variante",
   }));
 }
 
