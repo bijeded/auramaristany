@@ -102,10 +102,10 @@ WCAG 1.4.11 requires 3:1 for graphical objects against **adjacent** colors. For 
 
 | token | hex | vs `#f5f5f5` track | vs white card |
 |---|---|---|---|
-| `--rosa` | `#eddbd8` | **1.22 : 1** ✗ | 1.28 : 1 ✗ |
-| `--rosa-deep` | `#e0c8c3` | **1.39 : 1** ✗ | 1.47 : 1 ✗ |
-| `--lavanda` (current fill) | `#9982f4` | **2.81 : 1** ✗ | 3.09 : 1 ~ |
-| `--lavanda-dark` (exists) | `#7a63d4` | **4.29 : 1** ✓ | 4.68 : 1 ✓ |
+| `--rosa` | `#eddbd8` | **1.22 : 1** ✗ | 1.34 : 1 ✗ |
+| `--rosa-deep` | `#e0c8c3` | **1.46 : 1** ✗ | 1.59 : 1 ✗ |
+| `--lavanda` (current fill) | `#9982f4` | **2.81 : 1** ✗ | 3.06 : 1 ~ |
+| `--lavanda-dark` (exists) | `#7a63d4` | **4.22 : 1** ✓ | 4.60 : 1 ✓ |
 | `--rosa-bar` (**new**) | `#b8746a` | **3.35 : 1** ✓ | 3.66 : 1 ✓ |
 
 Two findings worth stating plainly:

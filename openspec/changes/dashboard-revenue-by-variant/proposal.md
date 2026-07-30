@@ -12,7 +12,7 @@ Regrinding revenue to the variant grain makes the pair comparable — and the us
 - **The card drops Recharts and adopts the inline-bar form of "Clientes por variante"**, so the two cards are visually one system. `components/admin/ProgramRevenueDonut.tsx` is deleted (it has been misnamed since A10 turned the donut into bars) and both cards render through a single shared `VariantBarList`.
 - **Row order is shared, membership is not.** The income card follows the clients card's order for variants they have in common, then appends revenue-only variants (churned ones with no active client) by total descending. Each card lists only its own non-empty rows, so the two lists can differ in length.
 - **The two cards stay equal height** side by side, as they are today.
-- **Bar colors move to tokens (D23).** The two `#9982f4` literals are retired. Clients bars become `--lavanda-dark`; income bars get a new `--rosa-bar` token. This is not cosmetic: the current `#9982f4` bar sits at 2.77:1 against its `--gris-claro` track, below the 3:1 WCAG 1.4.11 floor for graphical objects, and no existing pink token clears it either (`--rosa` is 1.18:1 — it is a background color).
+- **Bar colors move to tokens (D23).** The two `#9982f4` literals are retired. Clients bars become `--lavanda-dark`; income bars get a new `--rosa-bar` token. This is not cosmetic: the current `#9982f4` bar sits at 2.81:1 against its `--gris-claro` track, below the 3:1 WCAG 1.4.11 floor for graphical objects, and no existing pink token clears it either (`--rosa` is 1.22:1 — it is a background color).
 - **`groupRevenueByProgram` and the `ProgramRevenue` type are deleted**, having zero callers after the swap.
 
 ## Capabilities

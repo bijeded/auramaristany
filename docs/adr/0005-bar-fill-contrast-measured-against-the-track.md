@@ -13,7 +13,7 @@ adjacent to it:
 
 | | vs `#f5f5f5` track | vs white card |
 |---|---|---|
-| `--lavanda` `#9982f4` | **2.81 : 1** ✗ | 3.09 : 1 ~ |
+| `--lavanda` `#9982f4` | **2.81 : 1** ✗ | 3.06 : 1 ~ |
 
 The reason it passed inspection is the second column. Measured against the white card the
 fill scrapes past 3:1, and "lavender on white" is how anyone describes the card when they
@@ -42,7 +42,7 @@ Concretely, for this codebase:
   track, so the next reader inherits the number rather than re-deriving it.
 
 `--rosa-bar` (`#b8746a`, 3.35:1) was added under this rule, and the clients bars moved to the
-existing `--lavanda-dark` (`#7a63d4`, 4.29:1).
+existing `--lavanda-dark` (`#7a63d4`, 4.22:1).
 
 ## Alternatives considered
 

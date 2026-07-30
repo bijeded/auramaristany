@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { logAndGeneric } from "./errors";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import type {
   FinanceSubRow,
@@ -84,13 +85,22 @@ export async function getPaidInvoices(monthsBack = 12): Promise<FinanceInvoiceRo
  */
 export async function getRevenueByVariantAllTime(): Promise<FinanceVariantInvoiceRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("invoices")
     // OJO — `!program_variant_id` NO es decorativo: subscriptions tiene dos FKs
     // hacia program_variants y sin desambiguar PostgREST devuelve un error, no
-    // filas (regla 9). Un lector que sólo mire `!data` degrada en silencio.
+    // filas (regla 9).
     .select("amount_paid, subscriptions(program_variants!program_variant_id(name))")
     .eq("status", "paid");
+
+  // Por eso se lee `error` y no sólo `data`: el modo de falla de la regla 9 es
+  // un error de PostgREST, no un resultado vacío. Mirando sólo `data`, una
+  // regresión del embed se vería como "todavía no hay ingresos" — la tarjeta en
+  // blanco y ni una línea en el log.
+  if (error) {
+    logAndGeneric("getRevenueByVariantAllTime", error);
+    return [];
+  }
 
   // keep: invoices JOIN subscriptions JOIN program_variants — nested join not inferred.
   type Raw = {
@@ -99,7 +109,9 @@ export async function getRevenueByVariantAllTime(): Promise<FinanceVariantInvoic
   };
   return ((data ?? []) as Raw[]).map((r) => ({
     amount_paid: r.amount_paid,
-    variant_name: r.subscriptions?.program_variants?.name ?? "—",
+    // Etiqueta y no "—": esta fila lleva barra propia y agrupa las invoices
+    // huérfanas. Un guion se lee como el nombre de una variante.
+    variant_name: r.subscriptions?.program_variants?.name ?? "Sin variante",
   }));
 }
 

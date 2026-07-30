@@ -190,7 +190,14 @@ export default async function AdminDashboardPage() {
       {/* Distribución */}
       <div className="flex" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
         <Card style={{ flex: 1 }}>
-          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Clientes por variante</h3>
+          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>Clientes por variante</h3>
+          {/* Las dos tarjetas llevan encabezado de la misma altura (título +
+              línea de ventana) para que las primeras filas arranquen a la misma
+              altura. Si una tuviera subtítulo y la otra no, el desfase anularía
+              justo la lectura fila-contra-fila que el orden compartido busca. */}
+          <p className="font-body" style={{ fontSize: 12, color: "var(--gris-texto)", marginBottom: 16 }}>
+            Suscripciones activas hoy
+          </p>
           <VariantBarList
             rows={clientsByVariant.map((p) => ({ label: p.variant, value: p.count, display: String(p.count) }))}
             fill="var(--lavanda-dark)"
