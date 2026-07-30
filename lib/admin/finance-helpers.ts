@@ -317,7 +317,10 @@ const EVER_SUBSCRIBED: Record<string, true> = {
   paused: true,
   completed: true,
   canceled: true,
-};
+  // El `satisfies` es sólo sobre las CLAVES: caza un estado mal escrito aquí en
+  // tiempo de compilación sin angostar la búsqueda de arriba, que tiene que
+  // seguir aceptando cualquier string para poder devolver `false`.
+} satisfies Partial<Record<SubscriptionStatus, true>>;
 
 /**
  * Bajas y tasa de fuga por variante, histórico completo.

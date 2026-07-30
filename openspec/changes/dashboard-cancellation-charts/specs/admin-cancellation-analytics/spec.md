@@ -50,7 +50,7 @@ The denominator SHALL be derived from the status set as a `Record<string, …>`-
 
 #### Scenario: Unpaid sits on the denominator side only
 - **WHEN** a variant has one `unpaid` subscription and one `active` subscription
-- **THEN** its denominator is 2, its numerator is 0, and its rate is 0%
+- **THEN** both count toward its denominator and neither toward its numerator, so the variant has no churn and is absent from the card entirely (a zero row is never rendered)
 
 #### Scenario: An unrecognized status does not break the chart
 - **WHEN** a subscription row carries a status not named in the denominator set

@@ -19,6 +19,17 @@ describe("cancellationReasonLabel", () => {
     expect(cancellationReasonLabel("otro")).toBe("Otro");
     expect(cancellationReasonLabel("pago_fallido")).toBe("Pago fallido");
   });
+
+  /**
+   * Regla 8 un nivel más allá: una función de etiquetas sobre un enum que vive
+   * en la base. `tsc` prueba que la unión es exhaustiva, nunca que la fila
+   * pertenezca a la unión. Si el CHECK gana un motivo antes que la unión, la
+   * fila tiene que salir legible —y el `localeCompare` que ordena la carta no
+   * puede toparse con un `undefined`.
+   */
+  it("un motivo que la unión aún no conoce cae a su clave cruda, nunca a undefined", () => {
+    expect(cancellationReasonLabel("motivo_del_futuro")).toBe("motivo_del_futuro");
+  });
 });
 
 describe("CANCELLATION_REASON_OPTIONS", () => {

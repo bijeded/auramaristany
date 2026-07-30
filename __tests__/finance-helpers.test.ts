@@ -14,6 +14,7 @@ import {
   countWithShare,
   type ChurnSubRow,
 } from "@/lib/admin/finance-helpers";
+import type { CancellationReason } from "@/lib/supabase/types";
 
 // ---------------------------------------------------------------------------
 // Task 1: formatMXN
@@ -568,6 +569,15 @@ describe("groupCancellationReasons", () => {
       "pago_fallido",
       "otro",
       "precio_muy_caro",
+    ]);
+  });
+
+  it("un motivo desconocido sale con su clave cruda en vez de una fila en blanco", () => {
+    const unknown = [{ reason: "motivo_del_futuro" as CancellationReason }, { reason: "otro" as const }];
+
+    expect(groupCancellationReasons(unknown)).toEqual([
+      { reason: "motivo_del_futuro", label: "motivo_del_futuro", count: 1, share: 50 },
+      { reason: "otro", label: "Otro", count: 1, share: 50 },
     ]);
   });
 

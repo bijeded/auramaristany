@@ -13,6 +13,13 @@ const REASON_LABELS: Record<CancellationReason, string> = {
   pago_fallido: "Pago fallido",
 };
 
+// keep: ensanchamiento del índice. `REASON_LABELS` se queda tipado contra la
+// unión —así un motivo nuevo obliga a escribirle su etiqueta—, pero la BÚSQUEDA
+// tiene que poder fallar: quien llama trae el valor de una fila de
+// `cancellation_surveys`, y `tsc` prueba que la unión es exhaustiva, no que la
+// fila pertenezca a la unión.
+const REASON_LABEL_LOOKUP = REASON_LABELS as Record<string, string>;
+
 /**
  * Pinta un motivo de baja para que lo lea una persona.
  *
@@ -20,9 +27,16 @@ const REASON_LABELS: Record<CancellationReason, string> = {
  * cancelación" en el dashboard en vez de escribir su propia copia: dos mapas
  * del mismo enum son una tabla copiada (regla 8) y se separan en el siguiente
  * motivo que se agregue.
+ *
+ * Recibe `string` y no `CancellationReason` a propósito, con caída al valor
+ * crudo: es la regla 8 un nivel más allá, sobre una función de etiquetas. Si el
+ * CHECK de `cancellation_surveys` gana un motivo que la unión todavía no tiene,
+ * la carta pinta la clave cruda —fea pero legible, y evidente para quien la
+ * vea— en vez de una fila en blanco, y el `localeCompare` del orden no se
+ * encuentra un `undefined`.
  */
-export function cancellationReasonLabel(reason: CancellationReason): string {
-  return REASON_LABELS[reason];
+export function cancellationReasonLabel(reason: string): string {
+  return REASON_LABEL_LOOKUP[reason] ?? reason;
 }
 
 /** Reasons whose row carries a free-text `detail`. */
