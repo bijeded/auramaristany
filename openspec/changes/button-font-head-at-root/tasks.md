@@ -31,7 +31,7 @@
 - [ ] 5.1 Open `/auth/login`, `/portal/settings` and the `/admin` sidebar side by side at ~375px and confirm the three reported buttons are indistinguishable in font from `Ingresar`.
 - [ ] 5.2 Sweep the admin screens whose buttons change without having been reported — clients list, payments, content authoring, onboarding builder, messages, series modals — for clipped, wrapped, or overflowing labels. This is where the regression risk introduced by the root fix lives.
 - [ ] 5.3 Confirm tap targets remain ≥44px, with the documented 32px `kg | lb` toggle unchanged and out of scope.
-- [ ] 5.4 Write the smoke card for the above. Every step must be possible with existing demo data and non-destructive.
+- [x] 5.4 Write the smoke card for the above. Every step must be possible with existing demo data and non-destructive.
 
 ## 6. Ship
 
