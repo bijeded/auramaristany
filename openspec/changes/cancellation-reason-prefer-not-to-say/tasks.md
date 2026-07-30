@@ -1,36 +1,41 @@
 ## 1. Migration first (before any app code merges)
 
-- [ ] 1.1 Write `supabase/migrations/019_cancellation_reason_prefer_not_to_say.sql`: drop and recreate the `cancellation_surveys.reason` `CHECK` with `prefiero_no_decir` added to the existing seven. Comment says why the value exists — declining to answer is not "Otro" — so the next reader does not re-merge them.
-- [ ] 1.2 Apply it via the Supabase Management API. **SQL on ONE single line** — the pipeline eats newlines, so a `--` comment silently comments out everything after it and returns `[]` as though it worked.
-- [ ] 1.3 Verify against the real database, not the file. Run the `pg_constraint` query **before and after** and paste both into the PR:
-      `select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid = 'cancellation_surveys'::regclass and contype = 'c';`
-      The **before** proves the constraint's real name matches what the migration drops; the **after** must show **exactly one** reason check, listing eight values. The after alone cannot distinguish "renamed correctly" from "a second constraint was created alongside the old one" — which is the migration's silent failure mode, and the one a comment in the SQL cannot prevent.
-- [ ] 1.4 Probe the write path end to end under a **client** session (not service-role): insert a row with `reason = 'prefiero_no_decir'`, confirm migration 011's insert policy (`profile_id = auth.uid() and source = 'voluntary' and reason <> 'pago_fallido'`) accepts it, then delete the probe row. This is the one check that proves the policy and the `CHECK` agree.
-- [ ] 1.5 Record in the PR when 1.2–1.4 ran and what they returned (rule 11).
+- [x] 1.1 Write `supabase/migrations/019_cancellation_reason_prefer_not_to_say.sql`: drop and recreate the `cancellation_surveys.reason` `CHECK` with `prefiero_no_decir` added to the existing seven. Comment says why the value exists — declining to answer is not "Otro" — so the next reader does not re-merge them.
+- [x] 1.2 Apply the migration. **Applied by the human on 2026-07-30** — no `SUPABASE_ACCESS_TOKEN`, Supabase CLI not logged in and no `psql` available to this agent, so DDL could not be run here. (SQL on ONE single line if going through the Management API: the pipeline eats newlines, so a `--` comment silently comments out everything after it and returns `[]` as though it worked.)
+- [x] 1.3 Verify against the real database, not the file. **The `pg_constraint` query was NOT run** — no SQL access. Verified functionally instead via PostgREST, which excludes both failure modes and is arguably stronger than reading the catalogue:
+      · service-role insert `prefiero_no_decir` → **201**. Rules out "not applied" and "drop was a no-op + a second check added alongside" — a surviving seven-value check would reject it.
+      · service-role insert `motivo_inventado` → **400 / 23514**. Rules out "constraint dropped but the `add` failed", which would look identical to success on the first probe alone.
+      · the rejection message names the constraint — `cancellation_surveys_reason_check` — which is the evidence the before/after query was meant to supply: the migration dropped the right name, and exactly one check enforces `reason`.
+- [x] 1.4 Probe the write path end to end under a **client** session (not service-role), which is the one check proving migration 011's insert policy and the `CHECK` agree:
+      · client insert `prefiero_no_decir` → **201**, accepted by `with check (profile_id = auth.uid() and source = 'voluntary' and reason <> 'pago_fallido')`.
+      · client insert `pago_fallido` → **403 / 42501**, still unforgeable by a client.
+      · probe row deleted by the same client session, which also exercised `delete_own_voluntary`.
+      · table back to its 7 seed rows, no `prefiero_no_decir` left behind — Aura's dashboard untouched.
+- [x] 1.5 Record in the PR when 1.2–1.4 ran and what they returned (rule 11).
 
 ## 2. Types and pure helpers (TDD)
 
-- [ ] 2.1 Write tests: `cancellationReasonLabel("prefiero_no_decir")` returns "Prefiero no decir"; `reasonRequiresDetail("prefiero_no_decir")` is **false**; `CANCELLATION_REASON_OPTIONS` contains it, places it **last**, and still excludes `pago_fallido`.
-- [ ] 2.2 Add `prefiero_no_decir` to the `CancellationReason` union in `lib/supabase/types.ts`.
-- [ ] 2.3 Add the `REASON_LABELS` entry and extend `CANCELLATION_REASON_OPTIONS` in `lib/portal/cancellation.ts`. `DETAIL_REASONS` stays unchanged — the test from 2.1 is what keeps it that way.
-- [ ] 2.4 Confirm `isChurned` and the dashboard denominator need no change (they key on subscription status, not on reason), and say so rather than leaving it unexamined.
+- [x] 2.1 Write tests: `cancellationReasonLabel("prefiero_no_decir")` returns "Prefiero no decir"; `reasonRequiresDetail("prefiero_no_decir")` is **false**; `CANCELLATION_REASON_OPTIONS` contains it, places it **last**, and still excludes `pago_fallido`.
+- [x] 2.2 Add `prefiero_no_decir` to the `CancellationReason` union in `lib/supabase/types.ts`.
+- [x] 2.3 Add the `REASON_LABELS` entry and extend `CANCELLATION_REASON_OPTIONS` in `lib/portal/cancellation.ts`. `DETAIL_REASONS` stays unchanged — the test from 2.1 is what keeps it that way.
+- [x] 2.4 Confirm `isChurned` and the dashboard denominator need no change (they key on subscription status, not on reason), and say so rather than leaving it unexamined.
 
 ## 3. Server action (TDD)
 
-- [ ] 3.1 Write tests: the zod enum accepts `prefiero_no_decir`; an omitted reason results in `prefiero_no_decir`, **not** `otro`; a `detail` submitted alongside `prefiero_no_decir` is not stored.
-- [ ] 3.2 Add the value to `cancelInputSchema` in `lib/portal/settingsActions.ts` and change the fallback from `reason ?? "otro"` to `reason ?? "prefiero_no_decir"`.
-- [ ] 3.3 Leave the swallow-on-insert-failure behavior exactly as it is, and add a line to its comment naming what it costs: a value the `CHECK` rejects disappears silently. That comment is the reason task group 1 runs first.
+- [x] 3.1 Write tests: the zod enum accepts `prefiero_no_decir`; an omitted reason results in `prefiero_no_decir`, **not** `otro`; a `detail` submitted alongside `prefiero_no_decir` is not stored.
+- [x] 3.2 Add the value to `cancelInputSchema` in `lib/portal/settingsActions.ts` and change the fallback from `reason ?? "otro"` to `reason ?? "prefiero_no_decir"`.
+- [x] 3.3 Leave the swallow-on-insert-failure behavior exactly as it is, and add a line to its comment naming what it costs: a value the `CHECK` rejects disappears silently. That comment is the reason task group 1 runs first.
 
 ## 4. Modal — one source of options
 
-- [ ] 4.1 Delete the hardcoded "Prefiero no decir" radio at `components/portal/settings/CancelSubscriptionSection.tsx:172` and the `reason === null` modelling around it, so every radio comes from `CANCELLATION_REASON_OPTIONS`.
-- [ ] 4.2 Check the state type: if `reason` was `CancellationReason | null` only to model the extra radio, narrow it. If `null` still means "nothing selected yet", keep it and say which meaning survived.
-- [ ] 4.3 Confirm no free-text field appears for `prefiero_no_decir` (it follows from `reasonRequiresDetail`, but the modal's `showDetail` is the thing that must actually honor it).
-- [ ] 4.4 Tap targets stay >=44px and the option keeps its existing styling; the deleted radio had its own inline style, so check nothing regressed visually.
+- [x] 4.1 Delete the hardcoded "Prefiero no decir" radio at `components/portal/settings/CancelSubscriptionSection.tsx:172` and the `reason === null` modelling around it, so every radio comes from `CANCELLATION_REASON_OPTIONS`.
+- [x] 4.2 Check the state type: if `reason` was `CancellationReason | null` only to model the extra radio, narrow it. If `null` still means "nothing selected yet", keep it and say which meaning survived.
+- [x] 4.3 Confirm no free-text field appears for `prefiero_no_decir` (it follows from `reasonRequiresDetail`, but the modal's `showDetail` is the thing that must actually honor it).
+- [x] 4.4 Tap targets stay >=44px and the option keeps its existing styling; the deleted radio had its own inline style, so check nothing regressed visually.
 
 ## 5. Verification
 
-- [ ] 5.1 Local gate: `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` — all green, no regression in `__tests__/cancellation.test.ts` or `__tests__/settings-actions.test.ts`.
+- [x] 5.1 Local gate: `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` — all green, no regression in `__tests__/cancellation.test.ts` or `__tests__/settings-actions.test.ts`.
 - [ ] 5.2 Runtime, on Preview: cancel a demo subscription selecting "Prefiero no decir", confirm the row lands with that reason and no detail — then confirm the same for cancelling with nothing selected.
 - [ ] 5.3 Runtime: the new bar appears on "Razones de cancelación" in `/admin/dashboard` with its Spanish label, and the "Otro" bar no longer absorbs the declines.
 - [ ] 5.4 Reactivate the probe client and confirm her survey row is deleted as before (the reactivation path deletes the latest voluntary row; the new reason must not change that).
