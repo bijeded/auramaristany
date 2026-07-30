@@ -109,7 +109,7 @@ export function PerformanceTab({
                         fontSize: 12,
                         fontWeight: 600,
                         minWidth: 44,
-                        minHeight: 44,
+                        minHeight: 32,
                         background: weightUnit === u ? "var(--lavanda)" : "#fff",
                         color: weightUnit === u ? "#fff" : "var(--gris-texto)",
                       }}
