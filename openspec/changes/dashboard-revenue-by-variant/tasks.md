@@ -13,7 +13,7 @@
 
 ## 3. Query
 
-- [ ] 3.1 Add `getRevenueByVariantAllTime(): Promise<FinanceVariantInvoiceRow[]>` to `lib/admin/finance-queries.ts` — `.from("invoices").select("amount_paid, subscriptions(program_variants!program_variant_id(name))").eq("status", "paid")`, no date cutoff. Map to `{ amount_paid, variant_name }` with the same `// keep:` nested-join cast pattern as the neighbouring queries, falling back to `"—"` on a null name.
+- [ ] 3.1 Add `getRevenueByVariantAllTime(): Promise<FinanceVariantInvoiceRow[]>` to `lib/admin/finance-queries.ts` — `.from("invoices").select("amount_paid, subscriptions(program_variants!program_variant_id(name))").eq("status", "paid")`, no date cutoff. Map to `{ amount_paid, variant_name }` with the same `// keep:` nested-join cast pattern as the neighbouring queries. Label a null name `"Sin variante"` — **not** `"—"`, which was the original plan and was reversed in review: unlike `getActiveSubscriptions`, which filters such rows out, here the orphan bucket gets its own bar, and a dash in that position reads as a variant's name. Read `error` as well as `data` and route it to `logAndGeneric`: rule 9's failure mode is a PostgREST error, not an empty result.
 - [ ] 3.2 Leave `getPaidInvoices` and its 12-month cutoff untouched; verify "Ingresos por mes" still reads from it.
 
 ## 4. Presentation
