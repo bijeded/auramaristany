@@ -51,6 +51,8 @@ The default SHALL be expressed at a specificity that an explicit `font-body` uti
 - **THEN** the reason it departs from the default is recorded at that site or in this spec
 - **AND** an undeclared button is unambiguously a default, not a silent exception
 
+**Recorded reason for the current exceptions.** The 31 buttons that declare `font-body` are dense admin controls rendered at 12–13.5px: table pagination (`Anterior` / `Siguiente` on the clients and payments lists), `Exportar CSV`, the rich-text editor toolbars, and the modal `Cancelar` / `Guardar` pairs in the onboarding editor. Oswald is a condensed face and is hardest to read at exactly those sizes, so they stay in Hind. This was reviewed button by button at 375px during this change and confirmed deliberate — it is a decision, not an oversight. They are all admin-facing; no client-facing button takes this exception.
+
 ### Requirement: A link styled as a button keeps its font declared at the call site
 
 Several primary calls to action are `<Link>` or `<a>` elements styled to look like buttons — the graduated-client CTA, the `sin-suscripcion` CTA, and the two checkout CTAs. The base-layer default is scoped to the `button` element and therefore SHALL NOT reach them.

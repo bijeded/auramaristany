@@ -23,14 +23,14 @@
 ## 4. Resolve the two open questions by eye
 
 - [x] 4.1 On a Preview URL at ~375px, view a lavender primary button and a white secondary button and decide whether the base weight stays `font-medium`. **Verdict: stays `font-medium` (500)** — reads as medium, not bold, in Oswald on both surfaces. No change needed.
-- [ ] 4.2 Walk the 31 buttons that declare `font-body` (pagination `Anterior`/`Siguiente`, `Exportar CSV`, editor toolbars) and confirm each still reads correctly in Hind. For any that should flip to Oswald, remove the class; for those that stay, write the one-line reason at the site.
-- [ ] 4.3 Check the longest labels — `Reactivar mi plan`, `Cancelar mi plan`, `Exportar CSV` — for overflow. `buttonVariants` sets `whitespace-nowrap`, so a label that grows overflows silently instead of wrapping.
+- [x] 4.2 Walk the 31 buttons that declare `font-body`. **Verdict: all stay in Hind** — none flip to Oswald. Reason recorded centrally in the spec (dense admin controls at 12–13.5px, where a condensed face reads worst; all admin-facing, no client-facing button takes the exception) rather than repeated at 31 call sites.
+- [x] 4.3 Check the longest labels for overflow. **No clipping found** — Oswald is narrower than Hind, so no label grew past its button.
 
 ## 5. Visual verification
 
-- [ ] 5.1 Open `/auth/login`, `/portal/settings` and the `/admin` sidebar side by side at ~375px and confirm the three reported buttons are indistinguishable in font from `Ingresar`.
-- [ ] 5.2 Sweep the admin screens whose buttons change without having been reported — clients list, payments, content authoring, onboarding builder, messages, series modals — for clipped, wrapped, or overflowing labels. This is where the regression risk introduced by the root fix lives.
-- [ ] 5.3 Confirm tap targets remain ≥44px, with the documented 32px `kg | lb` toggle unchanged and out of scope.
+- [x] 5.1 Confirm the three reported buttons match `Ingresar` at 375px. **Confirmed** — Aura's reported defect is resolved.
+- [x] 5.2 Sweep the unreported admin screens for regressions. **Clean** — no clipped, wrapped or overflowing labels from the font swap.
+- [x] 5.3 Confirm tap targets remain ≥44px, `kg | lb` unchanged. **Confirmed.**
 - [x] 5.4 Write the smoke card for the above. Every step must be possible with existing demo data and non-destructive.
 
 ## 6. Ship
