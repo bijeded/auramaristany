@@ -11,9 +11,9 @@ export interface FinanceSubRow {
    * sumaba a Aura dinero que no va a llegar.
    *
    * `status` viaja aunque hoy la consulta filtre por `active`: la derivación se
-   * llama con el valor real, no con una suposición sobre el filtro, así que si
-   * algún día se ensancha la consulta la respuesta sigue siendo correcta en vez
-   * de quedarse callada y mal.
+   * llama con el valor real y no con una suposición sobre el filtro. Si algún día
+   * se ensancha la consulta, las filas nuevas caen en el balde que les toque
+   * —incluido `excluded`— en vez de desaparecer sin que nadie lo note.
    */
   status: SubscriptionStatus;
   cancel_at_period_end: boolean;
@@ -28,6 +28,15 @@ export interface OutcomePartition {
   completing: FinanceSubRow[];
   /** Baja voluntaria agotando su periodo. */
   cancelling: FinanceSubRow[];
+  /**
+   * Ni cobra ni está terminando: ya terminó. Hoy siempre vacío —la consulta
+   * filtra por `active`—, y existe justo para que eso no haga falta creerlo: sin
+   * este balde, ensanchar la consulta dejaría caer filas de las tres cohortes en
+   * silencio mientras el headcount seguía contándolas, que es exactamente la
+   * divergencia callada que este cambio viene a quitar. La suma de los cuatro es
+   * el total de entrada SIEMPRE, no sólo mientras el filtro coopere.
+   */
+  excluded: FinanceSubRow[];
 }
 
 /**
@@ -47,7 +56,7 @@ export interface OutcomePartition {
  * construcción, no por que quien las escriba se acuerde.
  */
 export function partitionByOutcome(rows: FinanceSubRow[]): OutcomePartition {
-  const out: OutcomePartition = { billing: [], completing: [], cancelling: [] };
+  const out: OutcomePartition = { billing: [], completing: [], cancelling: [], excluded: [] };
   for (const row of rows) {
     const { kind } = deriveCancellationState({
       status: row.status,
@@ -57,9 +66,7 @@ export function partitionByOutcome(rows: FinanceSubRow[]): OutcomePartition {
     if (kind === "completing") out.completing.push(row);
     else if (kind === "grace") out.cancelling.push(row);
     else if (kind === "eligible") out.billing.push(row);
-    // `completed` y `none` no son alcanzables mientras la consulta filtre por
-    // `active`; si lo fueran, quedarse fuera de las tres es lo correcto: no
-    // cobran y no están terminando, ya terminaron.
+    else out.excluded.push(row); // `completed` | `none` — ya terminaron.
   }
   return out;
 }

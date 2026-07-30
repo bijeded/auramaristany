@@ -1,6 +1,6 @@
 # 0003. A subscription has two endings, and finishing one keeps a reduced portal
 
-Status: Accepted · Date: 2026-07-28
+Status: Accepted · Date: 2026-07-28 · Extended by [0004](0004-ending-subscriptions-money-versus-access.md) (the reader side: which figures count an ending subscription)
 
 ## Context
 

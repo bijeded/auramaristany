@@ -18,6 +18,7 @@ import { ProgramRevenueDonut } from "@/components/admin/ProgramRevenueDonut";
 import Link from "next/link";
 import { STATUS_LABEL } from "@/lib/admin/payment-status";
 import { requireAdminPage } from "@/lib/admin/auth";
+import { COHORT_FILTER } from "@/lib/admin/clients-helpers";
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
@@ -27,22 +28,30 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-function Kpi({ label, value, sub, danger, success, href }: {
+function Kpi({ label, value, sub, danger, accent, href }: {
   label: string;
   value: React.ReactNode;
   sub?: React.ReactNode;
   danger?: boolean;
-  /** D17 — verde de logro: terminar el plazo es graduarse, no perder a alguien. */
-  success?: boolean;
+  /**
+   * D17 — color del numeral. Cada cohorte que termina lleva el suyo: verde de
+   * logro para quien se gradúa (toca ofrecerle Extra) y ámbar para quien se va.
+   * Sin esto las dos se leían como el mismo evento, y una buena racha de
+   * graduaciones parecía fuga de clientes.
+   */
+  accent?: string;
   href?: string;
 }) {
-  const accent = danger ? "var(--error)" : success ? "var(--exito)" : undefined;
+  const hue = danger ? "var(--error)" : accent;
   return (
     <Card>
       <div className="font-body" style={{ fontWeight: 500, fontSize: 12.5, marginBottom: 10, color: "var(--gris-texto)" }}>{label}</div>
-      <span className="font-head" style={{ fontSize: 30, fontWeight: 600, color: accent ?? "var(--negro)" }}>{value}</span>
+      {/* El acento va SÓLO en el numeral (30px): a 12px estos tonos no dan
+          contraste suficiente, así que el subtítulo se queda en gris legible y el
+          estado nunca depende del color a solas — lo dice la etiqueta. */}
+      <span className="font-head" style={{ fontSize: 30, fontWeight: 600, color: hue ?? "var(--negro)" }}>{value}</span>
       {sub && (
-        <div className="font-body" style={{ marginTop: 8, fontSize: 12, color: accent ?? "var(--gris-texto)" }}>
+        <div className="font-body" style={{ marginTop: 8, fontSize: 12, color: "var(--gris-texto)" }}>
           {href ? <a href={href} style={{ color: "inherit", textDecoration: "none" }}>{sub}</a> : sub}
         </div>
       )}
@@ -60,6 +69,23 @@ function Kpi({ label, value, sub, danger, success, href }: {
  * podría significar "lo que falta", decayendo a cero cada día 28.
  */
 const HORIZON_DAYS = 7;
+
+/**
+ * Enlace a la cohorte en el listado de clientes.
+ *
+ * La etiqueta viene de `COHORT_FILTER`, la misma que pinta la pill y contra la
+ * que valida `parseStatusFilter`: escrita a mano aquí sería una tercera copia, y
+ * renombrar la pill dejaría el enlace apuntando a un filtro inexistente.
+ *
+ * OJO — el enlace NO lleva la ventana de 7 días: la pill filtra por cohorte, sin
+ * horizonte. La tarjeta dice cuántas terminan esta semana y el listado muestra
+ * todas las de esa cohorte, así que puede traer más filas que el número de la
+ * tarjeta. De ahí "Ver todas" en vez de "Ver clientes": la lista es un
+ * superconjunto a propósito, no una discrepancia.
+ */
+function cohortHref(label: string): string {
+  return `/admin/clients?status=${encodeURIComponent(label)}`;
+}
 
 export default async function AdminDashboardPage() {
   await requireAdminPage();
@@ -104,12 +130,15 @@ export default async function AdminDashboardPage() {
       {/* D17 — grid, no flex-wrap: con seis tarjetas el `flex: 1 1 150px` las
           apretaba a 150px de ancho en una sola fila (las etiquetas con
           "(próx. 7 días)" caían a tres líneas) y por debajo de 980px rompía en un
-          5+1 desparejo. Con pistas de 300px mínimo el reparto es 3+3 en
-          escritorio, 2+2+2 en tableta y 1 por fila en móvil: nunca desparejo. */}
+          5+1 desparejo. Con pistas de 288px el reparto es 3+3 en escritorio,
+          2+2+2 en tableta y 1 por fila en móvil: nunca desparejo. 288 y no 300
+          porque el ancho útil son 936px (1000 menos 32 de padding a cada lado,
+          border-box por el preflight de Tailwind) y tres pistas de 300 + 32 de
+          hueco caben por 4px: cualquier ajuste de padding lo volcaría a 2+2+2. */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(288px, 1fr))",
           gap: 16,
           marginBottom: 18,
           alignItems: "stretch",
@@ -124,15 +153,16 @@ export default async function AdminDashboardPage() {
         <Kpi
           label="Terminan (próx. 7 días)"
           value={String(ending.count)}
-          success
-          sub="Ver clientes →"
-          href="/admin/clients?status=%C3%9Altimo%20mes"
+          accent="var(--exito)"
+          sub="Ver todas →"
+          href={cohortHref(COHORT_FILTER.completing)}
         />
         <Kpi
           label="Cancelaciones (próx. 7 días)"
           value={String(cancellations.count)}
-          sub="Ver clientes →"
-          href="/admin/clients?status=En%20cancelaci%C3%B3n"
+          accent="#9a7b1f"
+          sub="Ver todas →"
+          href={cohortHref(COHORT_FILTER.cancelling)}
         />
         <Kpi label="Requieren atención" value={String(pastDue)} danger sub="Ver clientes →" href="/admin/clients" />
       </div>

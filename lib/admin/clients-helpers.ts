@@ -83,6 +83,19 @@ export type StatusFilter =
   | null;
 
 /**
+ * Las etiquetas de las dos cohortes que están terminando, nombradas porque las
+ * usan tres sitios: las pills, el validador de la URL y los enlaces de las
+ * tarjetas del dashboard. Como literales repetidos, un cambio de nombre en las
+ * pills dejaría los enlaces apuntando a un filtro que ya no existe.
+ */
+export const COHORT_FILTER = {
+  /** Plazo fijo en su último mes ya pagado: se gradúa. */
+  completing: "Último mes",
+  /** Baja voluntaria agotando su periodo. */
+  cancelling: "En cancelación",
+} as const;
+
+/**
  * Las pills de estado, en el orden en que se muestran. Vive aquí y no dentro del
  * componente porque `parseStatusFilter` necesita la misma lista para validar lo
  * que llega por la URL: dos copias serían dos listas que se separan.
@@ -92,8 +105,8 @@ export const STATUS_FILTERS: Exclude<StatusFilter, null>[] = [
   "Vencidas",
   "Canceladas",
   "Completadas",
-  "Último mes",
-  "En cancelación",
+  COHORT_FILTER.completing,
+  COHORT_FILTER.cancelling,
   "Sin actividad",
 ];
 

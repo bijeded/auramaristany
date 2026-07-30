@@ -267,6 +267,7 @@ describe("canDeleteClient", () => {
 });
 
 import { clientsToCSV, statusBadge } from "@/lib/admin/clients-helpers";
+import { parseStatusFilter, STATUS_FILTERS } from "@/lib/admin/clients-helpers";
 
 // La base acepta NUEVE status desde la migración 017 —se ensanchó a propósito,
 // para que espejar a Stripe no fuera rechazado— y la UI sólo modelaba seis. Los
@@ -417,7 +418,6 @@ describe("nextChargeCell", () => {
   });
 });
 
-import { parseStatusFilter, STATUS_FILTERS } from "@/lib/admin/clients-helpers";
 
 // D17 — las tarjetas del dashboard enlazan aquí con ?status=…, así que el valor
 // entra por la URL y NO se puede meter tal cual en el estado: `StatusFilter` es

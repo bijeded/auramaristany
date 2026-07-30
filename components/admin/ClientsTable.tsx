@@ -11,7 +11,6 @@ import {
 import { paginate } from "@/lib/admin/pagination";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-
 export function ClientsTable({
   rows,
   now,

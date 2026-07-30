@@ -36,13 +36,20 @@ two are *intended* to disagree, and the divergence is specified rather than inci
 **2. No reader derives "is this ending?" itself. Every one calls `deriveCancellationState`.**
 The dashboard is its fourth caller, not a fourth copy. `partitionByOutcome` maps that
 function's `kind` onto three cohorts — `eligible → billing`, `completing`, `grace → cancelling`
-— in a single pass, so every row lands in exactly one bucket by construction. The invariant
-that follows (over any horizon, the three cohort cards partition the rows falling in it) is
-therefore structural, not a rule someone has to remember.
+— plus an `excluded` bucket for rows that already ended, in a single pass. Every row lands in
+exactly one bucket, so the four always sum to the input: nothing can be silently dropped if the
+query is ever widened. The invariant that follows (over any horizon, the three cohort cards
+partition the live rows falling in it) is therefore structural, not a rule someone has to
+remember.
 
 **3. A cohort count is not shipped without a way to see who is in it.** Each ending card links
 to a client-list filter for its own cohort. A number Aura cannot act on is not a feature, and
-the filters shipped first so the links were never dead.
+the filters shipped first so the links were never dead. This required `/admin/clients` to grow a
+URL contract it did not have — `?status=<label>`, validated against the closed filter list and
+seeded into the table's state — so the cohort labels are named constants rather than literals
+repeated across the pill, the parser and the link. Note the link carries the cohort but **not**
+the horizon: the card counts the coming week, the list shows the whole cohort, so the list is a
+deliberate superset and the card says "Ver todas" rather than implying a match.
 
 **4. Completing and cancelling stay separate, everywhere.** They are one flag apart in the data
 and opposite in response — a graduation into CuarentaMás Extra is an upsell conversation, a

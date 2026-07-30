@@ -5,6 +5,9 @@ import {
   groupRevenueByMonth,
   groupClientsByVariant,
   groupRevenueByProgram,
+  computeRenewalsWithinDays,
+  partitionByOutcome,
+  type FinanceSubRow,
 } from "@/lib/admin/finance-helpers";
 
 // ---------------------------------------------------------------------------
@@ -110,7 +113,6 @@ describe("groupRevenueByProgram", () => {
 // A11: computeRenewalsWithinDays (generalization of computeRenewalsThisMonth)
 // ---------------------------------------------------------------------------
 
-import { computeRenewalsWithinDays } from "@/lib/admin/finance-helpers";
 
 describe("computeRenewalsWithinDays", () => {
   const now = new Date("2026-06-15T12:00:00Z");
@@ -171,7 +173,6 @@ describe("filterPaymentsByStatus", () => {
 // D17: partitionByOutcome — la única derivación de "¿esta suscripción cobra?"
 // ---------------------------------------------------------------------------
 
-import { partitionByOutcome, type FinanceSubRow } from "@/lib/admin/finance-helpers";
 
 // Sólo llegan filas `active` (getActiveSubscriptions filtra por eso), pero el
 // status viaja igual y se le pasa a la derivación: si algún día se ensancha la
@@ -226,8 +227,23 @@ describe("partitionByOutcome", () => {
       sub({ completed_at: "2026-06-01T00:00:00Z", cancel_at_period_end: true }),
       sub({ completed_at: "2026-06-01T00:00:00Z" }),
     ];
-    const { billing, completing, cancelling } = partitionByOutcome(rows);
-    expect(billing.length + completing.length + cancelling.length).toBe(rows.length);
+    const { billing, completing, cancelling, excluded } = partitionByOutcome(rows);
+    expect(billing.length + completing.length + cancelling.length + excluded.length).toBe(rows.length);
+    expect(excluded).toHaveLength(0); // ninguna de éstas terminó ya
+  });
+
+  // Hoy la consulta filtra por `active`, así que esto no puede pasar — y por eso
+  // mismo se fija: si mañana se ensancha, una fila que ya terminó NO debe
+  // desaparecer en silencio (contaría en el headcount y en ninguna cohorte), ni
+  // colarse en `billing` sumando al MRR un cobro que no existe.
+  it("una que ya terminó no se pierde: va a `excluded`, no a las tres", () => {
+    const rows = [sub({ status: "completed" }), sub({ status: "canceled" }), sub()];
+    const { billing, completing, cancelling, excluded } = partitionByOutcome(rows);
+    expect(excluded).toHaveLength(2);
+    expect(billing).toHaveLength(1);
+    expect(completing).toHaveLength(0);
+    expect(cancelling).toHaveLength(0);
+    expect(billing.length + completing.length + cancelling.length + excluded.length).toBe(rows.length);
   });
 
   it("preserva price_mxn y variant_name, que es lo que consumen MRR y las barras", () => {
@@ -251,6 +267,8 @@ describe("las tres tarjetas reparten la ventana sin solaparse", () => {
     sub({ current_period_end: dentro, completed_at: "2026-06-01T00:00:00Z", cancel_at_period_end: true }),
     sub({ current_period_end: fuera }),
     sub({ current_period_end: null }),
+    // Ya terminada y dentro de la ventana: no es de ninguna de las tres tarjetas.
+    sub({ current_period_end: dentro, status: "canceled" }),
   ];
 
   it("la suma de las tres = las filas que vencen dentro de la ventana", () => {
@@ -259,14 +277,17 @@ describe("las tres tarjetas reparten la ventana sin solaparse", () => {
     const terminan = computeRenewalsWithinDays(completing, 7, now);
     const cancelaciones = computeRenewalsWithinDays(cancelling, 7, now);
 
-    const dentroDeVentana = rows.filter((r) => {
+    // Se recuenta la pertenencia a la ventana SIN usar la partición, para que la
+    // prueba no repita la implementación: sobre las cohortes vivas, la suma de
+    // las tres tiene que dar exactamente eso.
+    const vivasDentroDeVentana = [...billing, ...completing, ...cancelling].filter((r) => {
       if (!r.current_period_end) return false;
       const end = new Date(r.current_period_end);
       return end >= now && end <= new Date(now.getTime() + 7 * 86_400_000);
     }).length;
 
-    expect(renuevan.count + terminan.count + cancelaciones.count).toBe(dentroDeVentana);
-    expect(dentroDeVentana).toBe(3);
+    expect(renuevan.count + terminan.count + cancelaciones.count).toBe(vivasDentroDeVentana);
+    expect(vivasDentroDeVentana).toBe(3);
   });
 
   it("el importe de 'Renuevan' sólo suma lo que de verdad se va a cobrar", () => {
