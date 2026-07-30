@@ -5,30 +5,27 @@ import { useRouter } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
   filterClients, clientsToCSV, canDeleteClient,
-  nextChargeCell, statusBadge,
+  nextChargeCell, statusBadge, STATUS_FILTERS,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
 import { paginate } from "@/lib/admin/pagination";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
-// D17 — "Último mes" y "En cancelación" van junto a "Completadas"/"Canceladas"
-// a propósito, y por eso NO se llaman igual: estas dos siguen activas y
-// entrenando; aquéllas ya terminaron.
-const STATE_FILTERS: Exclude<StatusFilter, null>[] = [
-  "Activas",
-  "Vencidas",
-  "Canceladas",
-  "Completadas",
-  "Último mes",
-  "En cancelación",
-  "Sin actividad",
-];
 
-export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string }) {
+export function ClientsTable({
+  rows,
+  now,
+  initialStatus = null,
+}: {
+  rows: ClientListRow[];
+  now: string;
+  /** D17 — cohorte preseleccionada al llegar desde una tarjeta del dashboard. */
+  initialStatus?: StatusFilter;
+}) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [prog, setProg] = useState("Todas");
-  const [estado, setEstado] = useState<StatusFilter>(null);
+  const [estado, setEstado] = useState<StatusFilter>(initialStatus);
   const [page, setPage] = useState(1);
 
   const programs = useMemo(() => ["Todas", ...Array.from(new Set(rows.map((r) => r.program_name))).sort()], [rows]);
@@ -89,7 +86,7 @@ export function ClientsTable({ rows, now }: { rows: ClientListRow[]; now: string
           <button key={f} className={"pill " + (prog === f ? "active" : "")} onClick={() => resetPage(setProg)(f)}>{f}</button>
         ))}
         <span style={{ width: 1, height: 22, background: "var(--gris-linea)", margin: "0 6px" }} aria-hidden />
-        {STATE_FILTERS.map((f) => (
+        {STATUS_FILTERS.map((f) => (
           <button key={f} className={"pill " + (estado === f ? "active" : "")} onClick={() => resetPage(setEstado)(estado === f ? null : f)}>{f}</button>
         ))}
       </div>

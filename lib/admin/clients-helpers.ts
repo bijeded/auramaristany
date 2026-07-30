@@ -82,6 +82,36 @@ export type StatusFilter =
   | "Sin actividad"
   | null;
 
+/**
+ * Las pills de estado, en el orden en que se muestran. Vive aquí y no dentro del
+ * componente porque `parseStatusFilter` necesita la misma lista para validar lo
+ * que llega por la URL: dos copias serían dos listas que se separan.
+ */
+export const STATUS_FILTERS: Exclude<StatusFilter, null>[] = [
+  "Activas",
+  "Vencidas",
+  "Canceladas",
+  "Completadas",
+  "Último mes",
+  "En cancelación",
+  "Sin actividad",
+];
+
+/**
+ * Traduce el `?status=` de la URL a un filtro válido, o a null.
+ *
+ * D17 — las tarjetas "Terminan" y "Cancelaciones" del dashboard enlazan aquí con
+ * la cohorte ya seleccionada, así que el valor entra por la barra de direcciones.
+ * NO se puede pasar tal cual al estado: `StatusFilter` es una unión cerrada y
+ * cualquiera puede escribir lo que quiera ahí. Lo desconocido se ignora y la
+ * lista sale sin filtrar, que es lo que un enlace roto debería hacer.
+ */
+export function parseStatusFilter(raw: string | string[] | undefined): StatusFilter {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  return STATUS_FILTERS.find((f) => f === value) ?? null;
+}
+
 /** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
 export const INACTIVITY_THRESHOLD_DAYS = 10;
 

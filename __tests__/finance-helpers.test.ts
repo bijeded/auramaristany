@@ -5,7 +5,6 @@ import {
   groupRevenueByMonth,
   groupClientsByVariant,
   groupRevenueByProgram,
-  computeRenewalsThisMonth,
 } from "@/lib/admin/finance-helpers";
 
 // ---------------------------------------------------------------------------
@@ -108,29 +107,6 @@ describe("groupRevenueByProgram", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6: computeRenewalsThisMonth
-// ---------------------------------------------------------------------------
-
-describe("computeRenewalsThisMonth", () => {
-  const now = new Date("2026-06-15T12:00:00Z");
-  it("cuenta subs que vencen en <=30 días y suma su price_mxn", () => {
-    const subs = [
-      { current_period_end: "2026-06-20T00:00:00Z", price_mxn: 990 },
-      { current_period_end: "2026-07-10T00:00:00Z", price_mxn: 1490 },
-      { current_period_end: "2026-08-01T00:00:00Z", price_mxn: 500 },
-    ];
-    expect(computeRenewalsThisMonth(subs, now)).toEqual({ count: 2, amount: 2480 });
-  });
-  it("ignora vencimientos pasados y nulos", () => {
-    const subs = [
-      { current_period_end: "2026-06-01T00:00:00Z", price_mxn: 990 },
-      { current_period_end: null, price_mxn: 1490 },
-    ];
-    expect(computeRenewalsThisMonth(subs, now)).toEqual({ count: 0, amount: 0 });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // A11: computeRenewalsWithinDays (generalization of computeRenewalsThisMonth)
 // ---------------------------------------------------------------------------
 
@@ -161,10 +137,6 @@ describe("computeRenewalsWithinDays", () => {
   it("ignora pasados y nulos", () => {
     expect(computeRenewalsWithinDays(subs.slice(2), 7, now)).toEqual({ count: 0, amount: 0 });
   });
-
-  it("computeRenewalsThisMonth sigue equivaliendo a la ventana de 30 días", () => {
-    expect(computeRenewalsThisMonth(subs, now)).toEqual(computeRenewalsWithinDays(subs, 30, now));
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -192,5 +164,114 @@ describe("filterPaymentsByStatus", () => {
     expect(filterPaymentsByStatus(rows, "paid")).toHaveLength(2);
     expect(filterPaymentsByStatus(rows, "void")).toHaveLength(1);
     expect(filterPaymentsByStatus(rows, "uncollectible")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D17: partitionByOutcome — la única derivación de "¿esta suscripción cobra?"
+// ---------------------------------------------------------------------------
+
+import { partitionByOutcome, type FinanceSubRow } from "@/lib/admin/finance-helpers";
+
+// Sólo llegan filas `active` (getActiveSubscriptions filtra por eso), pero el
+// status viaja igual y se le pasa a la derivación: si algún día se ensancha la
+// consulta, la respuesta sigue siendo correcta en vez de romperse en silencio.
+const sub = (o: Partial<FinanceSubRow> = {}): FinanceSubRow => ({
+  current_period_end: "2026-06-20T00:00:00Z",
+  price_mxn: 999,
+  variant_name: "Base",
+  status: "active",
+  cancel_at_period_end: false,
+  completed_at: null,
+  ...o,
+});
+
+describe("partitionByOutcome", () => {
+  it("una suscripción normal va a `billing`: volverá a cobrar", () => {
+    const { billing, completing, cancelling } = partitionByOutcome([sub()]);
+    expect(billing).toHaveLength(1);
+    expect(completing).toHaveLength(0);
+    expect(cancelling).toHaveLength(0);
+  });
+
+  // Las DOS señales = final programado. Es una graduación a CuarentaMás Extra,
+  // no una baja, y por eso no cae en `cancelling`.
+  it("con completed_at Y la bandera va a `completing`, no a `cancelling`", () => {
+    const { billing, completing, cancelling } = partitionByOutcome([
+      sub({ completed_at: "2026-06-01T00:00:00Z", cancel_at_period_end: true }),
+    ]);
+    expect(completing).toHaveLength(1);
+    expect(cancelling).toHaveLength(0);
+    expect(billing).toHaveLength(0);
+  });
+
+  it("con la bandera sola va a `cancelling`: se va por su cuenta", () => {
+    const { completing, cancelling } = partitionByOutcome([sub({ cancel_at_period_end: true })]);
+    expect(cancelling).toHaveLength(1);
+    expect(completing).toHaveLength(0);
+  });
+
+  // `completed_at` a solas no prueba nada: L2b lo escribía sin cancelar en
+  // Stripe, así que una fila vieja lo trae puesto y sigue cobrando tan campante.
+  it("una marca de completado huérfana sigue en `billing`", () => {
+    const { billing, completing } = partitionByOutcome([sub({ completed_at: "2026-06-01T00:00:00Z" })]);
+    expect(billing).toHaveLength(1);
+    expect(completing).toHaveLength(0);
+  });
+
+  it("cada fila cae en EXACTAMENTE un balde", () => {
+    const rows = [
+      sub(),
+      sub({ cancel_at_period_end: true }),
+      sub({ completed_at: "2026-06-01T00:00:00Z", cancel_at_period_end: true }),
+      sub({ completed_at: "2026-06-01T00:00:00Z" }),
+    ];
+    const { billing, completing, cancelling } = partitionByOutcome(rows);
+    expect(billing.length + completing.length + cancelling.length).toBe(rows.length);
+  });
+
+  it("preserva price_mxn y variant_name, que es lo que consumen MRR y las barras", () => {
+    const { billing } = partitionByOutcome([sub({ price_mxn: 1490, variant_name: "Avanzado" })]);
+    expect(billing[0]).toMatchObject({ price_mxn: 1490, variant_name: "Avanzado" });
+  });
+});
+
+// El invariante del dashboard: sobre una misma ventana, las tres tarjetas
+// reparten exactamente las filas que vencen en ella. Ni se cuenta una dos veces
+// ni se cae ninguna, y eso lo garantiza la estructura (un solo paso), no la
+// disciplina de quien la use.
+describe("las tres tarjetas reparten la ventana sin solaparse", () => {
+  const now = new Date("2026-06-15T12:00:00Z");
+  const dentro = "2026-06-20T00:00:00Z"; // +5d
+  const fuera = "2026-07-20T00:00:00Z";  // +35d
+
+  const rows: FinanceSubRow[] = [
+    sub({ current_period_end: dentro }),
+    sub({ current_period_end: dentro, cancel_at_period_end: true }),
+    sub({ current_period_end: dentro, completed_at: "2026-06-01T00:00:00Z", cancel_at_period_end: true }),
+    sub({ current_period_end: fuera }),
+    sub({ current_period_end: null }),
+  ];
+
+  it("la suma de las tres = las filas que vencen dentro de la ventana", () => {
+    const { billing, completing, cancelling } = partitionByOutcome(rows);
+    const renuevan = computeRenewalsWithinDays(billing, 7, now);
+    const terminan = computeRenewalsWithinDays(completing, 7, now);
+    const cancelaciones = computeRenewalsWithinDays(cancelling, 7, now);
+
+    const dentroDeVentana = rows.filter((r) => {
+      if (!r.current_period_end) return false;
+      const end = new Date(r.current_period_end);
+      return end >= now && end <= new Date(now.getTime() + 7 * 86_400_000);
+    }).length;
+
+    expect(renuevan.count + terminan.count + cancelaciones.count).toBe(dentroDeVentana);
+    expect(dentroDeVentana).toBe(3);
+  });
+
+  it("el importe de 'Renuevan' sólo suma lo que de verdad se va a cobrar", () => {
+    const { billing } = partitionByOutcome(rows);
+    // De las tres que vencen dentro, sólo UNA vuelve a cobrar.
+    expect(computeRenewalsWithinDays(billing, 7, now)).toEqual({ count: 1, amount: 999 });
   });
 });

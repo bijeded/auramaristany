@@ -416,3 +416,34 @@ describe("nextChargeCell", () => {
     });
   });
 });
+
+import { parseStatusFilter, STATUS_FILTERS } from "@/lib/admin/clients-helpers";
+
+// D17 — las tarjetas del dashboard enlazan aquí con ?status=…, así que el valor
+// entra por la URL y NO se puede meter tal cual en el estado: `StatusFilter` es
+// una unión cerrada y cualquiera puede teclear lo que quiera en la barra.
+describe("parseStatusFilter", () => {
+  it("acepta cada etiqueta válida, incluidas las dos nuevas", () => {
+    for (const f of STATUS_FILTERS) {
+      expect(parseStatusFilter(f)).toBe(f);
+    }
+    expect(parseStatusFilter("Último mes")).toBe("Último mes");
+    expect(parseStatusFilter("En cancelación")).toBe("En cancelación");
+  });
+
+  it("un valor inventado no llega al estado: se ignora", () => {
+    expect(parseStatusFilter("Pausadas")).toBeNull();
+    expect(parseStatusFilter("'; drop table subscriptions; --")).toBeNull();
+  });
+
+  it("sin parámetro no filtra", () => {
+    expect(parseStatusFilter(undefined)).toBeNull();
+    expect(parseStatusFilter("")).toBeNull();
+  });
+
+  // Next puede entregar el mismo parámetro repetido como arreglo.
+  it("tolera que llegue repetido", () => {
+    expect(parseStatusFilter(["Activas", "Canceladas"])).toBe("Activas");
+    expect(parseStatusFilter([])).toBeNull();
+  });
+});

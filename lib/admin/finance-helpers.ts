@@ -1,7 +1,67 @@
+import { deriveCancellationState } from "@/lib/portal/cancellation";
+import type { SubscriptionStatus } from "@/lib/supabase/types";
+
 export interface FinanceSubRow {
   current_period_end: string | null; // ISO
   price_mxn: number;
   variant_name: string;
+  /**
+   * D17 — las tres señales del ciclo de vida. Sin ellas el dashboard no podía
+   * distinguir una suscripción que renueva de una que se está acabando, y le
+   * sumaba a Aura dinero que no va a llegar.
+   *
+   * `status` viaja aunque hoy la consulta filtre por `active`: la derivación se
+   * llama con el valor real, no con una suposición sobre el filtro, así que si
+   * algún día se ensancha la consulta la respuesta sigue siendo correcta en vez
+   * de quedarse callada y mal.
+   */
+  status: SubscriptionStatus;
+  cancel_at_period_end: boolean;
+  completed_at: string | null;
+}
+
+/** Las tres cohortes en que se reparte una suscripción activa. */
+export interface OutcomePartition {
+  /** Vuelve a cobrar: alimenta el MRR y "Renuevan". */
+  billing: FinanceSubRow[];
+  /** Último mes ya pagado de un plazo fijo — se gradúa, no se va. */
+  completing: FinanceSubRow[];
+  /** Baja voluntaria agotando su periodo. */
+  cancelling: FinanceSubRow[];
+}
+
+/**
+ * Reparte las suscripciones activas en las tres cohortes, en UNA pasada.
+ *
+ * No decide nada por su cuenta: le pregunta a `deriveCancellationState`, la
+ * misma función que usa el portal y el listado de clientes. Ésa es la razón de
+ * que exista — "¿esta suscripción se está acabando?" vive repartida entre
+ * `status`, `completed_at` y `cancel_at_period_end`, y cada lector que se lo
+ * deduzca por su cuenta se equivoca en un subconjunto distinto (L2c lo cazó
+ * tres veces, y una cuarta llegó a producción). El orden también importa: la
+ * bandera hay que mirarla DESPUÉS de la completion, porque quien se gradúa la
+ * trae puesta igual; eso ya está resuelto dentro de la derivación.
+ *
+ * Una pasada y un solo balde por fila hacen que el invariante del dashboard
+ * —las tres tarjetas reparten la ventana sin solaparse— sea cierto por
+ * construcción, no por que quien las escriba se acuerde.
+ */
+export function partitionByOutcome(rows: FinanceSubRow[]): OutcomePartition {
+  const out: OutcomePartition = { billing: [], completing: [], cancelling: [] };
+  for (const row of rows) {
+    const { kind } = deriveCancellationState({
+      status: row.status,
+      cancelAtPeriodEnd: row.cancel_at_period_end,
+      completedAt: row.completed_at,
+    });
+    if (kind === "completing") out.completing.push(row);
+    else if (kind === "grace") out.cancelling.push(row);
+    else if (kind === "eligible") out.billing.push(row);
+    // `completed` y `none` no son alcanzables mientras la consulta filtre por
+    // `active`; si lo fueran, quedarse fuera de las tres es lo correcto: no
+    // cobran y no están terminando, ya terminaron.
+  }
+  return out;
 }
 
 export interface FinanceInvoiceRow {
@@ -100,7 +160,7 @@ export function groupRevenueByProgram(invoices: FinanceInvoiceRow[]): ProgramRev
 }
 
 // ---------------------------------------------------------------------------
-// Task 6: computeRenewalsThisMonth
+// Task 6 / D17: computeRenewalsWithinDays
 // ---------------------------------------------------------------------------
 
 export function computeRenewalsWithinDays(
@@ -120,14 +180,6 @@ export function computeRenewalsWithinDays(
     }
   }
   return { count, amount };
-}
-
-// 30-day wrapper kept for backward compatibility (dashboard "Renuevan este mes")
-export function computeRenewalsThisMonth(
-  subs: { current_period_end: string | null; price_mxn: number }[],
-  now: Date = new Date()
-): { count: number; amount: number } {
-  return computeRenewalsWithinDays(subs, 30, now);
 }
 
 // ---------------------------------------------------------------------------

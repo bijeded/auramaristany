@@ -6,8 +6,8 @@ import {
 } from "@/lib/admin/finance-queries";
 import {
   computeMRR,
-  computeRenewalsThisMonth,
   computeRenewalsWithinDays,
+  partitionByOutcome,
   groupClientsByVariant,
   groupRevenueByMonth,
   groupRevenueByProgram,
@@ -27,19 +27,39 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-function Kpi({ label, value, sub, danger, href }: { label: string; value: React.ReactNode; sub?: React.ReactNode; danger?: boolean; href?: string }) {
+function Kpi({ label, value, sub, danger, success, href }: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  danger?: boolean;
+  /** D17 — verde de logro: terminar el plazo es graduarse, no perder a alguien. */
+  success?: boolean;
+  href?: string;
+}) {
+  const accent = danger ? "var(--error)" : success ? "var(--exito)" : undefined;
   return (
-    <Card style={{ flex: "1 1 150px", minWidth: 150 }}>
+    <Card>
       <div className="font-body" style={{ fontWeight: 500, fontSize: 12.5, marginBottom: 10, color: "var(--gris-texto)" }}>{label}</div>
-      <span className="font-head" style={{ fontSize: 30, fontWeight: 600, color: danger ? "var(--error)" : "var(--negro)" }}>{value}</span>
+      <span className="font-head" style={{ fontSize: 30, fontWeight: 600, color: accent ?? "var(--negro)" }}>{value}</span>
       {sub && (
-        <div className="font-body" style={{ marginTop: 8, fontSize: 12, color: danger ? "var(--error)" : "var(--gris-texto)" }}>
+        <div className="font-body" style={{ marginTop: 8, fontSize: 12, color: accent ?? "var(--gris-texto)" }}>
           {href ? <a href={href} style={{ color: "inherit", textDecoration: "none" }}>{sub}</a> : sub}
         </div>
       )}
     </Card>
   );
 }
+
+/**
+ * D17 — ventana rodante de las tres tarjetas de cohorte, en días.
+ *
+ * Rodante y no mes calendario: al renovar, `invoice.paid` empuja
+ * `current_period_end` al mes siguiente, y al expirar una que termina pasa a
+ * `canceled`/`completed` y sale del conjunto `active`. O sea que la mitad pasada
+ * de cualquier mes está vacía por construcción, y un "mes calendario" sólo
+ * podría significar "lo que falta", decayendo a cero cada día 28.
+ */
+const HORIZON_DAYS = 7;
 
 export default async function AdminDashboardPage() {
   await requireAdminPage();
@@ -51,10 +71,24 @@ export default async function AdminDashboardPage() {
     getRecentPayments(10),
   ]);
 
-  const mrr = computeMRR(activeSubs);
-  const renewals = computeRenewalsThisMonth(activeSubs, now);
-  const expiring7d = computeRenewalsWithinDays(activeSubs, 7, now);
+  // D17 — la partición se hace UNA vez y de ella cuelgan las tres tarjetas de
+  // ventana. `deriveCancellationState` decide la cohorte; aquí no se lee ninguna
+  // bandera, que es justo lo que evita la cuarta copia de la misma derivación.
+  const { billing, completing, cancelling } = partitionByOutcome(activeSubs);
+
+  // El MRR sale SÓLO de `billing`: una suscripción que se está acabando no
+  // producirá otro cobro, y sumarla era mostrarle a Aura dinero que no llega.
+  const mrr = computeMRR(billing);
+
+  // Las tres, sobre la MISMA ventana de 7 días, y cada etiqueta lo dice. El MRR
+  // ya responde "el mes"; estas tarjetas responden "esta semana".
+  const renewals = computeRenewalsWithinDays(billing, HORIZON_DAYS, now);
+  const ending = computeRenewalsWithinDays(completing, HORIZON_DAYS, now);
+  const cancellations = computeRenewalsWithinDays(cancelling, HORIZON_DAYS, now);
+
   const byMonth = groupRevenueByMonth(invoices, 12, now);
+  // Headcount y variantes van sobre TODAS las activas, incluidas las que
+  // terminan: siguen teniendo acceso al portal y siguen entrenando.
   const clientsByVariant = groupClientsByVariant(activeSubs);
   const revenueByProgram = groupRevenueByProgram(invoices);
   const maxClients = Math.max(1, ...clientsByVariant.map((p) => p.count));
@@ -67,11 +101,39 @@ export default async function AdminDashboardPage() {
       <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 13, marginBottom: 20 }}>{dateLabel}</p>
 
       {/* KPIs */}
-      <div className="flex flex-wrap" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
+      {/* D17 — grid, no flex-wrap: con seis tarjetas el `flex: 1 1 150px` las
+          apretaba a 150px de ancho en una sola fila (las etiquetas con
+          "(próx. 7 días)" caían a tres líneas) y por debajo de 980px rompía en un
+          5+1 desparejo. Con pistas de 300px mínimo el reparto es 3+3 en
+          escritorio, 2+2+2 en tableta y 1 por fila en móvil: nunca desparejo. */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: 16,
+          marginBottom: 18,
+          alignItems: "stretch",
+        }}
+      >
         <Kpi label="Ingreso mensual recurrente" value={formatMXN(mrr)} sub={<em style={{ fontStyle: "italic" }}>*Estimado</em>} />
         <Kpi label="Suscripciones activas" value={String(activeSubs.length)} />
-        <Kpi label="Renuevan este mes" value={String(renewals.count)} sub={formatMXN(renewals.amount)} />
-        <Kpi label="Vencen en 7 días" value={String(expiring7d.count)} sub={formatMXN(expiring7d.amount)} />
+        <Kpi label="Renuevan (próx. 7 días)" value={String(renewals.count)} sub={formatMXN(renewals.amount)} />
+        {/* Terminar el plazo es una GRADUACIÓN —toca ofrecerle Extra—, no una
+            baja. Va en verde de logro, deliberadamente distinta de la de al
+            lado, para que Aura no las lea como el mismo evento. */}
+        <Kpi
+          label="Terminan (próx. 7 días)"
+          value={String(ending.count)}
+          success
+          sub="Ver clientes →"
+          href="/admin/clients?status=%C3%9Altimo%20mes"
+        />
+        <Kpi
+          label="Cancelaciones (próx. 7 días)"
+          value={String(cancellations.count)}
+          sub="Ver clientes →"
+          href="/admin/clients?status=En%20cancelaci%C3%B3n"
+        />
         <Kpi label="Requieren atención" value={String(pastDue)} danger sub="Ver clientes →" href="/admin/clients" />
       </div>
 

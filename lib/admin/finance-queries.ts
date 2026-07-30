@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import type { SubscriptionStatus } from "@/lib/supabase/types";
 import type {
   FinanceSubRow,
   FinanceInvoiceRow,
@@ -11,12 +12,22 @@ export async function getActiveSubscriptions(): Promise<FinanceSubRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
-    .select("current_period_end, program_variants!program_variant_id(name, price_mxn)")
+    .select(
+      "current_period_end, status, cancel_at_period_end, completed_at, program_variants!program_variant_id(name, price_mxn)"
+    )
+    // D17 — `active` y sólo `active`, POR DECISIÓN, no por descuido: así toda
+    // cifra financiera es conservadora. Una `trialing` todavía no ha pagado y
+    // una `past_due` ya falló, y ninguna de las dos debe sumar al MRR ni a la
+    // proyección; `past_due` sale por su cuenta en "Requieren atención".
+    // No lo "arregles" ensanchándolo sin cambiar la spec.
     .eq("status", "active");
 
   // keep: subscriptions JOIN program_variants — nested join shape not inferred by SDK.
   type Raw = {
     current_period_end: string | null;
+    status: SubscriptionStatus;
+    cancel_at_period_end: boolean | null;
+    completed_at: string | null;
     program_variants: { name: string; price_mxn: number } | null;
   };
   return ((data ?? []) as Raw[])
@@ -25,6 +36,9 @@ export async function getActiveSubscriptions(): Promise<FinanceSubRow[]> {
       current_period_end: r.current_period_end,
       price_mxn: r.program_variants!.price_mxn,
       variant_name: r.program_variants!.name,
+      status: r.status,
+      cancel_at_period_end: r.cancel_at_period_end ?? false,
+      completed_at: r.completed_at,
     }));
 }
 
