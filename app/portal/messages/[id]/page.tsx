@@ -32,7 +32,7 @@ export default async function MessageDetailPage({ params }: { params: Promise<{ 
         <Link href="/portal/messages" style={{ color: "var(--gris-texto)", fontSize: 14, textDecoration: "none" }}>← Mensajes</Link>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 20px 30px" }}>
-        <h1 className="font-head" style={{ fontSize: 22, fontWeight: 700, marginBottom: 14 }}>{msg.subject}</h1>
+        <h1 className="font-head" style={{ fontSize: 22, fontWeight: 700, marginBottom: 14, overflowWrap: "break-word" }}>{msg.subject}</h1>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16 }}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--lavanda)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>A</div>
           <div>
@@ -40,7 +40,7 @@ export default async function MessageDetailPage({ params }: { params: Promise<{ 
             <div style={{ fontSize: 12, color: "var(--gris-suave)" }}>{new Date(msg.createdAt).toLocaleDateString("es-MX")}</div>
           </div>
         </div>
-        <p className="font-body" style={{ whiteSpace: "pre-line", fontSize: 15.5, lineHeight: "24px", color: "var(--negro)" }}>{msg.body}</p>
+        <p className="font-body" style={{ whiteSpace: "pre-line", overflowWrap: "break-word", fontSize: 15.5, lineHeight: "24px", color: "var(--negro)" }}>{msg.body}</p>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ export function NewMessageEmail({
 }) {
   return (
     <Layout heading="Tienes un nuevo mensaje de Aura" cta={{ href: portalUrl, label: "Ver mensaje" }}>
-      <Text style={{ fontWeight: 600, color: "#1a1a1a" }}>{subject}</Text>
+      <Text style={{ fontWeight: 600, color: "#1a1a1a", overflowWrap: "break-word", wordWrap: "break-word" }}>{subject}</Text>
       {/*
         El cuerpo es TEXTO PLANO (messages.body nunca ha sido HTML) y se
         interpola como hijo de <Text>, así que React lo escapa. Nunca usar
@@ -22,7 +22,9 @@ export function NewMessageEmail({
         `pre-line` reproduce el mismo salto de línea que el portal
         (app/portal/messages/[id]/page.tsx); sin él los párrafos se colapsan.
       */}
-      <Text style={{ whiteSpace: "pre-line" }}>{body}</Text>
+      {/* `wordWrap` es el alias antiguo: motores tipo Outlook/Windows Mail no
+          honran `overflow-wrap`. Cuesta nada y amplía la cobertura de clientes. */}
+      <Text style={{ whiteSpace: "pre-line", overflowWrap: "break-word", wordWrap: "break-word" }}>{body}</Text>
     </Layout>
   );
 }

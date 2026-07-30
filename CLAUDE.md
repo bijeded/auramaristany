@@ -49,7 +49,7 @@ npm run build               # production build
 > `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 > (the signing secret it prints must match `STRIPE_WEBHOOK_SECRET` in `.env.local`). Without this, `checkout.session.completed` never arrives and `/portal/activando` times out — not a bug.
 
-**Green baseline (2026-07-30):** tsc PASS · lint clean · **704/704 tests** (52 files) · build OK.
+**Green baseline (2026-07-30):** tsc PASS · lint clean · **719/719 tests** (52 files) · build OK.
 
 ---
 

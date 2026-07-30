@@ -247,7 +247,7 @@ export function MessagesAdmin({
             ) : (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
-                  <h2 className="font-head" style={{ fontSize: 20, fontWeight: 700 }}>{detail.subject}</h2>
+                  <h2 className="font-head" style={{ fontSize: 20, fontWeight: 700, overflowWrap: "break-word", minWidth: 0 }}>{detail.subject}</h2>
                   <span style={{ fontSize: 12, color: "var(--gris-suave)", whiteSpace: "nowrap" }}>
                     {detail.isBroadcast ? "📢 Difusión" : "👤 Individual"}
                   </span>
@@ -255,7 +255,7 @@ export function MessagesAdmin({
                 <div style={{ fontSize: 12, color: "var(--gris-suave)", marginBottom: 14 }}>
                   {new Date(detail.createdAt).toLocaleString("es-MX")}
                 </div>
-                <p className="font-body" style={{ whiteSpace: "pre-line", fontSize: 15, lineHeight: "23px", color: "var(--negro)", marginBottom: 18 }}>{detail.body}</p>
+                <p className="font-body" style={{ whiteSpace: "pre-line", overflowWrap: "break-word", fontSize: 15, lineHeight: "23px", color: "var(--negro)", marginBottom: 18 }}>{detail.body}</p>
 
                 <div className="font-body" style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
                   Destinatarias ({detail.recipients.filter((r) => r.read).length} de {detail.recipients.length} leído{detail.recipients.length === 1 ? "" : "s"})

@@ -76,7 +76,7 @@ export function HistoryDayView({ detail }: { detail: HistoryLogDetail }) {
             </p>
             <p
               className="font-body rounded-xl"
-              style={{ padding: "12px 14px", background: "var(--gris-claro)", fontSize: 14, whiteSpace: "pre-wrap" }}
+              style={{ padding: "12px 14px", background: "var(--gris-claro)", fontSize: 14, whiteSpace: "pre-wrap", overflowWrap: "break-word" }}
             >
               {detail.generalNotes}
             </p>
