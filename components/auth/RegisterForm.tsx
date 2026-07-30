@@ -199,7 +199,7 @@ export function RegisterForm() {
         <Button
           type="submit"
           disabled={!terms || loading}
-          className="w-full font-head font-medium"
+          className="w-full"
           style={{ background: "var(--lavanda)", color: "#fff" }}
         >
           {loading ? "Creando cuenta..." : "Crear mi cuenta"}

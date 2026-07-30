@@ -52,7 +52,7 @@ export function DayEditorForm({ day, seriesId, programId, weekNumber, dayOfWeek 
             <option value="publicado">Publicado</option>
           </select>
           <button type="button" onClick={handleSave} disabled={saving || title.trim() === ""}
-            className="font-head px-6 py-2.5 rounded-xl text-white disabled:opacity-50"
+            className="px-6 py-2.5 rounded-xl text-white disabled:opacity-50"
             style={{ background: "var(--lavanda)" }}>
             {saving ? "Guardando…" : "Guardar"}
           </button>

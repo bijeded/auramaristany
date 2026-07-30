@@ -49,7 +49,7 @@ export function AccountForm({
       </div>
       {error && <p className="text-sm font-medium" style={{ color: "var(--error)" }}>{error}</p>}
       {success && <p className="text-sm font-medium" style={{ color: "var(--exito)" }}>Datos actualizados.</p>}
-      <Button type="submit" disabled={loading} className="w-full font-head font-medium"
+      <Button type="submit" disabled={loading} className="w-full"
         style={{ background: "var(--lavanda)", color: "#fff" }}>
         {loading ? "Guardando..." : "Guardar cambios"}
       </Button>

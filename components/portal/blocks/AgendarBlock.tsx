@@ -59,7 +59,7 @@ export function AgendarBlock({ booking }: { booking?: AgendarBookingState }) {
       </p>
       <Link
         href="/portal/booking"
-        className="inline-flex items-center justify-center rounded-lg font-body font-semibold"
+        className="inline-flex items-center justify-center rounded-lg font-head font-semibold"
         style={{
           minHeight: 48,
           padding: "0 20px",

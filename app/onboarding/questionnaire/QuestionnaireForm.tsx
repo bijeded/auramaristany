@@ -133,7 +133,7 @@ export function QuestionnaireForm({
       <Button
         type="submit"
         disabled={loading}
-        className="w-full font-head uppercase tracking-wider"
+        className="w-full uppercase tracking-wider"
         style={{ background: "var(--lavanda)", color: "#fff" }}
       >
         {loading ? "Guardando..." : "Comenzar mi programa"}

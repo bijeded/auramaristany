@@ -39,7 +39,7 @@ export function CheckoutButton({ variantSlug }: { variantSlug: string }) {
       <Button
         onClick={handleCheckout}
         disabled={loading}
-        className="w-full font-head uppercase tracking-wider"
+        className="w-full uppercase tracking-wider"
         style={{ background: "var(--lavanda)", color: "#fff" }}
       >
         {loading ? "Redirigiendo al pago..." : "Continuar al pago"}

@@ -39,7 +39,7 @@ export function PillarsView({ pillars, dateLabel }: { pillars: PillarWithBlocks[
           <button
             type="button"
             onClick={() => setOpen(open === p.id ? null : p.id)}
-            className="flex w-full items-center justify-between p-4 font-head text-left"
+            className="flex w-full items-center justify-between p-4 text-left"
           >
             {p.title}
             <ChevronDown size={18} style={{ transform: open === p.id ? "rotate(180deg)" : "none" }} />

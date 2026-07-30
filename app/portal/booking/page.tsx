@@ -32,7 +32,7 @@ function NotAvailable() {
         </p>
         <Link
           href="/portal/today"
-          className="mt-4 inline-flex items-center rounded-lg font-body font-semibold"
+          className="mt-4 inline-flex items-center rounded-lg font-head font-semibold"
           style={{ minHeight: 48, padding: "0 20px", background: "var(--lavanda)", color: "var(--blanco)" }}
         >
           Volver a Hoy

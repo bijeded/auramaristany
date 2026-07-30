@@ -103,6 +103,16 @@ h1, h2, h3, h4 {
   line-height: 1.08;
 }
 
+/* El preflight de Tailwind pone `button { font-family: inherit }`, así que sin
+   esta regla todo botón hereda Hind de `body` y sólo se ve bien si alguien se
+   acordó de escribir `font-head` en ese llamado. Esto lo decide una sola vez.
+   Es un selector de elemento (0,0,1), así que la utilidad `.font-body` (0,1,0)
+   le gana por especificidad y sigue siendo la forma de salirse a propósito:
+   los controles densos del admin (paginación, toolbars) ya la traen. */
+button {
+  font-family: var(--font-head);
+}
+
 /* Una URL pegada no tiene espacios: sin esto se maqueta como una caja
    indivisible que se sale de la tarjeta y agrega scroll horizontal a la
    página en móvil. Cubre el portal (TextBlock) y el editor (TextBlockEditor). */

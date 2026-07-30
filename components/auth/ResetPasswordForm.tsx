@@ -79,7 +79,7 @@ export function ResetPasswordForm() {
         <Button
           type="submit"
           disabled={loading}
-          className="w-full font-head font-medium"
+          className="w-full"
           style={{ background: "var(--lavanda)", color: "#fff" }}
         >
           {loading ? "Enviando..." : "Enviar enlace"}

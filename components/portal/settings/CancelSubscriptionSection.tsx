@@ -64,7 +64,7 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
           type="button"
           onClick={reactivate}
           disabled={busy}
-          className="font-head w-full rounded-xl mt-3"
+          className="w-full rounded-xl mt-3"
           style={{
             fontSize: 15, fontWeight: 500, minHeight: 48,
             background: "var(--lavanda)", color: "#fff", border: "none", opacity: busy ? 0.6 : 1,
