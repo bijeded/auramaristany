@@ -36,9 +36,10 @@
 ## 5. Verification
 
 - [x] 5.1 Local gate: `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` — all green, no regression in `__tests__/cancellation.test.ts` or `__tests__/settings-actions.test.ts`.
-- [ ] 5.2 Runtime, on Preview: cancel a demo subscription selecting "Prefiero no decir", confirm the row lands with that reason and no detail — then confirm the same for cancelling with nothing selected.
+- [x] 5.2a Runtime, on Preview: the modal renders seven options ending in "Prefiero no decir", in order, with no free-text field for it and no grey de-emphasis. **Confirmed by screenshot.**
+- [ ] 5.2b Runtime: the end-to-end write (modal → server action → row). ⚠ **NOT runnable on demo data** — demo subs carry synthetic Stripe ids (`sub_seed_NNN`), so `cancelSubscription` 404s at the Stripe call and returns the generic error before reaching the insert. The first smoke card asked for exactly this and was unrunnable — the trap `CLAUDE.md` documents, sprung again (see **D27**). Needs a client registered through real test-mode checkout. The DB half is already proven: a client-session insert of `prefiero_no_decir` returned 201 against production.
 - [ ] 5.3 Runtime: the new bar appears on "Razones de cancelación" in `/admin/dashboard` with its Spanish label, and the "Otro" bar no longer absorbs the declines.
-- [ ] 5.4 Reactivate the probe client and confirm her survey row is deleted as before (the reactivation path deletes the latest voluntary row; the new reason must not change that).
+- [ ] 5.4 Reactivate the probe client and confirm her survey row is deleted as before. ⚠ Same blocker as 5.2b — reactivation also calls Stripe first. The policy half was probed directly: a client-session DELETE of an own voluntary row returned 204.
 - [ ] 5.5 `code-review` subagent verdict before the PR. `security-review` is required too: the diff touches a client-facing write path, a zod schema, and an RLS-governed insert.
 - [ ] 5.6 Restore any demo data touched by 5.2–5.4, so the dashboard Aura sees is not left carrying a test cancellation.
 
