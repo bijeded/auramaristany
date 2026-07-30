@@ -10,6 +10,7 @@ const REASON_LABELS: Record<CancellationReason, string> = {
   no_veo_resultados: "No veo resultados",
   encontre_otra_opcion: "Encontré otra opción",
   otro: "Otro",
+  prefiero_no_decir: "Prefiero no decir",
   pago_fallido: "Pago fallido",
 };
 
@@ -46,8 +47,18 @@ export function reasonRequiresDetail(reason: CancellationReason): boolean {
   return DETAIL_REASONS.includes(reason);
 }
 
-/** Client-facing survey options — order matters for the radio list.
- *  `pago_fallido` is system-only and deliberately excluded. */
+/**
+ * Client-facing survey options — order matters for the radio list.
+ * `pago_fallido` is system-only and deliberately excluded.
+ *
+ * D19 — la lista COMPLETA del modal sale de aquí, incluida "Prefiero no decir",
+ * que va al final: se lee como el cierre de una lista de motivos, no como uno
+ * más. Vivía escrita a mano en `CancelSubscriptionSection` como un octavo radio
+ * modelado con `reason === null`, o sea una segunda lista de opciones mantenida
+ * aparte de ésta — la tabla copiada de la regla 8, en JSX. Por eso el modal
+ * acabó ofreciendo un valor que el CHECK de la base no aceptaba, y por eso no
+ * se agrega ninguna opción al componente: se agregan aquí.
+ */
 export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationReason; label: string }> = [
   "precio_muy_caro",
   "no_tengo_tiempo",
@@ -55,6 +66,7 @@ export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationRea
   "no_veo_resultados",
   "encontre_otra_opcion",
   "otro",
+  "prefiero_no_decir",
 ].map((value) => ({ value: value as CancellationReason, label: REASON_LABELS[value as CancellationReason] }));
 
 const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", "past_due"];
