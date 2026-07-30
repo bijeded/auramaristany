@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
   filterClients, clientsToCSV, canDeleteClient,
-  nextChargeCell, statusBadge, STATUS_FILTERS, isInactive, INACTIVITY_THRESHOLD_DAYS,
+  nextChargeCell, statusBadge, STATUS_FILTERS, parseStatusFilter, isInactive, INACTIVITY_THRESHOLD_DAYS,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
 import { paginate } from "@/lib/admin/pagination";
@@ -101,7 +101,10 @@ export function ClientsTable({
           <span>Estado</span>
           <select
             value={estado ?? ""}
-            onChange={(e) => resetPage(setEstado)((e.target.value || null) as StatusFilter)}
+            // parseStatusFilter y no un cast: es el mismo validador por el que
+            // pasa el deep link de D17, así que el select y la URL comparten un
+            // solo parser y el centinela "" cae a null por la misma vía.
+            onChange={(e) => resetPage(setEstado)(parseStatusFilter(e.target.value))}
             className="font-body"
             style={{
               minHeight: 44, borderRadius: 999, border: "1px solid var(--gris-linea)",
@@ -189,7 +192,13 @@ export function ClientsTable({
                               <div style={{ color, fontWeight: quiet ? 600 : 400 }}>
                                 {relativeDayLabel(c.last_activity_date, now)}
                               </div>
-                              <div style={{ color: "var(--gris-suave)", fontSize: 12, marginTop: 2 }}>
+                              {/* --gris-texto y no --gris-suave: las segundas
+                                  líneas vecinas (correo, variante) usan el suave,
+                                  pero da 2.81:1 sobre el blanco de la fila y esto
+                                  es texto normal de 12px, que pide 4.5:1. Se
+                                  prefiere la regla de contraste a parecerse a
+                                  celdas que ya la incumplían. */}
+                              <div style={{ color: "var(--gris-texto)", fontSize: 12, marginTop: 2 }}>
                                 {dayLabel(c.last_activity_date)}
                               </div>
                             </>
