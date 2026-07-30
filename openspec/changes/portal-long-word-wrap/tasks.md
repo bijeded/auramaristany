@@ -31,8 +31,13 @@
 - [~] 5.5 NOT VERIFIED — Gmail mobile check skipped by decision (Francisco, 2026-07-30): low impact, not worth blocking on. The inline `overflowWrap` ships regardless; if a mail client strips it the email body can still overflow. Re-check if a client ever reports it.
 - [x] 5.6 Spot-check ordinary prose on `/portal/today`, `/portal/pilares` and a message with no long token: line breaking is unchanged
 
+## 5b. Post-review surfaces (added after code review)
+
+- [x] 5b.1 Client day notes with a long URL wrap inside the card at 375px (`/portal/historial`)
+- [x] 5b.2 Admin sent-message subject wraps instead of widening the flex row
+
 ## 6. Ship
 
-- [ ] 6.1 `code-review` verdict obtained (no `security-review`: no auth, RLS, service-role, validation, Stripe or webhook surface, and no new rendering sink)
-- [ ] 6.2 Conventional Commit on a branch, PR opened, CI green, merge
+- [x] 6.1 `code-review` verdict obtained: APPROVED WITH WARNINGS; all 3 warnings + 2 suggestions fixed in commit d427d32 (no `security-review`: no auth, RLS, service-role, validation, Stripe or webhook surface, and no new rendering sink)
+- [x] 6.2 Conventional Commit on a branch, PR opened, CI green, merge
 - [ ] 6.3 `/opsx:sync` + `openspec validate`, then `/opsx:archive`
