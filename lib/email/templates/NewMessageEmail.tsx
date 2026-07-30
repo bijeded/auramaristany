@@ -22,7 +22,7 @@ export function NewMessageEmail({
         `pre-line` reproduce el mismo salto de línea que el portal
         (app/portal/messages/[id]/page.tsx); sin él los párrafos se colapsan.
       */}
-      <Text style={{ whiteSpace: "pre-line" }}>{body}</Text>
+      <Text style={{ whiteSpace: "pre-line", overflowWrap: "break-word" }}>{body}</Text>
     </Layout>
   );
 }
