@@ -1,5 +1,9 @@
 # portal-exercise-display
 
+## Purpose
+
+Defines how exercises are presented to the client in the portal and how she logs her work against them: rest times as minute-based labels, an explicit "Hecho ✓" completion control, per-set entry of reps and weight, and a per-exercise `kg | lb` unit toggle. The unit is a property of the moment of capture — it is chosen per exercise, converts typed values in place, and is never stored; weight always persists as canonical kilograms so that history, charts and aggregation share one unit. Covers both the live `/portal/today` view and the read-only rendering of a logged day.
+
 ## Requirements
 
 ### Requirement: Rest time is displayed in minutes
@@ -41,6 +45,8 @@ Each exercise card in `/portal/today` SHALL present a "Hecho ✓" pill button of
 ### Requirement: Per-exercise weight unit toggle at log time
 Each exercise card with the `weight_kg` metric in `/portal/today` SHALL offer a `kg | lb` toggle that applies to all of that exercise's set inputs. The default unit MUST be kg. The chosen unit MUST persist per exercise while the screen stays mounted (sticky per session), and MUST NOT be persisted to the database.
 
+The toggle buttons SHALL render at a minimum height of 32px and a minimum width of 44px. The 32px height is a deliberate, documented exception to the ≥44px tap-target rule in `CLAUDE.md`: this control was judged visually too heavy at 44px next to the compact "Mi registro" header, and the shorter height was chosen with the tradeoff stated. It applies to this control only and MUST NOT be read as license to shrink other tap targets.
+
 #### Scenario: Choosing lb for one exercise
 - **WHEN** the client switches an exercise's toggle to lb
 - **THEN** that exercise's weight column header reads "Peso (lb)" and its inputs are interpreted as lb, while other exercises keep their own unit
@@ -52,6 +58,14 @@ Each exercise card with the `weight_kg` metric in `/portal/today` SHALL offer a 
 #### Scenario: Round-trip stability
 - **WHEN** the client flips kg → lb → kg without editing
 - **THEN** the displayed value returns to its original kg value (1-decimal rounding, no cumulative drift)
+
+#### Scenario: Toggle control height
+- **WHEN** the exercise card renders on mobile
+- **THEN** each `kg` / `lb` button is at least 32px tall and at least 44px wide
+
+#### Scenario: Shrinking the toggle does not shrink its neighbours
+- **WHEN** the "Mi registro" panel renders alongside the "Hecho ✓" button
+- **THEN** the "Hecho ✓" button keeps its own ≥48px height, unaffected by the toggle's 32px height
 
 ### Requirement: Weight is always stored in kilograms
 Regardless of the entry unit, the system SHALL persist `weight_kg` values in kilograms rounded to 1 decimal. The `weight_kg` JSON key and the `progress_logs` structure MUST NOT change, and the entry unit MUST NOT be stored.
@@ -67,3 +81,4 @@ Regardless of the entry unit, the system SHALL persist `weight_kg` values in kil
 #### Scenario: History list unaffected
 - **WHEN** a logged day is viewed in Historial
 - **THEN** weights display in kg exactly as stored
+
