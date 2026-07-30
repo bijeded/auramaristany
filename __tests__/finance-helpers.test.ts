@@ -9,7 +9,12 @@ import {
   computeRenewalsWithinDays,
   partitionByOutcome,
   type FinanceSubRow,
+  groupChurnByVariant,
+  groupCancellationReasons,
+  countWithShare,
+  type ChurnSubRow,
 } from "@/lib/admin/finance-helpers";
+import type { CancellationReason } from "@/lib/supabase/types";
 
 // ---------------------------------------------------------------------------
 // Task 1: formatMXN
@@ -406,5 +411,188 @@ describe("las tres tarjetas reparten la ventana sin solaparse", () => {
     const { billing } = partitionByOutcome(rows);
     // De las tres que vencen dentro, sólo UNA vuelve a cobrar.
     expect(computeRenewalsWithinDays(billing, 7, now)).toEqual({ count: 1, amount: 999 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dashboard-cancellation-charts: groupChurnByVariant + groupCancellationReasons
+// ---------------------------------------------------------------------------
+
+describe("groupChurnByVariant", () => {
+  it("cuenta las bajas y la tasa sobre quienes se suscribieron", () => {
+    // 3 bajas de 12 que alguna vez se suscribieron a la variante.
+    const rows: ChurnSubRow[] = [
+      ...Array.from({ length: 3 }, () => ({ status: "canceled" as const, variant_name: "Fuerza" })),
+      ...Array.from({ length: 9 }, () => ({ status: "active" as const, variant_name: "Fuerza" })),
+    ];
+
+    expect(groupChurnByVariant(rows)).toEqual([
+      { variant: "Fuerza", churned: 3, everSubscribed: 12, rate: 25 },
+    ]);
+  });
+
+  /**
+   * El caso que sostiene la exclusión de `incomplete_expired`. Ocho checkouts
+   * abandonados llevarían la tasa de 50% a 10%: la carta leería "aquí no se va
+   * nadie" justo cuando la fuga es peor.
+   */
+  it("un checkout abandonado no diluye la tasa", () => {
+    const rows: ChurnSubRow[] = [
+      { status: "canceled", variant_name: "Fuerza" },
+      { status: "active", variant_name: "Fuerza" },
+      ...Array.from({ length: 8 }, () => ({ status: "incomplete_expired" as const, variant_name: "Fuerza" })),
+    ];
+
+    expect(groupChurnByVariant(rows)).toEqual([
+      { variant: "Fuerza", churned: 1, everSubscribed: 2, rate: 50 },
+    ]);
+  });
+
+  it("quien se gradúa cuenta en el denominador y no en el numerador", () => {
+    const rows: ChurnSubRow[] = [
+      { status: "completed", variant_name: "Fuerza" },
+      { status: "canceled", variant_name: "Fuerza" },
+    ];
+
+    expect(groupChurnByVariant(rows)).toEqual([
+      { variant: "Fuerza", churned: 1, everSubscribed: 2, rate: 50 },
+    ]);
+  });
+
+  it("una impaga sólo suma del lado del denominador", () => {
+    const rows: ChurnSubRow[] = [
+      { status: "unpaid", variant_name: "Nutrición" },
+      { status: "active", variant_name: "Nutrición" },
+    ];
+
+    // Sin bajas, la variante no aparece: una barra de cero no es información.
+    expect(groupChurnByVariant(rows)).toEqual([]);
+  });
+
+  it("una variante sin bajas no aparece, ni siquiera si todas se graduaron", () => {
+    const rows: ChurnSubRow[] = [
+      { status: "completed", variant_name: "Fuerza" },
+      { status: "completed", variant_name: "Fuerza" },
+    ];
+
+    expect(groupChurnByVariant(rows)).toEqual([]);
+  });
+
+  /**
+   * Regla 8 — un estado que exista en el CHECK y no aquí no puede tumbar la
+   * carta. Queda fuera de los DOS lados y las demás filas siguen pintándose.
+   */
+  it("un estado desconocido no rompe la carta: queda fuera de ambos lados", () => {
+    const rows: ChurnSubRow[] = [
+      { status: "estado_del_futuro" as ChurnSubRow["status"], variant_name: "Fuerza" },
+      { status: "canceled", variant_name: "Fuerza" },
+      { status: "active", variant_name: "Fuerza" },
+    ];
+
+    expect(groupChurnByVariant(rows)).toEqual([
+      { variant: "Fuerza", churned: 1, everSubscribed: 2, rate: 50 },
+    ]);
+  });
+
+  it("ordena por número de bajas, no por tasa", () => {
+    const rows: ChurnSubRow[] = [
+      // Nutrición: 2 de 4 → 50%, la tasa más alta.
+      ...Array.from({ length: 2 }, () => ({ status: "canceled" as const, variant_name: "Nutrición" })),
+      ...Array.from({ length: 2 }, () => ({ status: "active" as const, variant_name: "Nutrición" })),
+      // Fuerza: 3 de 40 → 8%, pero es la de más volumen.
+      ...Array.from({ length: 3 }, () => ({ status: "canceled" as const, variant_name: "Fuerza" })),
+      ...Array.from({ length: 37 }, () => ({ status: "active" as const, variant_name: "Fuerza" })),
+    ];
+
+    expect(groupChurnByVariant(rows)).toEqual([
+      { variant: "Fuerza", churned: 3, everSubscribed: 40, rate: 8 },
+      { variant: "Nutrición", churned: 2, everSubscribed: 4, rate: 50 },
+    ]);
+  });
+
+  it("con el mismo número de bajas, desempata por nombre para que el orden sea estable", () => {
+    const rows: ChurnSubRow[] = [
+      { status: "canceled", variant_name: "Nutrición" },
+      { status: "canceled", variant_name: "Fuerza" },
+    ];
+
+    expect(groupChurnByVariant(rows).map((r) => r.variant)).toEqual(["Fuerza", "Nutrición"]);
+  });
+
+  it("sin filas devuelve una lista vacía", () => {
+    expect(groupChurnByVariant([])).toEqual([]);
+  });
+});
+
+describe("groupCancellationReasons", () => {
+  const rows = [
+    ...Array.from({ length: 5 }, () => ({ reason: "no_tengo_tiempo" as const })),
+    ...Array.from({ length: 3 }, () => ({ reason: "pago_fallido" as const })),
+    ...Array.from({ length: 2 }, () => ({ reason: "precio_muy_caro" as const })),
+    ...Array.from({ length: 2 }, () => ({ reason: "otro" as const })),
+  ];
+
+  it("cuenta cada motivo y su parte del total", () => {
+    // 5 de 12 → 41.67% → 42%.
+    expect(groupCancellationReasons(rows)[0]).toEqual({
+      reason: "no_tengo_tiempo",
+      label: "No tengo tiempo",
+      count: 5,
+      share: 42,
+    });
+  });
+
+  /**
+   * El pago fallido es baja INVOLUNTARIA, y es el único motivo con remedio
+   * operativo: se persigue una tarjeta nueva, no un cambio de opinión.
+   * Excluirlo dejaría la carta describiendo una población que ninguna etiqueta
+   * de la pantalla nombra.
+   */
+  it("el pago fallido aparece con su etiqueta", () => {
+    const fallido = groupCancellationReasons(rows).find((r) => r.reason === "pago_fallido");
+    expect(fallido).toEqual({ reason: "pago_fallido", label: "Pago fallido", count: 3, share: 25 });
+  });
+
+  it("los conteos reparten el total: cada fila de encuesta cuenta una vez", () => {
+    const total = groupCancellationReasons(rows).reduce((sum, r) => sum + r.count, 0);
+    expect(total).toBe(rows.length);
+  });
+
+  it("un motivo que nadie eligió no aparece", () => {
+    expect(groupCancellationReasons(rows).some((r) => r.reason === "no_veo_resultados")).toBe(false);
+  });
+
+  it("ordena por conteo descendente y desempata por etiqueta", () => {
+    // "Otro" y "Precio muy caro" empatan a 2.
+    expect(groupCancellationReasons(rows).map((r) => r.reason)).toEqual([
+      "no_tengo_tiempo",
+      "pago_fallido",
+      "otro",
+      "precio_muy_caro",
+    ]);
+  });
+
+  it("un motivo desconocido sale con su clave cruda en vez de una fila en blanco", () => {
+    const unknown = [{ reason: "motivo_del_futuro" as CancellationReason }, { reason: "otro" as const }];
+
+    expect(groupCancellationReasons(unknown)).toEqual([
+      { reason: "motivo_del_futuro", label: "motivo_del_futuro", count: 1, share: 50 },
+      { reason: "otro", label: "Otro", count: 1, share: 50 },
+    ]);
+  });
+
+  it("sin encuestas devuelve una lista vacía", () => {
+    expect(groupCancellationReasons([])).toEqual([]);
+  });
+});
+
+describe("countWithShare", () => {
+  it("compone el texto de la fila", () => {
+    expect(countWithShare(3, 25)).toBe("3 (25%)");
+  });
+
+  it("no usa decimales: una tasa es la forma del problema, no una cifra contable", () => {
+    expect(countWithShare(5, 42)).toBe("5 (42%)");
+    expect(countWithShare(1, 100)).toBe("1 (100%)");
   });
 });

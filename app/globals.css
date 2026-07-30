@@ -16,6 +16,15 @@
      dejó pasar al relleno anterior (--lavanda, 2.81:1 sobre pista) durante meses.
      Cuesta parecerse menos al rosa de marca; es el precio de que se vea. */
   --rosa-bar: #b8746a;
+  /* Relleno de la barra de "Razones de cancelación". 4.47:1 sobre la pista
+     --gris-claro, medido igual que --rosa-bar: contra la PISTA, no contra la
+     tarjeta blanca.
+     Existe porque la carta vecina de su par ya usa --ambar y dos listas de
+     barras adyacentes con el mismo relleno se leen como una sola lista corrida.
+     Ciruela y no verde a propósito: el dashboard le tiene reservada esa familia
+     a la graduación (--exito-text en "Terminan"), y una barra de fuga en verde
+     contradiría justo la distinción que `isChurned` existe para sostener. */
+  --ciruela-bar: #96617f;
   --lavanda: #9982f4;
   --lavanda-dark: #7a63d4;
   --lavanda-soft: #efeafe;
@@ -34,7 +43,11 @@
      --exito; las cifras y el texto usan éste. */
   --exito-text: #2f7d54;
   /* Ámbar de "todavía puede cobrar" (pausada, impaga, incompleta). Estaba
-     repetido a mano como #9a7b1f en cinco archivos. 4.07:1 sobre blanco. */
+     repetido a mano como #9a7b1f en cinco archivos. 4.07:1 sobre blanco.
+     También es RELLENO de barra desde "Cancelaciones por variante", así que
+     lleva su ratio contra la PISTA como pide el ADR 0005: 3.69:1 sobre
+     --gris-claro, por encima del 3:1 de WCAG 1.4.11. Medir contra el blanco de
+     la tarjeta no sirve para una barra — la pista es su color adyacente. */
   --ambar: #9a7b1f;
   --ambar-tint: rgba(240, 198, 116, 0.18);
   --font-head: 'Oswald', system-ui, sans-serif;

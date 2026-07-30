@@ -5,6 +5,7 @@ import {
   cancellationReasonLabel,
   reasonRequiresDetail,
   deriveCancellationState,
+  isChurned,
 } from "@/lib/portal/cancellation";
 
 // A9 — Cancellation + exit survey: pure helpers
@@ -17,6 +18,17 @@ describe("cancellationReasonLabel", () => {
     expect(cancellationReasonLabel("encontre_otra_opcion")).toBe("Encontré otra opción");
     expect(cancellationReasonLabel("otro")).toBe("Otro");
     expect(cancellationReasonLabel("pago_fallido")).toBe("Pago fallido");
+  });
+
+  /**
+   * Regla 8 un nivel más allá: una función de etiquetas sobre un enum que vive
+   * en la base. `tsc` prueba que la unión es exhaustiva, nunca que la fila
+   * pertenezca a la unión. Si el CHECK gana un motivo antes que la unión, la
+   * fila tiene que salir legible —y el `localeCompare` que ordena la carta no
+   * puede toparse con un `undefined`.
+   */
+  it("un motivo que la unión aún no conoce cae a su clave cruda, nunca a undefined", () => {
+    expect(cancellationReasonLabel("motivo_del_futuro")).toBe("motivo_del_futuro");
   });
 });
 
@@ -168,5 +180,58 @@ describe("isCompletionScheduled", () => {
   it("ni una suscripción corriente", () => {
     expect(isCompletionScheduled({ completedAt: null, cancelAtPeriodEnd: false })).toBe(false);
     expect(isCompletionScheduled({})).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dashboard-cancellation-charts: isChurned
+// ---------------------------------------------------------------------------
+
+/**
+ * La matriz cubre los NUEVE valores del CHECK de `subscriptions.status`
+ * (migración 017), no los que hoy parezcan relevantes. Es el punto de la regla
+ * 8: una unión más angosta que el CHECK no la ve ni `tsc` ni el lint, y aquí
+ * decidiría si alguien cuenta como baja.
+ */
+describe("isChurned", () => {
+  it("una suscripción cancelada es baja", () => {
+    expect(isChurned("canceled")).toBe(true);
+  });
+
+  /**
+   * El caso que justifica que esta función exista. `handleSubscriptionDeleted`
+   * ya separó los dos finales —escribe `completed` a quien terminó su plazo y
+   * `canceled` a quien se fue—, así que quien se gradúa NUNCA llega con
+   * `canceled`. Contarla como baja convertiría el mejor desenlace de Aura en su
+   * peor métrica.
+   */
+  it("quien se gradúa no es baja jamás", () => {
+    expect(isChurned("completed")).toBe(false);
+  });
+
+  it("una que se está acabando todavía no es baja: no ha terminado", () => {
+    // Ya la cuenta "Cancelaciones (próx. 7 días)" desde el balde `cancelling`.
+    expect(isChurned("active")).toBe(false);
+  });
+
+  /**
+   * `unpaid` va en el DENOMINADOR y no en el numerador: el listado de clientes
+   * ya archiva `past_due` y `unpaid` juntas bajo "Vencidas" y pinta `unpaid`
+   * como "Impaga" en ámbar. La lectura de Aura es cliente en apuros, no cliente
+   * que se fue — y si acaba yéndose de verdad, llega su fila `pago_fallido`.
+   */
+  it("una impaga no es baja", () => {
+    expect(isChurned("unpaid")).toBe(false);
+  });
+
+  it("ni una vencida, en prueba o pausada", () => {
+    expect(isChurned("past_due")).toBe(false);
+    expect(isChurned("trialing")).toBe(false);
+    expect(isChurned("paused")).toBe(false);
+  });
+
+  it("un checkout abandonado no es baja: nunca fue cliente", () => {
+    expect(isChurned("incomplete")).toBe(false);
+    expect(isChurned("incomplete_expired")).toBe(false);
   });
 });

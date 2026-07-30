@@ -1,5 +1,7 @@
 import {
   getActiveSubscriptions,
+  getCancellationReasonsAllTime,
+  getChurnByVariantAllTime,
   getPaidInvoices,
   getPastDueCount,
   getRecentPayments,
@@ -8,8 +10,11 @@ import {
 import {
   computeMRR,
   computeRenewalsWithinDays,
-  partitionByOutcome,
+  countWithShare,
+  groupCancellationReasons,
+  groupChurnByVariant,
   groupClientsByVariant,
+  partitionByOutcome,
   groupRevenueByMonth,
   groupRevenueByVariant,
   orderRevenueByClientsOrder,
@@ -94,13 +99,16 @@ function cohortHref(label: string): string {
 export default async function AdminDashboardPage() {
   await requireAdminPage();
   const now = new Date();
-  const [activeSubs, invoices, pastDue, recent, variantInvoices] = await Promise.all([
-    getActiveSubscriptions(),
-    getPaidInvoices(12),
-    getPastDueCount(),
-    getRecentPayments(10),
-    getRevenueByVariantAllTime(),
-  ]);
+  const [activeSubs, invoices, pastDue, recent, variantInvoices, churnSubs, reasonSurveys] =
+    await Promise.all([
+      getActiveSubscriptions(),
+      getPaidInvoices(12),
+      getPastDueCount(),
+      getRecentPayments(10),
+      getRevenueByVariantAllTime(),
+      getChurnByVariantAllTime(),
+      getCancellationReasonsAllTime(),
+    ]);
 
   // D17 — la partición se hace UNA vez y de ella cuelgan las tres tarjetas de
   // ventana. `deriveCancellationState` decide la cohorte; aquí no se lee ninguna
@@ -132,6 +140,29 @@ export default async function AdminDashboardPage() {
     clientsByVariant
   );
   const revenueTotal = revenueByVariant.reduce((sum, r) => sum + r.total, 0);
+
+  // Las dos cartas de fuga. Cada una sale de SU consulta y no se cuadran entre
+  // sí a propósito.
+  //
+  // OJO — la de motivos suele traer MÁS filas que la de variante, y no es un
+  // desajuste: es un DESFASE EN EL TIEMPO. La encuesta se escribe cuando una
+  // clienta decide irse; la baja se cuenta cuando ya se fue. En medio caben dos
+  // estados corrientes:
+  //   · ventana de gracia — canceló pero sigue `active` hasta que termine su
+  //     periodo (y si reactiva, su fila de encuesta se borra y nunca llega a
+  //     ser baja). Ya la cuenta el KPI "Cancelaciones (próx. 7 días)".
+  //   · `unpaid` — el webhook ya escribió su `pago_fallido`, pero Stripe aún no
+  //     borra la suscripción. Va en el denominador, no en el numerador.
+  // Mucho más raro: una encuesta que sobrevive a su suscripción borrada
+  // (`on delete set null`). En los datos demo son 5 bajas contra 7 encuestas —
+  // 5 idas, 1 en gracia, 1 impaga—, y ninguna por borrado.
+  //
+  // Es la misma divergencia deliberada de ADR 0004 que ya tienen "Clientes" e
+  // "Ingresos" por variante, y por eso cada carta dice sobre qué población saca
+  // su porcentaje. Cuadrarlas ensanchando la de bajas volvería la tasa "gente
+  // que quizá se vaya" — ver ADR 0006.
+  const churnByVariant = groupChurnByVariant(churnSubs);
+  const cancellationReasons = groupCancellationReasons(reasonSurveys);
   const dayMonth = now.toLocaleDateString("es-MX", { day: "numeric", month: "long" }); // "16 de junio"
   const dateLabel = `${dayMonth}, ${now.getFullYear()}`; // "16 de junio, 2026"
 
@@ -259,6 +290,52 @@ export default async function AdminDashboardPage() {
           </tbody>
         </table>
       </Card>
+
+      {/* Cancelaciones — el par de fuga.
+          Mismo esqueleto que el par de variantes de arriba (título + línea de
+          población, encabezados de la misma altura) para que las primeras filas
+          arranquen parejas.
+          Los subtítulos NO son adorno: las dos cartas enseñan "N (%)" y los dos
+          porcentajes miden cosas distintas —el de la izquierda es una TASA sobre
+          quienes se suscribieron y el de la derecha una PARTE del total, que sí
+          suma 100%—. Sin la línea, lado a lado invitan justo a la comparación
+          equivocada. */}
+      <div className="flex" style={{ gap: 16, marginTop: 18, alignItems: "stretch" }}>
+        <Card style={{ flex: 1 }}>
+          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>Cancelaciones por variante</h3>
+          <p className="font-body" style={{ fontSize: 12, color: "var(--gris-texto)", marginBottom: 16 }}>
+            Histórico completo · % de quienes se suscribieron
+          </p>
+          {/* La barra la escala el CONTEO, no la tasa: la carta ordena por
+              volumen y el porcentaje aporta el contexto que el volumen esconde.
+              3 bajas de 40 y 3 de 4 empatan por conteo y son problemas
+              distintos. */}
+          <VariantBarList
+            rows={churnByVariant.map((c) => ({
+              label: c.variant,
+              value: c.churned,
+              display: countWithShare(c.churned, c.rate),
+            }))}
+            fill="var(--ambar)"
+            emptyMessage="Nadie ha cancelado todavía"
+          />
+        </Card>
+        <Card style={{ flex: 1 }}>
+          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>Razones de cancelación</h3>
+          <p className="font-body" style={{ fontSize: 12, color: "var(--gris-texto)", marginBottom: 16 }}>
+            Histórico completo · % del total de cancelaciones
+          </p>
+          <VariantBarList
+            rows={cancellationReasons.map((r) => ({
+              label: r.label,
+              value: r.count,
+              display: countWithShare(r.count, r.share),
+            }))}
+            fill="var(--ciruela-bar)"
+            emptyMessage="Aún no hay motivos registrados"
+          />
+        </Card>
+      </div>
     </div>
   );
 }

@@ -34,6 +34,11 @@ Headcounts and distribution-by-variant are computed over every `active` row, end
 two are *intended* to disagree, and the divergence is specified rather than incidental.
 
 **2. No reader derives "is this ending?" itself. Every one calls `deriveCancellationState`.**
+That question is about a **live** subscription, and this is the only function that answers it.
+It is not the only cancellation derivation in the codebase: ADR 0006 adds `isChurned` for the
+*historical* question — "how did this subscription end?" — which `deriveCancellationState`
+structurally cannot answer, since it classifies a terminal `canceled` row as `none`. One
+question each; neither substitutes for the other.
 The dashboard is its fourth caller, not a fourth copy. `partitionByOutcome` maps that
 function's `kind` onto three cohorts — `eligible → billing`, `completing`, `grace → cancelling`
 — plus an `excluded` bucket for rows that already ended, in a single pass. Every row lands in
@@ -82,10 +87,17 @@ one combined "ending" number, which would make a good month read as churn.
   change rather than a hunt.
 - **Any new KPI must declare which side it is on** — money or people — before it is written.
   There is no default, and picking wrong is invisible to every test, since the row-set is
-  identical either way.
+  identical either way. ADR 0006 adds a third admissible answer: **a rate**, which is neither,
+  and which declares its *denominator* instead. A churn rate's numerator counts departures and
+  its denominator is a people figure that deliberately includes graduations, so "money or
+  people" cannot classify it — but it is still required to say what it counts.
 - **`deriveCancellationState` is now load-bearing for admin finance as well as the portal.**
   Its precedence order is not a detail: changing it would silently re-file every graduation as
   churn, in three surfaces at once. It has tests; they matter more than they look.
+  It is the derivation for **live** subscriptions only, and it is not the only one: ADR 0006
+  adds `isChurned` for the historical question ("how did this subscription end?"), which this
+  function structurally cannot answer — it classifies a terminal `canceled` row as `none`.
+  Neither function substitutes for the other.
 - **The narrower `status` filter is a decision, not an omission.** `trialing` and `past_due`
   are deliberately absent from every finance figure, which makes them conservative; `past_due`
   surfaces on its own through "Requieren atención". Widening the query would change MRR, and
