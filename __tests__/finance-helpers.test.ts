@@ -277,16 +277,20 @@ describe("las tres tarjetas reparten la ventana sin solaparse", () => {
     const terminan = computeRenewalsWithinDays(completing, 7, now);
     const cancelaciones = computeRenewalsWithinDays(cancelling, 7, now);
 
-    // Se recuenta la pertenencia a la ventana SIN usar la partición, para que la
-    // prueba no repita la implementación: sobre las cohortes vivas, la suma de
-    // las tres tiene que dar exactamente eso.
-    const vivasDentroDeVentana = [...billing, ...completing, ...cancelling].filter((r) => {
+    // Se recuenta sobre el FIXTURE, nunca sobre la salida de la partición:
+    // contarlo sobre `[...billing, ...completing, ...cancelling]` volvía la
+    // igualdad una tautología —duplicar una fila en dos baldes la satisfacía
+    // igual— y dejaba todo el peso en el literal de abajo. `active` es la
+    // condición que la consulta garantiza, así que es el filtro honesto.
+    const vivasDentroDeVentana = rows.filter((r) => r.status === "active").filter((r) => {
       if (!r.current_period_end) return false;
       const end = new Date(r.current_period_end);
       return end >= now && end <= new Date(now.getTime() + 7 * 86_400_000);
     }).length;
 
     expect(renuevan.count + terminan.count + cancelaciones.count).toBe(vivasDentroDeVentana);
+    // El literal también importa: fija el conteo esperado del fixture, así que
+    // un cambio en la partición no puede "cuadrar" moviendo las dos cifras.
     expect(vivasDentroDeVentana).toBe(3);
   });
 

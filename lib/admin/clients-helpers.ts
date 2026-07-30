@@ -308,9 +308,10 @@ export function canDeleteClient(
  * se acuerde de esta pantalla, y entonces un status nuevo debe verse raro, no
  * borrar la lista de clientes de Aura.
  */
-// Ámbar = "todavía puede cobrar". Se nombra porque ahora lo usan tres entradas
-// y un hex repetido a mano es un hex que acaba divergiendo.
-const AMBAR = { bg: "rgba(240,198,116,.18)", color: "#9a7b1f" };
+// Ámbar = "todavía puede cobrar". Vive en globals.css porque el hex estaba
+// repetido a mano en cinco archivos; quedan tres por convertir (payment-status,
+// SubscriptionCard, ClientDetailTabs), anotados en BACKLOG.
+const AMBAR = { bg: "var(--ambar-tint)", color: "var(--ambar)" };
 
 const STATUS_PRESENTATION: Record<string, { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },

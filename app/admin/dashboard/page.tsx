@@ -36,6 +36,8 @@ function Kpi({ label, value, sub, danger, accent, href }: {
   /**
    * D17 — color del numeral. Cada cohorte que termina lleva el suyo: verde de
    * logro para quien se gradúa (toca ofrecerle Extra) y ámbar para quien se va.
+   * Se usan los tokens legibles como texto (--exito-text, no --exito): el verde
+   * de los fondos teñidos no llega ni al 3:1 que pide una cifra grande.
    * Sin esto las dos se leían como el mismo evento, y una buena racha de
    * graduaciones parecía fuga de clientes.
    */
@@ -153,14 +155,14 @@ export default async function AdminDashboardPage() {
         <Kpi
           label="Terminan (próx. 7 días)"
           value={String(ending.count)}
-          accent="var(--exito)"
+          accent="var(--exito-text)"
           sub="Ver todas →"
           href={cohortHref(COHORT_FILTER.completing)}
         />
         <Kpi
           label="Cancelaciones (próx. 7 días)"
           value={String(cancellations.count)}
-          accent="#9a7b1f"
+          accent="var(--ambar)"
           sub="Ver todas →"
           href={cohortHref(COHORT_FILTER.cancelling)}
         />
