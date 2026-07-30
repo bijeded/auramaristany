@@ -170,12 +170,8 @@ function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: (
               {opt.label}
             </label>
           ))}
-          {/* D19 — aquí había un octavo radio, "Prefiero no decir", escrito a
-              mano y modelado con `setReason(null)`. Ya no: es un valor propio
-              de `CANCELLATION_REASON_OPTIONS`, así que lo pinta el map de
-              arriba como cualquier otro. Una lista de opciones escrita aparte
-              de la de verdad es lo que dejó al modal ofreciendo un motivo que
-              el CHECK de la base no aceptaba. No lo devuelvas. */}
+          {/* Toda opción sale de `CANCELLATION_REASON_OPTIONS` — ver su docblock
+              y la regla 8 de CLAUDE.md. Ninguna se escribe aquí. */}
         </div>
 
         {showDetail && (

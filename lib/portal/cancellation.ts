@@ -59,7 +59,7 @@ export function reasonRequiresDetail(reason: CancellationReason): boolean {
  * acabó ofreciendo un valor que el CHECK de la base no aceptaba, y por eso no
  * se agrega ninguna opción al componente: se agregan aquí.
  */
-export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationReason; label: string }> = [
+export const CLIENT_FACING_REASONS = [
   "precio_muy_caro",
   "no_tengo_tiempo",
   "no_logre_objetivo",
@@ -67,7 +67,26 @@ export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationRea
   "encontre_otra_opcion",
   "otro",
   "prefiero_no_decir",
-].map((value) => ({ value: value as CancellationReason, label: REASON_LABELS[value as CancellationReason] }));
+] as const satisfies readonly CancellationReason[];
+
+/**
+ * Las opciones tal como las pinta el modal. Se DERIVAN de la lista de arriba,
+ * igual que el `z.enum` de `cancelSubscription`: una sola declaración y todo lo
+ * demás cuelga de ella.
+ *
+ * Antes esta lista se escribía aquí y otra vez, a mano, dentro del esquema zod
+ * del server action — la tercera copia de un mismo enum (con el CHECK de la
+ * base como cuarta). D19 tuvo que editarla en tres sitios para agregar un
+ * motivo, que es justo la señal de la regla 8: si hay que tocar N listas para
+ * un valor, alguna se va a quedar atrás. La que se quedara atrás aquí falla
+ * cerrado —zod rechaza con un error genérico— pero le niega a la cliente un
+ * motivo que la pantalla sí le ofrece.
+ *
+ * `pago_fallido` queda fuera por construcción, no por acordarse: no está en
+ * CLIENT_FACING_REASONS, así que ni el modal lo ofrece ni el esquema lo acepta.
+ */
+export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationReason; label: string }> =
+  CLIENT_FACING_REASONS.map((value) => ({ value, label: REASON_LABELS[value] }));
 
 const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", "past_due"];
 

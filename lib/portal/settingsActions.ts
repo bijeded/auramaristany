@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { validatePhone } from "@/lib/auth/phone";
 import { stripe } from "@/lib/stripe";
 import { sanitizePlainText } from "@/lib/admin/sanitize-html";
-import { reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
+import { CLIENT_FACING_REASONS, reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { createClient as createStatelessClient } from "@supabase/supabase-js";
 
@@ -18,15 +18,11 @@ const GENERIC_ERROR = "No se pudo guardar. Intenta más tarde.";
 const CANCELABLE_STATUSES: SubscriptionStatus[] = ["active", "trialing", "past_due"];
 
 const cancelInputSchema = z.object({
-  reason: z.enum([
-    "precio_muy_caro",
-    "no_tengo_tiempo",
-    "no_logre_objetivo",
-    "no_veo_resultados",
-    "encontre_otra_opcion",
-    "otro",
-    "prefiero_no_decir",
-  ]).optional(),
+  // Derivado, no recopiado: la lista vive UNA vez en `CLIENT_FACING_REASONS`.
+  // Escrita a mano aquí era la tercera copia del mismo enum —modal, esquema y
+  // CHECK— y D19 tuvo que tocar las tres para agregar un motivo. `pago_fallido`
+  // se queda fuera por construcción: no está en la lista de origen.
+  reason: z.enum(CLIENT_FACING_REASONS).optional(),
   detail: z.string().max(200).optional(),
 });
 

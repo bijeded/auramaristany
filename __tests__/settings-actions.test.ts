@@ -156,6 +156,20 @@ describe("cancelSubscription", () => {
     expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ reason: "prefiero_no_decir", source: "voluntary" });
   });
 
+  /**
+   * El esquema zod DERIVA su lista de `CLIENT_FACING_REASONS`, así que este
+   * rechazo no depende de que alguien se acordara de omitir `pago_fallido` al
+   * escribir el enum a mano: sale de que la baja involuntaria no es una opción
+   * de cliente. La política de insert de la 011 es la segunda reja.
+   */
+  it("rechaza 'pago_fallido': una baja involuntaria no se puede falsificar desde el cliente", async () => {
+    queryResults = { subscriptions: OWNED_SUB };
+    const r = await cancelSubscription({ reason: "pago_fallido" as never });
+    expect(r.ok).toBe(false);
+    expect(calls.find((c) => c.op === "insert")).toBeUndefined();
+    expect(stripeUpdate).not.toHaveBeenCalled();
+  });
+
   it("acepta 'prefiero_no_decir' elegido explícitamente", async () => {
     queryResults = { subscriptions: OWNED_SUB };
     const r = await cancelSubscription({ reason: "prefiero_no_decir" });

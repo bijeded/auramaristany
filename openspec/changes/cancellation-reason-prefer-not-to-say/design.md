@@ -50,9 +50,23 @@ This is a **breaking change to stored meaning**, and it is why the proposal says
 
 The hardcoded radio is rule 8's copied table expressed in JSX: a second list of options maintained by hand beside the real one. It is exactly how the modal came to offer an unstorable value, so leaving it in place while adding the enum would fix the symptom and keep the mechanism.
 
+### D3b — "Prefiero no decir" stops being greyed out
+
+The deleted radio carried `color: "var(--gris-texto)"`; options rendered from `CANCELLATION_REASON_OPTIONS` use the default text colour. So the option now looks like its peers instead of a de-emphasised escape hatch.
+
+Deliberate, not a side effect. Greying out the one option whose selection you actually store misrepresents it: declining is a real recorded answer now, not a way of skipping. Contrast improves rather than degrades. Recorded here so the next reader does not restore the de-emphasis by reflex.
+
 ### D4 — `reasonRequiresDetail` excludes the new value
 
 Asking a client who declined to answer to elaborate is a contradiction. `DETAIL_REASONS` stays `["encontre_otra_opcion", "otro"]`, and a test pins the exclusion so a future "make every reason expandable" pass has to argue with it.
+
+### D5b — One declaration for the reason list
+
+`CLIENT_FACING_REASONS` is the single source; `CANCELLATION_REASON_OPTIONS` and the server action's `z.enum` both derive from it.
+
+Adding one value to this change originally required editing the list in three places — the options array, the zod schema, and the DB `CHECK` — with a fourth copy in `seed-demo.ts` that this change deletes. Three hand-maintained copies of one enum is the same defect as the hardcoded radio, one layer down, and it is where the next drift would have landed. The validator copy fails *closed* (zod rejects with a generic error) rather than silently, so it is less dangerous than the `CHECK` mismatch — but it would deny a client a reason the screen is actively offering her.
+
+`pago_fallido` is now excluded by construction rather than by remembering to omit it: it is not in `CLIENT_FACING_REASONS`, so neither the modal offers it nor the schema accepts it.
 
 ### D5 — No spec delta for `admin-cancellation-analytics`
 
