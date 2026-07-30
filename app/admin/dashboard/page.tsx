@@ -142,11 +142,25 @@ export default async function AdminDashboardPage() {
   const revenueTotal = revenueByVariant.reduce((sum, r) => sum + r.total, 0);
 
   // Las dos cartas de fuga. Cada una sale de SU consulta y no se cuadran entre
-  // sí a propósito: la de variante cuenta filas de `subscriptions` y la de
-  // motivos cuenta filas de encuesta, que sobreviven al borrado de su
-  // suscripción (`on delete set null`). Es la misma divergencia deliberada de
-  // ADR 0004 que ya tienen "Clientes" e "Ingresos" por variante, y por eso cada
-  // carta dice sobre qué población saca su porcentaje.
+  // sí a propósito.
+  //
+  // OJO — la de motivos suele traer MÁS filas que la de variante, y no es un
+  // desajuste: es un DESFASE EN EL TIEMPO. La encuesta se escribe cuando una
+  // clienta decide irse; la baja se cuenta cuando ya se fue. En medio caben dos
+  // estados corrientes:
+  //   · ventana de gracia — canceló pero sigue `active` hasta que termine su
+  //     periodo (y si reactiva, su fila de encuesta se borra y nunca llega a
+  //     ser baja). Ya la cuenta el KPI "Cancelaciones (próx. 7 días)".
+  //   · `unpaid` — el webhook ya escribió su `pago_fallido`, pero Stripe aún no
+  //     borra la suscripción. Va en el denominador, no en el numerador.
+  // Mucho más raro: una encuesta que sobrevive a su suscripción borrada
+  // (`on delete set null`). En los datos demo son 5 bajas contra 7 encuestas —
+  // 5 idas, 1 en gracia, 1 impaga—, y ninguna por borrado.
+  //
+  // Es la misma divergencia deliberada de ADR 0004 que ya tienen "Clientes" e
+  // "Ingresos" por variante, y por eso cada carta dice sobre qué población saca
+  // su porcentaje. Cuadrarlas ensanchando la de bajas volvería la tasa "gente
+  // que quizá se vaya" — ver ADR 0006.
   const churnByVariant = groupChurnByVariant(churnSubs);
   const cancellationReasons = groupCancellationReasons(reasonSurveys);
   const dayMonth = now.toLocaleDateString("es-MX", { day: "numeric", month: "long" }); // "16 de junio"

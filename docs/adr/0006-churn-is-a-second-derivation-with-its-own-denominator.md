@@ -76,9 +76,27 @@ both numerator and denominator and leaves the chart standing.
   its numerator counts departures and its denominator is a people figure that deliberately
   includes graduations. ADR 0004's rule stands — a new KPI declares its side before it is
   written — with "a rate, and here is its denominator" now an available answer.
-- **The two churn cards' totals may legitimately differ.** Surveys outlive their subscriptions,
-  so the reasons card can exceed the variant card. Each card names its own population on screen;
-  reconciling them would mean adopting the worse data source.
+- **The two churn cards' totals differ routinely, and mostly for one reason: a timing lag.** A
+  survey row is written the moment a client *decides* to leave; the churn count includes her only
+  once she *has* left. Between those two moments she sits on the reasons card and not on the
+  variant card. Two states live in that gap, and both are ordinary rather than exceptional:
+
+  - **grace window** — she cancelled, her subscription is still `active` until the period ends,
+    she still has portal access, and she is already counted by the "Cancelaciones (próx. 7 días)"
+    KPI. If she reactivates, her survey row is deleted and she never becomes churn at all.
+  - **`unpaid`** — dunning exhausted, so the webhook wrote her `pago_fallido` survey, but Stripe
+    has not deleted the subscription yet. Per the denominator decision above, she is not churn.
+
+  A third, much rarer cause: a survey outlives its subscription
+  (`subscription_id` is `on delete set null`), so a deleted client keeps her reason and loses her
+  variant. On the demo dataset the split is 5 churned against 7 surveys — 5 departed, 1 in grace,
+  1 unpaid — and *none* of that gap comes from deletion.
+
+  This was mis-documented on first writing: the deletion case was named and the lag was not, which
+  is exactly backwards from how often each occurs. Anyone reconciling the two cards should reach
+  for the lag first. Reconciling them by widening the churn count is rejected — it would make the
+  rate mean "people who might leave", double-count anyone who reactivates, and break the ADR 0004
+  requirement that a figure declare its population.
 - **A small denominator produces a loud percentage.** One departure out of one subscription reads
   `1 (100%)`. Bars are scaled by count, so such a row sorts to the bottom. Whether a
   minimum-sample floor is worth adding is deferred until Aura has read the card with real numbers.

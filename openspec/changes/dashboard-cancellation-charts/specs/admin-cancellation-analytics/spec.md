@@ -130,7 +130,9 @@ Each of the two cards SHALL carry a subtitle naming the population its percentag
 
 Without the two subtitles the cards are a readability trap: side by side, both show `N (%)`, and a reader has no way to know that one percentage can exceed the other's scale or that the two sets of percentages sum to different things — the reasons column sums to 100% and the variant column does not.
 
-The two cards' totals SHALL NOT be forced into agreement. A survey row survives deletion of its subscription (`subscription_id` is `on delete set null`) while the churn count comes from `subscriptions`, so the reasons total may exceed the variant total. This is the same deliberate divergence already documented for "Clientes por variante" versus "Ingresos por variante" (ADR 0004), not a reconciliation defect.
+The two cards' totals SHALL NOT be forced into agreement, and the reasons total will routinely exceed the variant total. The dominant cause is a **timing lag**: a survey row is written when a client decides to leave, while the churn count includes her only once she has left. A client in her grace window (cancelled but still `active`) and a client in `unpaid` (survey written, subscription not yet deleted in Stripe) both appear on the reasons card and on neither side of the variant card's numerator. A survey outliving a deleted subscription (`subscription_id` is `on delete set null`) is a real but far rarer third cause.
+
+This is the same deliberate divergence already documented for "Clientes por variante" versus "Ingresos por variante" (ADR 0004), not a reconciliation defect. Widening the churn numerator to close the gap SHALL be rejected: it would make the rate mean "clients who might leave", double-count anyone who reactivates during her grace window, and contradict the requirement that each figure declare its population.
 
 Both cards SHALL state "Histórico completo", matching the existing income card, so neither is misread against the dashboard's rolling 7-day KPI cards.
 
@@ -141,6 +143,14 @@ Both cards SHALL state "Histórico completo", matching the existing income card,
 #### Scenario: Reasons card names its denominator
 - **WHEN** the reasons card renders
 - **THEN** its subtitle states that the percentage is of the total cancellations, and that the window is the full history
+
+#### Scenario: Totals diverge while a cancellation is still in its grace window
+- **WHEN** a client has cancelled but her subscription is still `active` until the period ends
+- **THEN** her reason is counted on the reasons card while she is absent from the variant card's numerator, because she has not left yet
+
+#### Scenario: Totals diverge for a client whose payments failed
+- **WHEN** a client is `unpaid` and the webhook has written her `pago_fallido` survey
+- **THEN** her reason is counted on the reasons card while she counts only toward the variant card's denominator
 
 #### Scenario: Totals diverge after a client is deleted
 - **WHEN** a churned client's subscription row is deleted while her survey row remains
