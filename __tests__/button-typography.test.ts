@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { buttonVariants } from "@/components/ui/button";
 
 /**
@@ -33,5 +35,28 @@ describe("tipografía base del botón", () => {
     for (const variant of ["default", "destructive", "outline", "secondary", "ghost", "link"] as const) {
       expect(buttonVariants({ variant })).toContain("font-head");
     }
+  });
+});
+
+/**
+ * `buttonVariants` sólo cubre los ~10 <Button> de shadcn. La otra mitad de la
+ * decisión — la regla `button` de globals.css — cubre los ~93 <button> planos,
+ * que son la mayoría del problema, y no la veía ninguna prueba: un borrado
+ * accidental pasaba tsc, lint, el build y toda la suite en verde.
+ *
+ * Esto es una aserción sobre el TEXTO del archivo, no sobre el render. Mismo
+ * patrón que middleware-matcher.test.ts, y por la misma razón: la única
+ * alternativa sería maquetar, y jsdom no maqueta.
+ */
+describe("regla base de globals.css", () => {
+  const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+
+  it("declara la fuente de titulares para todo <button>", () => {
+    expect(css).toMatch(/button\s*\{[^}]*font-family:\s*var\(--font-head\)/);
+  });
+
+  it("usa el token, no la pila literal", () => {
+    const rule = css.match(/\nbutton\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(rule).not.toMatch(/Oswald/);
   });
 });

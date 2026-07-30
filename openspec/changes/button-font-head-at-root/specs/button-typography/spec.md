@@ -51,13 +51,22 @@ The default SHALL be expressed at a specificity that an explicit `font-body` uti
 - **THEN** the reason it departs from the default is recorded at that site or in this spec
 - **AND** an undeclared button is unambiguously a default, not a silent exception
 
-**Recorded reason for the current exceptions.** The 31 buttons that declare `font-body` are dense admin controls rendered at 12–13.5px: table pagination (`Anterior` / `Siguiente` on the clients and payments lists), `Exportar CSV`, the rich-text editor toolbars, and the modal `Cancelar` / `Guardar` pairs in the onboarding editor. Oswald is a condensed face and is hardest to read at exactly those sizes, so they stay in Hind. This was reviewed button by button at 375px during this change and confirmed deliberate — it is a decision, not an oversight. They are all admin-facing; no client-facing button takes this exception.
+**Recorded reason for the current exceptions.** The 31 buttons that declare `font-body` are dense admin controls rendered at 12–13.5px: table pagination (`Anterior` / `Siguiente` on the clients and payments lists), `Exportar CSV`, the rich-text editor toolbars, and the modal `Cancelar` / `Guardar` pairs in the onboarding editor. Oswald is a condensed face and is hardest to read at exactly those sizes, so they stay in Hind. This was reviewed button by button at 375px during this change and confirmed deliberate — it is a decision, not an oversight.
+
+Every one of these is **admin-facing**, and that is the line: a control an admin uses dozens of times a day at 13px optimizes for legibility, while a client-facing call to action optimizes for matching the buttons beside it. No client-facing button or CTA takes this exception.
 
 ### Requirement: A link styled as a button keeps its font declared at the call site
 
-Several primary calls to action are `<Link>` or `<a>` elements styled to look like buttons — the graduated-client CTA, the `sin-suscripcion` CTA, and the two checkout CTAs. The base-layer default is scoped to the `button` element and therefore SHALL NOT reach them.
+Several calls to action are `<Link>` or `<a>` elements styled to look like buttons. The base-layer default is scoped to the `button` element and therefore SHALL NOT reach any of them: an anchor's font is decided **only** by its own class.
 
-These call sites SHALL keep their explicit `font-head` declaration. Removing it as "redundant" would silently return them to the body font, reintroducing on the marketing and checkout path exactly the defect this change removes elsewhere.
+The population is defined by **styling, not by which class it already carries** — every `<Link>`/`<a>` that is dressed as a button, regardless of whether it currently says `font-head` or `font-body`. Enumerating it as "the anchors that carry `font-head`" is the review-rule-21 error one level out, and it hid five link CTAs on the first pass.
+
+Two groups, both SHALL be kept correct:
+
+- **Already declaring `font-head`** — the graduated-client CTA, the `sin-suscripcion` CTA, and the two checkout CTAs. These SHALL keep the declaration. Removing it as "redundant" would silently return them to the body font, reintroducing on the marketing and checkout path exactly the defect this change removes elsewhere.
+- **Client-facing CTAs that declared `font-body`** — `Agendar mi llamada` (`AgendarBlock`) and `Volver a Hoy` (`/portal/booking`), both full lavender primaries at `minHeight: 48`. These SHALL declare `font-head`. Before this change they matched the unmarked buttons beside them because both rendered in Hind; making buttons Oswald without moving these would **introduce** a mismatch on a client-facing screen — the same defect this change exists to remove.
+
+Admin-facing link CTAs (`Enviar mensaje`, `Enviar WhatsApp`, `+ Nuevo mensaje`, the content-runway link) stay in `font-body`, under the same admin-density exception recorded above.
 
 #### Scenario: A link CTA is not touched by the button default
 - **WHEN** the `font-head` on a link-styled CTA is removed on the assumption that the base now covers it
@@ -67,6 +76,16 @@ These call sites SHALL keep their explicit `font-head` declaration. Removing it 
 #### Scenario: Link CTAs still match real buttons after the change
 - **WHEN** a client views the checkout CTAs and the `sin-suscripcion` CTA
 - **THEN** they render in Oswald, from their own explicit declaration, matching the buttons elsewhere in the product
+
+#### Scenario: A client-facing link CTA beside a real button
+- **WHEN** a client views `Agendar mi llamada` on their day, or `Volver a Hoy` on the booking screen
+- **THEN** it renders in Oswald, matching the buttons on the same screen
+- **AND** it did not stay in Hind while the buttons around it changed
+
+#### Scenario: The link-CTA population is enumerated by styling
+- **WHEN** the set of button-styled anchors is derived
+- **THEN** it includes every `<Link>`/`<a>` dressed as a button, whichever font class it currently carries
+- **AND** it is not derived from the anchors that happen to already declare `font-head`
 
 ### Requirement: Button weight is decided once, with the font
 
