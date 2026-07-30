@@ -2,6 +2,7 @@ import { Check } from "lucide-react";
 import type { ReadOnlyExercise } from "./ExerciseListReadOnly";
 import type { ExercisesDone } from "@/lib/content/history-helpers";
 import { formatRestLabel } from "@/lib/content/rest-label";
+import { formatSetsReps } from "@/lib/content/sets-reps-label";
 
 const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   reps_done: { label: "Reps", unit: "" },
@@ -55,8 +56,11 @@ export function ExerciseListLogged({
               )}
             </div>
 
-            <p className="font-body mt-1" style={{ fontSize: 13, color: "var(--gris-texto)" }}>
-              Meta: {ex.sets}×{ex.reps}
+            <p
+              className="font-body mt-1"
+              style={{ fontSize: 13, color: "var(--gris-texto)", overflowWrap: "break-word" }}
+            >
+              Meta: {formatSetsReps(ex.sets, ex.reps)}
               {ex.rest_seconds != null && <> · Descanso: {formatRestLabel(ex.rest_seconds)}</>}
             </p>
 

@@ -4,6 +4,7 @@ import { Play, Check } from "lucide-react";
 import { useState } from "react";
 import type { ExerciseFormState, ExerciseSeriesEntry, WeightUnit } from "@/hooks/useProgressForm";
 import { formatRestLabel } from "@/lib/content/rest-label";
+import { formatSetsReps } from "@/lib/content/sets-reps-label";
 
 export interface Exercise {
   id: string;
@@ -312,9 +313,13 @@ export function ExerciseListBlock({ content, formState, weightUnits, onUpdateCom
                     fontWeight: 600,
                     background: "var(--lavanda-tint)",
                     color: "var(--lavanda-dark)",
+                    // reps is authored free text: wrap it, and allow the flex
+                    // child to shrink or overflow-wrap stays inert.
+                    overflowWrap: "break-word",
+                    minWidth: 0,
                   }}
                 >
-                  {ex.sets} × {ex.reps}
+                  {formatSetsReps(ex.sets, ex.reps)}
                 </span>
                 <span
                   className="font-body rounded-full px-3 py-1"

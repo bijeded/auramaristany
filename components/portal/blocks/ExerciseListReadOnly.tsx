@@ -1,4 +1,5 @@
 import { formatRestLabel } from "@/lib/content/rest-label";
+import { formatSetsReps } from "@/lib/content/sets-reps-label";
 
 export interface ReadOnlyExercise {
   id: string;
@@ -36,8 +37,11 @@ export function ExerciseListReadOnly({ content }: { content: ExerciseListReadOnl
             {ex.name}
           </p>
 
-          <p className="font-body mt-1" style={{ fontSize: 13, color: "var(--gris-texto)" }}>
-            Meta: {ex.sets}×{ex.reps}
+          <p
+            className="font-body mt-1"
+            style={{ fontSize: 13, color: "var(--gris-texto)", overflowWrap: "break-word" }}
+          >
+            Meta: {formatSetsReps(ex.sets, ex.reps)}
             {ex.rest_seconds != null && (
               <>
                 {" · "}
