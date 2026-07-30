@@ -36,6 +36,6 @@
 ## 6. Ship
 
 - [x] 6.1 Run `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build`. Note in the PR that all four pass in either state — none of them lay out text, so they are not evidence the change works.
-- [ ] 6.2 Obtain a `code-review` verdict. No `security-review` expected: no database, auth, RLS, Stripe, webhook, cron or email surface is touched — state that explicitly rather than implying a verdict exists.
-- [ ] 6.3 Open the PR with the before/after screenshots at 375px, the confirmed weight from 4.1, and the `font-body` decisions from 4.2.
+- [x] 6.2 Obtain a `code-review` verdict. No `security-review` expected: no database, auth, RLS, Stripe, webhook, cron or email surface is touched — state that explicitly rather than implying a verdict exists.
+- [x] 6.3 Open the PR with the before/after screenshots at 375px, the confirmed weight from 4.1, and the `font-body` decisions from 4.2.
 - [x] 6.4 Add a backlog row for the deferred token duplication: `tailwind.config.ts:67` hard-codes the `Oswald`/`Hind` stacks instead of referencing `var(--font-head)` / `var(--font-body)`, so the tokens live in two places and can drift.
