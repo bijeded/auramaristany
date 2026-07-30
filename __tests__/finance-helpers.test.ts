@@ -110,7 +110,7 @@ describe("groupRevenueByProgram", () => {
 });
 
 // ---------------------------------------------------------------------------
-// A11: computeRenewalsWithinDays (generalization of computeRenewalsThisMonth)
+// A11 / D17: computeRenewalsWithinDays (el envoltorio de 30 días se retiró en D17)
 // ---------------------------------------------------------------------------
 
 
