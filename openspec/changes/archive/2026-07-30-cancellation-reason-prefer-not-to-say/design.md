@@ -90,7 +90,7 @@ The end-to-end wire — modal → server action → row written against a **real
 
 Why it is a narrow risk rather than a leap: both halves are proven separately. A client-session insert of `prefiero_no_decir` returned 201 against production, so the database accepts it through the same RLS policy the action uses; the payload logic (`reason ?? "prefiero_no_decir"`, detail dropped, `pago_fallido` rejected) is unit-tested with Stripe mocked; and the modal's render was confirmed by screenshot. What is unproven is only that those pieces are wired together — and no line of this diff changes that wiring.
 
-It could not be verified cheaply because demo subscriptions carry synthetic Stripe ids (**D27**), so `cancelSubscription` 404s before reaching the insert. That is a property of the demo data, not of this change.
+It could not be verified cheaply because demo subscriptions carry synthetic Stripe ids (**D28**), so `cancelSubscription` 404s before reaching the insert. That is a property of the demo data, not of this change.
 
 **What the first real cancellation will reveal, if anything is wrong:** the client sees the generic error and no survey row is written. It cannot corrupt data or half-complete — Stripe runs first, and the insert failure is swallowed after the cancellation already succeeded.
 
