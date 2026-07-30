@@ -97,6 +97,7 @@ Visual source: **`design-handoff-aura/`** — hi-fi prototype (17 screens, build
 - **Recreate** the UI with the project's libraries (shadcn/Tailwind/Recharts/dnd-kit) — **do not** copy the prototype's JSX (it uses in-browser Babel, not production code).
 - **Copy:** warm, 1st person ("Mi progreso"), celebrates achievements, no jargon; **avoid "bienestar"**.
 - **Prototype domain rules (honored):** 1 video per exercise; per-set logging (reps + weight, N rows = N sets); **never** body metrics (progress photos OK); exercises in cards; black logo on light backgrounds; buttons ≥48px / tap targets ≥44px; skeletons (no spinners).
+  - ⚠ **One documented exception:** the `kg | lb` weight-unit toggle is 32px tall by explicit decision (visually too heavy at 44px next to the compact "Mi registro" header). Scoped to that one control — see `portal-exercise-display` / `portal-performance-display`. Every other tap target keeps the floor above.
 - **Colors come from tokens in `app/globals.css`**, never hand-written hex. If the token is missing, add it — a raw hex in a component means the token system had a gap (D23). Check contrast: 4.5:1 normal text, 3:1 large.
 - ⚠ **The prototype is the original; the domain evolved.** Where the prototype and `SPEC.md`/code differ on **logic** (e.g. "Mes·Semana" not "Día X de 180"; 4×7 grid not 6×30; Desempeño with no stat cards; no day-type selector), **`SPEC.md` + the shipped code wins**. The prototype wins on **look & feel** (tokens, components, tone).
 
