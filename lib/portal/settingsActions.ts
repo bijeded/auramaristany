@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { validatePhone } from "@/lib/auth/phone";
 import { stripe } from "@/lib/stripe";
 import { sanitizePlainText } from "@/lib/admin/sanitize-html";
-import { reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
+import { CLIENT_FACING_REASONS, reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { createClient as createStatelessClient } from "@supabase/supabase-js";
 
@@ -18,14 +18,11 @@ const GENERIC_ERROR = "No se pudo guardar. Intenta más tarde.";
 const CANCELABLE_STATUSES: SubscriptionStatus[] = ["active", "trialing", "past_due"];
 
 const cancelInputSchema = z.object({
-  reason: z.enum([
-    "precio_muy_caro",
-    "no_tengo_tiempo",
-    "no_logre_objetivo",
-    "no_veo_resultados",
-    "encontre_otra_opcion",
-    "otro",
-  ]).optional(),
+  // Derivado, no recopiado: la lista vive UNA vez en `CLIENT_FACING_REASONS`.
+  // Escrita a mano aquí era la tercera copia del mismo enum —modal, esquema y
+  // CHECK— y D19 tuvo que tocar las tres para agregar un motivo. `pago_fallido`
+  // se queda fuera por construcción: no está en la lista de origen.
+  reason: z.enum(CLIENT_FACING_REASONS).optional(),
   detail: z.string().max(200).optional(),
 });
 
@@ -105,13 +102,24 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
   // Optimistic local mirror; handleSubscriptionUpdated remains the source of truth.
   await supabase.from("subscriptions").update({ cancel_at_period_end: true }).eq("id", sub.id);
 
-  // Record the survey (best-effort telemetry). reason omitted → default "otro".
-  // A failure here must not fail the cancellation, which already succeeded — so no
-  // orphan survey row can exist for a cancellation that didn't happen.
+  // Record the survey (best-effort telemetry). A failure here must not fail the
+  // cancellation, which already succeeded — so no orphan survey row can exist for
+  // a cancellation that didn't happen.
+  //
+  // OJO, ése es el precio de tragarse el error: si el valor no está en el CHECK
+  // de `cancellation_surveys.reason`, el insert se rechaza y la fila se pierde
+  // EN SILENCIO —ni el cliente, ni Aura, ni CI ven nada—. Por eso la migración
+  // que agrega un motivo va SIEMPRE antes que el código que lo nombra (D19,
+  // migración 019). No "arregles" esto propagando el error: lo correcto es no
+  // desplegar un valor que la base no acepta.
+  //
+  // D19 — sin razón, `prefiero_no_decir` y no "otro": confirmar sin elegir nada
+  // ES no querer decirlo. Guardarlo como "Otro" mezclaba a quien declinaba con
+  // quien daba un motivo fuera de la lista, y son respuestas opuestas.
   const { error: insertError } = await supabase.from("cancellation_surveys").insert({
     profile_id: user.id,
     subscription_id: sub.id,
-    reason: reason ?? "otro",
+    reason: reason ?? "prefiero_no_decir",
     detail,
     source: "voluntary",
   });

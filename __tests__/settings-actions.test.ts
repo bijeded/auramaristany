@@ -143,11 +143,44 @@ describe("cancelSubscription", () => {
     expect(stripeUpdate).toHaveBeenCalledWith("sub_stripe_1", { cancel_at_period_end: true });
   });
 
-  it("sin razón usa 'otro' y sigue cancelando", async () => {
+  /**
+   * D19 — confirmar sin elegir nada ES no querer decirlo, así que se guarda
+   * como tal. Antes caía en 'otro' y quedaba indistinguible de quien sí dio un
+   * motivo que la lista no cubría: dos poblaciones opuestas en la misma barra
+   * del dashboard.
+   */
+  it("sin razón guarda 'prefiero_no_decir' y sigue cancelando", async () => {
     queryResults = { subscriptions: OWNED_SUB };
     const r = await cancelSubscription({});
     expect(r.ok).toBe(true);
-    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ reason: "otro", source: "voluntary" });
+    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ reason: "prefiero_no_decir", source: "voluntary" });
+  });
+
+  /**
+   * El esquema zod DERIVA su lista de `CLIENT_FACING_REASONS`, así que este
+   * rechazo no depende de que alguien se acordara de omitir `pago_fallido` al
+   * escribir el enum a mano: sale de que la baja involuntaria no es una opción
+   * de cliente. La política de insert de la 011 es la segunda reja.
+   */
+  it("rechaza 'pago_fallido': una baja involuntaria no se puede falsificar desde el cliente", async () => {
+    queryResults = { subscriptions: OWNED_SUB };
+    const r = await cancelSubscription({ reason: "pago_fallido" as never });
+    expect(r.ok).toBe(false);
+    expect(calls.find((c) => c.op === "insert")).toBeUndefined();
+    expect(stripeUpdate).not.toHaveBeenCalled();
+  });
+
+  it("acepta 'prefiero_no_decir' elegido explícitamente", async () => {
+    queryResults = { subscriptions: OWNED_SUB };
+    const r = await cancelSubscription({ reason: "prefiero_no_decir" });
+    expect(r).toEqual({ ok: true });
+    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ reason: "prefiero_no_decir", source: "voluntary", detail: null });
+  });
+
+  it("no guarda detalle junto a 'prefiero_no_decir'", async () => {
+    queryResults = { subscriptions: OWNED_SUB };
+    await cancelSubscription({ reason: "prefiero_no_decir", detail: "algo que sí quiso escribir" });
+    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ detail: null });
   });
 
   it("sanitiza y guarda el detalle en razones de texto libre", async () => {

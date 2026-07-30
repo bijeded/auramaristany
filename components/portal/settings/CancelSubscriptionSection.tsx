@@ -97,6 +97,15 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
 }
 
 function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  /**
+   * `null` = todavía no ha elegido nada. UN solo significado desde D19: antes
+   * cargaba dos —"no ha elegido" y "eligió Prefiero no decir"—, indistinguibles
+   * dentro del componente. Ese segundo significado ya tiene valor propio.
+   *
+   * Se queda nullable porque el modal abre sin nada seleccionado y la encuesta
+   * es opcional: confirmar así manda `reason: undefined`, y el servidor lo
+   * guarda como `prefiero_no_decir`, que es exactamente lo que pasó.
+   */
   const [reason, setReason] = useState<CancellationReason | null>(null);
   const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -161,16 +170,8 @@ function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: (
               {opt.label}
             </label>
           ))}
-          <label className="flex items-center gap-2.5 cursor-pointer font-body" style={{ fontSize: 14, minHeight: 44, color: "var(--gris-texto)" }}>
-            <input
-              type="radio"
-              name="cancel-reason"
-              checked={reason === null}
-              onChange={() => setReason(null)}
-              className="w-4 h-4"
-            />
-            Prefiero no decir
-          </label>
+          {/* Toda opción sale de `CANCELLATION_REASON_OPTIONS` — ver su docblock
+              y la regla 8 de CLAUDE.md. Ninguna se escribe aquí. */}
         </div>
 
         {showDetail && (

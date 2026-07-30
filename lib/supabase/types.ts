@@ -21,6 +21,11 @@ export type CancellationReason =
   | "no_veo_resultados"
   | "encontre_otra_opcion"
   | "otro"
+  /** D19 — declinar NO es "Otro". Un motivo que la lista no cubre y un cliente
+   *  que decide no darlo piden respuestas opuestas, y la tarjeta "Razones de
+   *  cancelación" los pintaba en la misma barra. Espejo del CHECK de la
+   *  migración 019: los dos se mueven juntos o el insert se pierde en silencio. */
+  | "prefiero_no_decir"
   | "pago_fallido";
 export type CancellationSource = "voluntary" | "involuntary";
 export type BookingStatus = "active" | "canceled";

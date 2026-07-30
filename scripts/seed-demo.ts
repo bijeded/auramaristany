@@ -23,6 +23,11 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+// La unión se IMPORTA, no se recopia. El seed llevaba su propia copia a mano
+// desde que se escribió: dos uniones sobre un mismo CHECK, y sólo una se
+// entera cuando llega un motivo nuevo (regla 8). D19 agregó 'prefiero_no_decir'
+// y la copia no se habría enterado.
+import type { CancellationReason } from '../lib/supabase/types'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -184,15 +189,6 @@ const SCENARIO_STATUS: Record<Exclude<Scenario, 'no_subscription'>, string> = {
   unpaid: 'unpaid',
   incomplete_expired: 'incomplete_expired',
 }
-
-type CancellationReason =
-  | 'precio_muy_caro'
-  | 'no_tengo_tiempo'
-  | 'no_logre_objetivo'
-  | 'no_veo_resultados'
-  | 'encontre_otra_opcion'
-  | 'otro'
-  | 'pago_fallido'
 
 type ClientDef = {
   name: string
