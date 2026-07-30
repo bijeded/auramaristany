@@ -23,7 +23,7 @@
 - [ ] 4.3 Delete `components/admin/ProgramRevenueDonut.tsx`.
 - [ ] 4.4 Replace the "Ingresos por programa" card with "Ingresos por variante": heading plus the grand total via `formatMXN`, a subtitle stating the all-time window, and `<VariantBarList fill="var(--rosa-bar)" …>` with `display={formatMXN(total)}` and its own empty message. Wire the data through `getRevenueByVariantAllTime` → `groupRevenueByVariant` → `orderRevenueByClientsOrder(…, clientsByVariant)`; add the query to the existing `Promise.all`.
 - [ ] 4.5 Keep the flex row's `alignItems: "stretch"` so the two cards stay equal height with uneven lists; do not switch to `flex-start` or distribute rows.
-- [ ] 4.6 Confirm no `#9982f4` literal remains anywhere in `app/` or `components/`.
+- [ ] 4.6 Confirm no `#9982f4` literal remains **in the two variant cards** (`app/admin/dashboard/page.tsx`, the deleted `ProgramRevenueDonut.tsx`). Scoped deliberately: `#9982f4` also appears in `components/admin/RevenueBarChart.tsx`, `components/portal/PerformanceChart.tsx` and `components/admin/blocks/TextBlockEditor.tsx`, none of which this change touches — see the D23 follow-up note at the end of this file. `app/globals.css` keeps the literal as the `--lavanda` token *definition*, which is correct.
 - [ ] 4.7 Now that no caller remains, delete `groupRevenueByProgram`, the `ProgramRevenue` interface, and their block in `__tests__/finance-helpers.test.ts`. Confirm no remaining references (`rg 'groupRevenueByProgram|ProgramRevenue\b' lib app components __tests__`).
 
 ## 5. Verification
@@ -40,3 +40,10 @@
 - [ ] 6.2 `code-review` verdict (required). No `security-review`: read-only, admin-only behind the existing `requireAdminPage()`, no new input and no new write.
 - [ ] 6.3 After merge, `/opsx:sync` (rewrites the "Revenue by program" requirement in `openspec/specs/admin-dashboard-kpis/spec.md`), `openspec validate`, then `/opsx:archive` and delete the row in `BACKLOG.md` if one exists.
 - [ ] 6.4 Re-index codebase memory in `fast` mode so the graph does not keep the deleted symbols.
+
+---
+
+## Deferred (out of scope for this change)
+
+**D23 follow-up — three remaining `#9982f4` literals.** Found while doing task 4.6, not fixed here: `components/admin/RevenueBarChart.tsx:25` (bar fill), `components/portal/PerformanceChart.tsx:63` (line stroke + dot stroke), `components/admin/blocks/TextBlockEditor.tsx:17` (a color-picker swatch, where a literal is arguably correct since the value is stored as content). The first two are the same contrast defect this change fixes on the dashboard cards — `#9982f4` is 2.81:1 against `--gris-claro` and 3.09:1 against white — so `RevenueBarChart` in particular is a bar fill that does not clear WCAG 1.4.11. Not fixed here because this change's Step 1 scope names `RevenueBarChart.tsx` as must-not-touch, and widening mid-flight is what the scope-creep rule forbids. Worth its own small change.
+

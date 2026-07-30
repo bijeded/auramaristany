@@ -3,6 +3,7 @@ import {
   getPaidInvoices,
   getPastDueCount,
   getRecentPayments,
+  getRevenueByVariantAllTime,
 } from "@/lib/admin/finance-queries";
 import {
   computeMRR,
@@ -10,11 +11,12 @@ import {
   partitionByOutcome,
   groupClientsByVariant,
   groupRevenueByMonth,
-  groupRevenueByProgram,
+  groupRevenueByVariant,
+  orderRevenueByClientsOrder,
   formatMXN,
 } from "@/lib/admin/finance-helpers";
 import { RevenueBarChart } from "@/components/admin/RevenueBarChart";
-import { ProgramRevenueDonut } from "@/components/admin/ProgramRevenueDonut";
+import { VariantBarList } from "@/components/admin/VariantBarList";
 import Link from "next/link";
 import { STATUS_LABEL } from "@/lib/admin/payment-status";
 import { requireAdminPage } from "@/lib/admin/auth";
@@ -92,11 +94,12 @@ function cohortHref(label: string): string {
 export default async function AdminDashboardPage() {
   await requireAdminPage();
   const now = new Date();
-  const [activeSubs, invoices, pastDue, recent] = await Promise.all([
+  const [activeSubs, invoices, pastDue, recent, variantInvoices] = await Promise.all([
     getActiveSubscriptions(),
     getPaidInvoices(12),
     getPastDueCount(),
     getRecentPayments(10),
+    getRevenueByVariantAllTime(),
   ]);
 
   // D17 — la partición se hace UNA vez y de ella cuelgan las tres tarjetas de
@@ -118,8 +121,17 @@ export default async function AdminDashboardPage() {
   // Headcount y variantes van sobre TODAS las activas, incluidas las que
   // terminan: siguen teniendo acceso al portal y siguen entrenando.
   const clientsByVariant = groupClientsByVariant(activeSubs);
-  const revenueByProgram = groupRevenueByProgram(invoices);
-  const maxClients = Math.max(1, ...clientsByVariant.map((p) => p.count));
+
+  // Ingreso histórico completo, ordenado contra la tarjeta de clientes. Las dos
+  // listas pueden diferir en largo y en miembros: una variante puede tener
+  // clientes y no haber facturado todavía, u otra haber facturado y no tener ya
+  // ningún cliente activo. Es la divergencia de ADR 0004 hecha visible, no un
+  // desajuste que haya que cuadrar.
+  const revenueByVariant = orderRevenueByClientsOrder(
+    groupRevenueByVariant(variantInvoices),
+    clientsByVariant
+  );
+  const revenueTotal = revenueByVariant.reduce((sum, r) => sum + r.total, 0);
   const dayMonth = now.toLocaleDateString("es-MX", { day: "numeric", month: "long" }); // "16 de junio"
   const dateLabel = `${dayMonth}, ${now.getFullYear()}`; // "16 de junio, 2026"
 
@@ -179,24 +191,27 @@ export default async function AdminDashboardPage() {
       <div className="flex" style={{ gap: 16, marginBottom: 18, alignItems: "stretch" }}>
         <Card style={{ flex: 1 }}>
           <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Clientes por variante</h3>
-          <div className="flex flex-col" style={{ gap: 16 }}>
-            {clientsByVariant.length === 0 && <p className="font-body" style={{ fontSize: 13, color: "var(--gris-texto)" }}>Sin suscripciones activas</p>}
-            {clientsByVariant.map((p) => (
-              <div key={p.variant}>
-                <div className="flex" style={{ justifyContent: "space-between", marginBottom: 6 }}>
-                  <span className="font-body" style={{ fontSize: 13, fontWeight: 600 }}>{p.variant}</span>
-                  <span className="font-body" style={{ fontSize: 13, fontWeight: 600 }}>{p.count}</span>
-                </div>
-                <div style={{ height: 8, borderRadius: 4, background: "var(--gris-claro)" }}>
-                  <div style={{ height: 8, borderRadius: 4, width: `${(p.count / maxClients) * 100}%`, background: "#9982f4" }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <VariantBarList
+            rows={clientsByVariant.map((p) => ({ label: p.variant, value: p.count, display: String(p.count) }))}
+            fill="var(--lavanda-dark)"
+            emptyMessage="Sin suscripciones activas"
+          />
         </Card>
         <Card style={{ flex: 1 }}>
-          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>Ingresos por programa</h3>
-          <ProgramRevenueDonut data={revenueByProgram} />
+          <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>
+            Ingresos por variante {revenueByVariant.length > 0 && <>· {formatMXN(revenueTotal)}</>}
+          </h3>
+          {/* La ventana va dicha, no implícita: la tarjeta de al lado es una foto
+              de hoy y ésta es el acumulado de siempre. Sin la línea, dos listas
+              con el mismo eje parecen cubrir el mismo periodo. */}
+          <p className="font-body" style={{ fontSize: 12, color: "var(--gris-texto)", marginBottom: 16 }}>
+            Histórico completo
+          </p>
+          <VariantBarList
+            rows={revenueByVariant.map((r) => ({ label: r.variant, value: r.total, display: formatMXN(r.total) }))}
+            fill="var(--rosa-bar)"
+            emptyMessage="Aún no hay pagos registrados"
+          />
         </Card>
       </div>
 

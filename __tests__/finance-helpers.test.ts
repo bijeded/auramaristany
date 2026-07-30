@@ -4,7 +4,6 @@ import {
   computeMRR,
   groupRevenueByMonth,
   groupClientsByVariant,
-  groupRevenueByProgram,
   groupRevenueByVariant,
   orderRevenueByClientsOrder,
   computeRenewalsWithinDays,
@@ -87,27 +86,6 @@ describe("groupClientsByVariant", () => {
   });
   it("devuelve [] sin suscripciones", () => {
     expect(groupClientsByVariant([])).toEqual([]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Task 5: groupRevenueByProgram
-// ---------------------------------------------------------------------------
-
-describe("groupRevenueByProgram", () => {
-  it("suma amount_paid por programa, orden descendente", () => {
-    const invoices = [
-      { amount_paid: 990, invoice_date: "2026-06-01T00:00:00Z", program_name: "CuarentaMás" },
-      { amount_paid: 990, invoice_date: "2026-06-01T00:00:00Z", program_name: "CuarentaMás" },
-      { amount_paid: 1490, invoice_date: "2026-06-01T00:00:00Z", program_name: "Strong & Fit" },
-    ];
-    expect(groupRevenueByProgram(invoices)).toEqual([
-      { program: "CuarentaMás", total: 1980 },
-      { program: "Strong & Fit", total: 1490 },
-    ]);
-  });
-  it("devuelve [] sin invoices", () => {
-    expect(groupRevenueByProgram([])).toEqual([]);
   });
 });
 

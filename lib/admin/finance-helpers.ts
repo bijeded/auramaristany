@@ -101,7 +101,6 @@ export interface FinanceVariantInvoiceRow {
 
 export interface MonthRevenue { key: string; label: string; total: number }
 export interface VariantCount { variant: string; count: number }
-export interface ProgramRevenue { program: string; total: number }
 export interface VariantRevenue { variant: string; total: number }
 
 // ---------------------------------------------------------------------------
@@ -167,18 +166,6 @@ export function groupClientsByVariant(subs: { variant_name: string }[]): Variant
   return Array.from(counts.entries())
     .map(([variant, count]) => ({ variant, count }))
     .sort((a, b) => b.count - a.count);
-}
-
-// ---------------------------------------------------------------------------
-// Task 5: groupRevenueByProgram
-// ---------------------------------------------------------------------------
-
-export function groupRevenueByProgram(invoices: FinanceInvoiceRow[]): ProgramRevenue[] {
-  const totals = new Map<string, number>();
-  for (const inv of invoices) totals.set(inv.program_name, (totals.get(inv.program_name) ?? 0) + inv.amount_paid);
-  return Array.from(totals.entries())
-    .map(([program, total]) => ({ program, total }))
-    .sort((a, b) => b.total - a.total);
 }
 
 // ---------------------------------------------------------------------------
