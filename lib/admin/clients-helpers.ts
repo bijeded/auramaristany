@@ -1,7 +1,7 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
 import { deriveCancellationState } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
-import { dayLabel } from "@/lib/admin/date-helpers";
+import { dayLabel, daysBetween } from "@/lib/admin/date-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
 /**
@@ -148,16 +148,6 @@ export interface ClientListRow {
    */
   completed_at: string | null;
   last_activity_date: string | null; // max progress_logs.log_date (YYYY-MM-DD) o null
-}
-
-/**
- * Días completos transcurridos entre dos fechas date-only, en UTC (evita desfase
- * de zona horaria — lección EDGE-3). Ignora la parte de hora si viene un ISO completo.
- */
-function daysBetween(fromISO: string, toISO: string): number {
-  const from = Date.parse(`${fromISO.slice(0, 10)}T00:00:00Z`);
-  const to = Date.parse(`${toISO.slice(0, 10)}T00:00:00Z`);
-  return Math.floor((to - from) / 86_400_000);
 }
 
 /**
@@ -349,9 +339,14 @@ function csvCell(value: string): string {
 }
 
 export function clientsToCSV(rows: ClientListRow[]): string {
-  const header = "Nombre,Email,Programa,Variante,Estado,Inscripción";
+  // El encabezado y el arreglo de abajo son POSICIONALES: una columna añadida a
+  // uno y no al otro desalinea el CSV entero sin que nada falle.
+  // Se exporta `last_activity_date` crudo, no "hace 21 días": la etiqueta
+  // relativa se congela al exportar y miente al día siguiente, y una hoja de
+  // cálculo ordena y filtra por fecha, no por prosa.
+  const header = "Nombre,Email,Programa,Variante,Estado,Inscripción,Último acceso";
   const lines = rows.map((r) =>
-    [r.full_name, r.email, r.program_name, r.variant_name, statusBadge(r.status).label, r.enrollment_date]
+    [r.full_name, r.email, r.program_name, r.variant_name, statusBadge(r.status).label, r.enrollment_date, r.last_activity_date ?? ""]
       .map(csvCell)
       .join(",")
   );

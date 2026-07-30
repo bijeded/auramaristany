@@ -50,6 +50,16 @@
      la tarjeta no sirve para una barra — la pista es su color adyacente. */
   --ambar: #9a7b1f;
   --ambar-tint: rgba(240, 198, 116, 0.18);
+  /* "Lleva días sin registrar" en la columna Último acceso del listado de
+     clientes. Familia ámbar a propósito —es atención, no error: la cliente no
+     tiene ningún problema de cobro, simplemente no ha entrado.
+     NO reutiliza --ambar por CONTRASTE, no por semántica: #9a7b1f da 4.02:1
+     sobre blanco y la celda es texto normal de 11.5–13px, que pide 4.5:1. Éste
+     da 5.00:1 sobre el blanco de la fila y 4.58:1 sobre --gris-claro, así que
+     también aguanta el encabezado y cualquier fila teñida.
+     --ambar sigue siendo el de "todavía puede cobrar" (pausada, impaga); son
+     dos preguntas distintas y no deben compartir color por accidente. */
+  --inactivo: #8d6a12;
   --font-head: 'Oswald', system-ui, sans-serif;
   --font-body: 'Hind', system-ui, sans-serif;
   --r-card: 12px;

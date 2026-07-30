@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
   filterClients, clientsToCSV, canDeleteClient,
-  nextChargeCell, statusBadge, STATUS_FILTERS,
+  nextChargeCell, statusBadge, STATUS_FILTERS, isInactive, INACTIVITY_THRESHOLD_DAYS,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
 import { paginate } from "@/lib/admin/pagination";
-import { dayLabel } from "@/lib/admin/date-helpers";
+import { dayLabel, relativeDayLabel } from "@/lib/admin/date-helpers";
 
 export function ClientsTable({
   rows,
@@ -61,7 +61,9 @@ export function ClientsTable({
   }
 
   return (
-    <div style={{ padding: "28px 32px 40px", maxWidth: 1040 }}>
+    // 1040 alcanzaba para seis columnas; "Último acceso" es la séptima y la más
+    // ancha de la fila ("Cobro / acceso") ya lleva fecha y monto en dos líneas.
+    <div style={{ padding: "28px 32px 40px", maxWidth: 1200 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
         <h1 className="font-head" style={{ fontSize: 28, fontWeight: 700 }}>
           Clientes <span style={{ fontSize: 17, color: "var(--gris-texto)", fontWeight: 400 }}>({activas} activas)</span>
@@ -79,15 +81,40 @@ export function ClientsTable({
         </div>
       </div>
 
-      {/* Filtros: programa | estado */}
+      {/* Filtros: programa (pills) + estado (select).
+          Los siete filtros de estado eran pills y, con los de programa, sumaban
+          once controles en una fila de 1040px: se partían en dos renglones por
+          la mitad del grupo de estado, lo que se leía como un error de render.
+          La lista de programas sale de los datos, así que un programa más lo
+          empeoraba solo. El select quita el salto de raíz y deja la fila
+          insensible a cuántos programas existan. */}
       <div className="flex gap-2 flex-wrap items-center" style={{ marginBottom: 20 }}>
         {programs.map((f) => (
           <button key={f} className={"pill " + (prog === f ? "active" : "")} onClick={() => resetPage(setProg)(f)}>{f}</button>
         ))}
-        <span style={{ width: 1, height: 22, background: "var(--gris-linea)", margin: "0 6px" }} aria-hidden />
-        {STATUS_FILTERS.map((f) => (
-          <button key={f} className={"pill " + (estado === f ? "active" : "")} onClick={() => resetPage(setEstado)(estado === f ? null : f)}>{f}</button>
-        ))}
+        {/* Las opciones salen ENTERAS de STATUS_FILTERS. La única escrita a mano
+            es el centinela de "sin filtro", que no es un valor de filtro sino su
+            ausencia: una opción literal al lado de una lista mapeada es una
+            segunda copia de la tabla, y es como el modal de cancelación ofreció
+            "Prefiero no decir" durante meses (D19). */}
+        <label className="font-body" style={{ marginLeft: 6, display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--gris-texto)" }}>
+          <span>Estado</span>
+          <select
+            value={estado ?? ""}
+            onChange={(e) => resetPage(setEstado)((e.target.value || null) as StatusFilter)}
+            className="font-body"
+            style={{
+              minHeight: 44, borderRadius: 999, border: "1px solid var(--gris-linea)",
+              background: "#fff", color: "var(--gris-texto)", padding: "0 14px",
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            <option value="">Todos los estados</option>
+            {STATUS_FILTERS.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {filtered.length === 0 ? (
@@ -103,7 +130,7 @@ export function ClientsTable({
           <div style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 14, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: "var(--gris-claro)" }}>
-                {["Cliente", "Programa", "Inscripción", "Cobro / acceso", "Estado", ""].map((h, i) => (
+                {["Cliente", "Programa", "Inscripción", "Cobro / acceso", "Estado", "Último acceso", ""].map((h, i) => (
                   <th key={i} style={{ textAlign: "left", padding: "12px 20px", fontFamily: "var(--font-body)", fontWeight: 600, fontSize: 12, color: "var(--gris-texto)" }}>{h}</th>
                 ))}
               </tr></thead>
@@ -140,6 +167,34 @@ export function ClientsTable({
                       </td>
                       <td style={{ padding: "12px 20px" }}>
                         <span className="font-body" style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: badge.bg, color: badge.color }}>{badge.label}</span>
+                      </td>
+                      {/* Último acceso. La pregunta que Aura trae al abrir esta
+                          pantalla es "¿quién lleva días sin entrar?", y hasta
+                          ahora sólo se contestaba filtrando a propósito.
+                          El umbral NO se recalcula aquí: lo decide `isInactive`,
+                          el mismo que usan el filtro "Sin actividad" y el cron
+                          A4, para que siga habiendo una sola definición. */}
+                      <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5 }}>
+                        {(() => {
+                          const quiet = isInactive(c.last_activity_date, now, INACTIVITY_THRESHOLD_DAYS);
+                          const color = quiet ? "var(--inactivo)" : "var(--gris-texto)";
+                          // "Sin registros" y no "—": no es un dato que falte,
+                          // es que nunca registró. Distingue no haber empezado
+                          // de haber dejado de entrar.
+                          if (c.last_activity_date === null) {
+                            return <span style={{ color, fontWeight: 600 }}>Sin registros</span>;
+                          }
+                          return (
+                            <>
+                              <div style={{ color, fontWeight: quiet ? 600 : 400 }}>
+                                {relativeDayLabel(c.last_activity_date, now)}
+                              </div>
+                              <div style={{ color: "var(--gris-suave)", fontSize: 12, marginTop: 2 }}>
+                                {dayLabel(c.last_activity_date)}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: "12px 20px", textAlign: "right" }}>
                         <button onClick={(e) => handleDelete(c, e)} disabled={!canDel}

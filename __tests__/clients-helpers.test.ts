@@ -305,8 +305,21 @@ describe("clientsToCSV", () => {
   it("incluye encabezado y una fila por cliente", () => {
     const csv = clientsToCSV([base]);
     const lines = csv.split("\n");
-    expect(lines[0]).toBe("Nombre,Email,Programa,Variante,Estado,Inscripción");
-    expect(lines[1]).toBe("Ana López,ana@example.com,CuarentaMás,Base,Activa,2026-01-01");
+    expect(lines[0]).toBe("Nombre,Email,Programa,Variante,Estado,Inscripción,Último acceso");
+    expect(lines[1]).toBe("Ana López,ana@example.com,CuarentaMás,Base,Activa,2026-01-01,2026-07-15");
+  });
+
+  // Lo que Aura ve en la tabla tiene que poder exportarlo. Se exporta la fecha
+  // CRUDA y no "hace 21 días": la etiqueta relativa se congela en el momento de
+  // exportar y al día siguiente miente, y una hoja de cálculo ordena por fecha.
+  it("exporta la fecha cruda de último acceso, no la etiqueta relativa", () => {
+    const csv = clientsToCSV([{ ...base, last_activity_date: "2026-06-24" }]);
+    expect(csv.split("\n")[1].split(",")[6]).toBe("2026-06-24");
+  });
+
+  it("un cliente que nunca registró actividad exporta la celda vacía", () => {
+    const csv = clientsToCSV([{ ...base, last_activity_date: null }]);
+    expect(csv.split("\n")[1].split(",")[6]).toBe("");
   });
   it("escapa comas y comillas envolviendo en comillas dobles", () => {
     const csv = clientsToCSV([{ ...base, full_name: 'Díaz, "La" Ana' }]);
