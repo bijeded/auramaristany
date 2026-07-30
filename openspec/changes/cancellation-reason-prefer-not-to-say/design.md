@@ -84,6 +84,16 @@ The chart is verified anyway during runtime verification: the new bar must appea
 - **A `CHECK` migration on a live table** → `cancellation_surveys` is small and the constraint only widens, so no existing row can violate it. Still applied and confirmed rather than assumed.
 - **The union and the `CHECK` drift again later** → the new spec scenario names the failure mode (a silently dropped row), so the next reader meets it before the code.
 
+### D6 — Merging with the last seam unverified (accepted risk)
+
+The end-to-end wire — modal → server action → row written against a **real** Stripe subscription — was never exercised, and this change merged anyway. Decided by the repo owner on 2026-07-30, with the alternative (registering a throwaway client through real test-mode checkout) explicitly on the table.
+
+Why it is a narrow risk rather than a leap: both halves are proven separately. A client-session insert of `prefiero_no_decir` returned 201 against production, so the database accepts it through the same RLS policy the action uses; the payload logic (`reason ?? "prefiero_no_decir"`, detail dropped, `pago_fallido` rejected) is unit-tested with Stripe mocked; and the modal's render was confirmed by screenshot. What is unproven is only that those pieces are wired together — and no line of this diff changes that wiring.
+
+It could not be verified cheaply because demo subscriptions carry synthetic Stripe ids (**D27**), so `cancelSubscription` 404s before reaching the insert. That is a property of the demo data, not of this change.
+
+**What the first real cancellation will reveal, if anything is wrong:** the client sees the generic error and no survey row is written. It cannot corrupt data or half-complete — Stripe runs first, and the insert failure is swallowed after the cancellation already succeeded.
+
 ## Migration Plan
 
 1. Write migration 019 widening the `CHECK`. Single-line SQL through the Supabase Management API — the pipeline eats newlines and `--` comments out the rest.
