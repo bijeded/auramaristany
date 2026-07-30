@@ -247,7 +247,7 @@ export function MessagesAdmin({
             ) : (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
-                  <h2 className="font-head" style={{ fontSize: 20, fontWeight: 700 }}>{detail.subject}</h2>
+                  <h2 className="font-head" style={{ fontSize: 20, fontWeight: 700, overflowWrap: "break-word", minWidth: 0 }}>{detail.subject}</h2>
                   <span style={{ fontSize: 12, color: "var(--gris-suave)", whiteSpace: "nowrap" }}>
                     {detail.isBroadcast ? "📢 Difusión" : "👤 Individual"}
                   </span>

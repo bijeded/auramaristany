@@ -8,7 +8,9 @@ On mobile, a long unbroken string pasted into free-text content — in the repor
 - Four plain-text surfaces gain the same property inline, next to their existing `whiteSpace: "pre-line"` or heading styles:
   - portal message detail body and subject `<h1>` (`app/portal/messages/[id]/page.tsx`)
   - admin sent-message body (`components/admin/MessagesAdmin.tsx`)
-  - `messages.body` in the notification email (`lib/email/templates/NewMessageEmail.tsx`)
+  - client day notes in the history view (`components/portal/HistoryDayView.tsx`) — `whiteSpace: "pre-wrap"`
+  - admin sent-message subject `<h2>` (`components/admin/MessagesAdmin.tsx`), which additionally needs `minWidth: 0` because it is a flex child
+  - `messages.body` **and subject** in the notification email (`lib/email/templates/NewMessageEmail.tsx`), each also carrying the legacy `wordWrap` alias for older mail engines
 - `break-word` is chosen over `anywhere`: both prevent the overflow, but `break-word` starts the long token on a fresh line instead of splitting it mid-sentence, which reads better after a phrase like "en la siguiente dirección:".
 
 Explicitly **out of scope**:

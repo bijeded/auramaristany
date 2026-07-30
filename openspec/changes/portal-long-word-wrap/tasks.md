@@ -24,12 +24,12 @@
 
 ## 5. Visual verification (the real gate — nothing above can catch this defect)
 
-- [ ] 5.1 On the Preview URL at a 375px-wide viewport, open a pillar/content block containing a long URL: it wraps inside the card, and the page has no horizontal scroll
-- [ ] 5.2 In the admin rich-text editor, paste a long URL: it wraps inside the editor canvas, matching what the client sees
-- [ ] 5.3 Send a message whose body contains a long URL; open it at 375px in the portal: body wraps, no horizontal scroll
-- [ ] 5.4 Open the same message in the admin sent-messages detail: body wraps
-- [ ] 5.5 Read the notification email for that message in Gmail mobile: the URL wraps and the message does not scroll sideways. If it does not hold, record the finding and raise a follow-up — do not expand this change
-- [ ] 5.6 Spot-check ordinary prose on `/portal/today`, `/portal/pilares` and a message with no long token: line breaking is unchanged
+- [x] 5.1 On the Preview URL at a 375px-wide viewport, open a pillar/content block containing a long URL: it wraps inside the card, and the page has no horizontal scroll
+- [x] 5.2 In the admin rich-text editor, paste a long URL: it wraps inside the editor canvas, matching what the client sees
+- [x] 5.3 Send a message whose body contains a long URL; open it at 375px in the portal: body wraps, no horizontal scroll
+- [x] 5.4 Open the same message in the admin sent-messages detail: body wraps
+- [~] 5.5 NOT VERIFIED — Gmail mobile check skipped by decision (Francisco, 2026-07-30): low impact, not worth blocking on. The inline `overflowWrap` ships regardless; if a mail client strips it the email body can still overflow. Re-check if a client ever reports it.
+- [x] 5.6 Spot-check ordinary prose on `/portal/today`, `/portal/pilares` and a message with no long token: line breaking is unchanged
 
 ## 6. Ship
 
