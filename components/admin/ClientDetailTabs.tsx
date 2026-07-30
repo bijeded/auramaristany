@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
-import { subscriptionProgressLabel, nextChargeCell } from "@/lib/admin/clients-helpers";
+import { subscriptionProgressLabel, nextChargeCell, cancellationCell } from "@/lib/admin/clients-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 import { dayLabel, monthLabel, monthKey } from "@/lib/admin/date-helpers";
 import { normalizeWhatsappNumber, whatsappUrl } from "@/lib/admin/message-helpers";
@@ -76,10 +76,24 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
             )}
             {detail.subscriptions.map((s, i) => {
               const charge = nextChargeCell(s);
+              // Insignia y motivo salen de UNA decisión, no de dos condiciones
+              // escritas aquí: `cancel_at_period_end` también lo traen la que
+              // termina su último mes y la que se graduó.
+              const cancellation = cancellationCell(s, s.cancellation_survey);
               return (
               <div key={s.id} style={{ marginBottom: i < detail.subscriptions.length - 1 ? 18 : 0 }}>
-                <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{s.program_name} · {s.variant_name}</h3>
+                <div className="flex" style={{ gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+                  <h3 className="font-head" style={{ fontSize: 16, fontWeight: 600 }}>{s.program_name} · {s.variant_name}</h3>
+                  {cancellation && (
+                    <span className="font-body" style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: cancellation.badge.bg, color: cancellation.badge.color, whiteSpace: "nowrap" }}>
+                      {cancellation.badge.label}
+                    </span>
+                  )}
+                </div>
                 {[
+                  // Sólo se pregunta el motivo de quien se fue: la fila entera
+                  // desaparece para una suscripción viva.
+                  ...(cancellation ? [["Motivo", cancellation.reason] as [string, string]] : []),
                   ["Fecha de inicio", dayLabel(s.enrollment_date)],
                   // El encabezado de arriba nombra la variante que PAGA; esta fila,
                   // el nivel que ESTÁ HACIENDO, que puede haber subido desde entonces.

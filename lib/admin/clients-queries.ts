@@ -8,6 +8,7 @@ import {
   canDeleteClient,
   type ClientListRow,
   type SubStatus,
+  type CancellationSurveyLike,
 } from "./clients-helpers";
 import { countCompleted } from "@/lib/content/history-helpers";
 import type { ExercisesDone } from "@/lib/content/history-helpers";
@@ -105,6 +106,9 @@ export interface ClientSubscription {
   enrollment_date: string;
   current_period_end: string | null;
   price_mxn: number;
+  /** La encuesta de salida de ESTA suscripción, si dejó una. `null` tanto si la
+   *  baja nunca se encuestó como si la suscripción sigue viva. */
+  cancellation_survey: CancellationSurveyLike | null;
 }
 
 export interface OnboardingAnswer { question: string; answer: string }
@@ -170,6 +174,31 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
     }
   }
 
+  // Motivos de baja, uno por suscripción.
+  //
+  // Se busca por `subscription_id` y no por `profile_id` a propósito. El de
+  // perfil es el que SOBREVIVE al borrado de la suscripción (`on delete set
+  // null`), y por eso mismo es ambiguo: con dos suscripciones embarraría un
+  // motivo sobre las dos. Buscando por suscripción, las filas huérfanas quedan
+  // fuera por construcción —su `subscription_id` es null y no empata con
+  // nada—, no por un filtro que un cambio posterior pueda quitar.
+  const subIds = ((rawSubs ?? []) as RawSub[]).map((s) => s.id);
+  const surveys = new Map<string, CancellationSurveyLike>();
+  if (subIds.length > 0) {
+    const { data: surveyRows } = await supabase
+      .from("cancellation_surveys")
+      .select("subscription_id, reason, detail, created_at")
+      .in("subscription_id", subIds)
+      // Nada impide dos filas para una misma suscripción, así que se ordena y
+      // se queda la primera: que decida la fecha, no el orden de inserción.
+      .order("created_at", { ascending: false });
+    for (const r of (surveyRows ?? []) as { subscription_id: string | null; reason: string; detail: string | null }[]) {
+      if (r.subscription_id && !surveys.has(r.subscription_id)) {
+        surveys.set(r.subscription_id, { reason: r.reason, detail: r.detail });
+      }
+    }
+  }
+
   // keep: subscriptions JOIN program_variants JOIN programs — nested join not inferred.
   const subscriptions: ClientSubscription[] = ((rawSubs ?? []) as RawSub[])
     .filter((s) => s.program_variants)
@@ -189,6 +218,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       enrollment_date: s.enrollment_date,
       current_period_end: s.current_period_end,
       price_mxn: s.program_variants!.price_mxn,
+      cancellation_survey: surveys.get(s.id) ?? null,
     }));
 
   // Onboarding

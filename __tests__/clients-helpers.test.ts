@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterClients, isInactive, nextChargeCell, type ClientListRow } from "@/lib/admin/clients-helpers";
+import { cancellationCell, filterClients, isInactive, nextChargeCell, type ClientListRow } from "@/lib/admin/clients-helpers";
 
 const NOW = "2026-07-15";
 
@@ -458,5 +458,92 @@ describe("parseStatusFilter", () => {
   it("tolera que llegue repetido", () => {
     expect(parseStatusFilter(["Activas", "Canceladas"])).toBe("Activas");
     expect(parseStatusFilter([])).toBeNull();
+  });
+});
+
+// El riesgo entero de esta tarjeta cabe en una frase: `cancel_at_period_end`
+// vale true para TRES poblaciones distintas —la que se va, la que está en su
+// último mes pagado y la que ya se graduó— y sólo la primera es una baja.
+// Confundirlas pintaría "Cancelada" sobre el mejor desenlace de Aura (ADR 0003,
+// ADR 0004), así que cada una de las tres tiene su propia prueba negativa.
+describe("cancellationCell", () => {
+  const churned = {
+    status: "canceled" as const,
+    completed_at: null,
+    cancel_at_period_end: true,
+  };
+
+  it("una baja de verdad se anuncia con la MISMA insignia del listado", () => {
+    const cell = cancellationCell(churned, null);
+    expect(cell).not.toBeNull();
+    expect(cell!.badge).toEqual(statusBadge("canceled"));
+  });
+
+  it("una graduada NO es una baja", () => {
+    expect(
+      cancellationCell(
+        { status: "completed", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
+        null
+      )
+    ).toBeNull();
+  });
+
+  it("su último mes pagado tampoco: sigue entrenando", () => {
+    expect(
+      cancellationCell(
+        { status: "active", completed_at: "2026-07-01T00:00:00Z", cancel_at_period_end: true },
+        null
+      )
+    ).toBeNull();
+  });
+
+  it("ni el periodo de gracia: canceló pero todavía tiene acceso", () => {
+    expect(
+      cancellationCell({ status: "active", completed_at: null, cancel_at_period_end: true }, null)
+    ).toBeNull();
+  });
+
+  it("una suscripción viva y corriente no pinta nada", () => {
+    expect(
+      cancellationCell({ status: "active", completed_at: null, cancel_at_period_end: false }, null)
+    ).toBeNull();
+  });
+
+  it("el motivo sale de la tabla única de etiquetas", () => {
+    expect(cancellationCell(churned, { reason: "no_tengo_tiempo", detail: null })!.reason).toBe(
+      "No tengo tiempo"
+    );
+  });
+
+  it("cuando la cliente escribió algo, se lee junto a la etiqueta", () => {
+    const cell = cancellationCell(churned, { reason: "otro", detail: "Me mudé de ciudad" });
+    expect(cell!.reason).toContain("Otro");
+    expect(cell!.reason).toContain("Me mudé de ciudad");
+  });
+
+  // Declinar es una RESPUESTA. Colapsarla con "no hay encuesta" perdería el
+  // único dato que la cliente sí dio.
+  it("'prefiero no decir' no es lo mismo que no haber contestado", () => {
+    const declined = cancellationCell(churned, { reason: "prefiero_no_decir", detail: null })!.reason;
+    const missing = cancellationCell(churned, null)!.reason;
+    expect(declined).toBe("Prefiero no decir");
+    expect(missing).toBe("Sin motivo registrado");
+    expect(declined).not.toBe(missing);
+  });
+
+  it("un pago fallido se lee como su motivo, sin insignia aparte", () => {
+    const cell = cancellationCell(churned, { reason: "pago_fallido", detail: null })!;
+    expect(cell.reason).toBe("Pago fallido");
+    expect(cell.badge).toEqual(statusBadge("canceled"));
+  });
+
+  // Regla 8 un nivel más allá: si el CHECK de la base gana un motivo antes que
+  // la unión, la fila enseña el valor crudo en vez de quedarse en blanco.
+  it("un motivo que el código todavía no conoce se enseña crudo", () => {
+    expect(cancellationCell(churned, { reason: "se_mudo", detail: null })!.reason).toBe("se_mudo");
+  });
+
+  it("un detalle vacío no ensucia la etiqueta", () => {
+    expect(cancellationCell(churned, { reason: "otro", detail: "   " })!.reason).toBe("Otro");
   });
 });
