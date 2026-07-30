@@ -120,7 +120,7 @@ These three are one root cause (no single-statement transaction) and should be c
 | **D5** | `getSentMessages` loads all `message_recipients` | S | Scaling concern; fine for now. |
 | **D1** | Admin notes on the day's log | M | Deferred from Phase 3. |
 | **D3** | Zapier on-subscribe | M | Deferred from Phase 4. |
-| **D21** | Should a CI check catch unused `lib/` exports? | S | Open question from D18. Four instances project-wide is not yet evidence of a systemic leak, and such a rule fires immediately on `cancellationReasonLabel` — kept on purpose — so it needs an opt-out annotation, its own small design. Revisit if a later sweep finds more; the sweep is a one-liner in D18's PRs. |
+| **D21** | Should a CI check catch unused `lib/` exports? | S | Open question from D18. Four instances project-wide is not yet evidence of a systemic leak. ⚠ The example this item was built on has expired: `cancellationReasonLabel` **now has a caller** (the "Razones de cancelación" card, PR #42), so it is no longer the counter-example that made an opt-out annotation look mandatory. That weakens the objection but does not settle the question — re-count the remaining instances before designing anything, and note that the export was uncalled for two changes and correct to keep both times, which is the real argument for an annotation. Revisit if a later sweep finds more; the sweep is a one-liner in D18's PRs. |
 
 ---
 
