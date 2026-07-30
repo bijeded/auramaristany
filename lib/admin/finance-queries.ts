@@ -1,8 +1,9 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { logAndGeneric } from "./errors";
-import type { SubscriptionStatus } from "@/lib/supabase/types";
+import type { CancellationReason, SubscriptionStatus } from "@/lib/supabase/types";
 import type {
+  ChurnSubRow,
   FinanceSubRow,
   FinanceInvoiceRow,
   FinanceVariantInvoiceRow,
@@ -113,6 +114,77 @@ export async function getRevenueByVariantAllTime(): Promise<FinanceVariantInvoic
     // huérfanas. Un guion se lee como el nombre de una variante.
     variant_name: r.subscriptions?.program_variants?.name ?? "Sin variante",
   }));
+}
+
+/**
+ * Todas las suscripciones que alguna vez existieron, con su variante y su
+ * estado — la materia prima de "Cancelaciones por variante".
+ *
+ * SIN filtro de estado, y eso es lo que hay que no "arreglar": el numerador y
+ * el denominador de la tasa salen los dos de este mismo conjunto, y el reparto
+ * lo hace `groupChurnByVariant`, que está probado. Filtrar por `canceled` aquí
+ * dejaría a la carta sin denominador; filtrar por cualquier otra cosa movería
+ * una definición que vive en la spec a un lugar que ninguna prueba mira.
+ *
+ * Lee `subscriptions` y no `cancellation_surveys` a propósito: la variante es
+ * columna directa de esta tabla, así que la población está completa —cuenta a
+ * quien se fue haya contestado la encuesta o no—, mientras que
+ * `cancellation_surveys.subscription_id` es `on delete set null` y pierde la
+ * variante en cuanto se borra un cliente.
+ */
+export async function getChurnByVariantAllTime(): Promise<ChurnSubRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("subscriptions")
+    // `!program_variant_id` otra vez: dos FKs hacia program_variants y sin
+    // desambiguar PostgREST devuelve un error, no filas (regla 9).
+    .select("status, program_variants!program_variant_id(name)");
+
+  // Se lee `error`, no sólo `data`: el modo de falla de la regla 9 es un error,
+  // no un resultado vacío, y mirando sólo `data` una regresión del embed se
+  // vería como "nadie se ha ido nunca" — la tarjeta más tranquilizadora posible
+  // y ni una línea en el log.
+  if (error) {
+    logAndGeneric("getChurnByVariantAllTime", error);
+    return [];
+  }
+
+  // keep: subscriptions JOIN program_variants — nested join shape not inferred by SDK.
+  type Raw = {
+    status: SubscriptionStatus;
+    program_variants: { name: string } | null;
+  };
+  return ((data ?? []) as Raw[]).map((r) => ({
+    status: r.status,
+    // Etiqueta y no "—": una suscripción sin variante lleva barra propia, y un
+    // guion se lee como el nombre de una variante.
+    variant_name: r.program_variants?.name ?? "Sin variante",
+  }));
+}
+
+/**
+ * Motivos de baja, histórico completo — la materia prima de "Razones de
+ * cancelación".
+ *
+ * Sin join: la carta agrupa por motivo y nada más. Y SIN leer `detail`, que es
+ * texto libre del cliente: un agregado no tiene dónde ponerlo, enseñar
+ * respuestas sueltas en un dashboard sería exhibir las palabras de una persona
+ * como si fueran una estadística, y la columna puede traer texto con forma de
+ * HTML (regla 18) — no traerla es no tener que cuidarla.
+ *
+ * Cliente RLS-aware, sin service-role: la migración 011 ya le da `select` al
+ * admin vía `is_admin()`, y la ruta entra por `requireAdminPage()`.
+ */
+export async function getCancellationReasonsAllTime(): Promise<{ reason: CancellationReason }[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("cancellation_surveys").select("reason");
+
+  if (error) {
+    logAndGeneric("getCancellationReasonsAllTime", error);
+    return [];
+  }
+
+  return (data ?? []) as { reason: CancellationReason }[];
 }
 
 export async function getPastDueCount(): Promise<number> {
