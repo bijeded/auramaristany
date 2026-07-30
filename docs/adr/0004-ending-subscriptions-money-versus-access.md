@@ -34,6 +34,11 @@ Headcounts and distribution-by-variant are computed over every `active` row, end
 two are *intended* to disagree, and the divergence is specified rather than incidental.
 
 **2. No reader derives "is this ending?" itself. Every one calls `deriveCancellationState`.**
+That question is about a **live** subscription, and this is the only function that answers it.
+It is not the only cancellation derivation in the codebase: ADR 0006 adds `isChurned` for the
+*historical* question — "how did this subscription end?" — which `deriveCancellationState`
+structurally cannot answer, since it classifies a terminal `canceled` row as `none`. One
+question each; neither substitutes for the other.
 The dashboard is its fourth caller, not a fourth copy. `partitionByOutcome` maps that
 function's `kind` onto three cohorts — `eligible → billing`, `completing`, `grace → cancelling`
 — plus an `excluded` bucket for rows that already ended, in a single pass. Every row lands in

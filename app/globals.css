@@ -43,7 +43,11 @@
      --exito; las cifras y el texto usan éste. */
   --exito-text: #2f7d54;
   /* Ámbar de "todavía puede cobrar" (pausada, impaga, incompleta). Estaba
-     repetido a mano como #9a7b1f en cinco archivos. 4.07:1 sobre blanco. */
+     repetido a mano como #9a7b1f en cinco archivos. 4.07:1 sobre blanco.
+     También es RELLENO de barra desde "Cancelaciones por variante", así que
+     lleva su ratio contra la PISTA como pide el ADR 0005: 3.69:1 sobre
+     --gris-claro, por encima del 3:1 de WCAG 1.4.11. Medir contra el blanco de
+     la tarjeta no sirve para una barra — la pista es su color adyacente. */
   --ambar: #9a7b1f;
   --ambar-tint: rgba(240, 198, 116, 0.18);
   --font-head: 'Oswald', system-ui, sans-serif;
