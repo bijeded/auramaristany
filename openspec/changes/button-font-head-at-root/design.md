@@ -44,7 +44,7 @@ This is safe for the opt-out because **specificity, not source order, decides he
 
 `buttonVariants` already sets `font-medium`. The `font-medium` on `LoginForm.tsx:93` was always inert — `font-head` alone is what made `Ingresar` look right. Carrying that class into a fix would encode a false explanation of the bug, so it is removed rather than propagated.
 
-The base weight stays `font-medium` **pending visual confirmation**, because Oswald reads heavier than Hind at the same numeric weight and the buttons sit on saturated lavender. If 500 reads as bold in the smoke pass, the fix is to change the one base declaration — which is precisely the property this design is buying. The confirmed value gets recorded in the change before merge.
+The base weight stays `font-medium` (500). **Confirmed by eye at 375px on the Preview** — Oswald at 500 reads as medium, not bold, on both the lavender primary and the white secondary. No change to the weight was needed; the concern that motivated the check did not materialize.
 
 **4. Body-font buttons are kept and re-framed, not stripped.**
 
@@ -80,5 +80,5 @@ No data migration, no schema change, no deploy coordination. Branch → Preview 
 
 ## Open Questions
 
-- **Does the base weight stay `font-medium`?** Resolved during implementation by looking at a lavender primary button and a white secondary button at 375px, then recorded. Deliberately not decided in the abstract — Oswald's apparent weight is the thing under test.
+- ~~**Does the base weight stay `font-medium`?**~~ **Resolved:** yes. Confirmed on the Preview at 375px — 500 reads correctly in Oswald on the lavender and white surfaces.
 - **Do any of the 31 `font-body` controls actually want Oswald?** Answered by the same pass. Any that flip get the class removed; any that stay get their reason written down.

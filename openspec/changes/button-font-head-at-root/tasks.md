@@ -22,7 +22,7 @@
 
 ## 4. Resolve the two open questions by eye
 
-- [ ] 4.1 On a Preview URL at ~375px, view a lavender primary button and a white secondary button and decide whether the base weight stays `font-medium`. Oswald reads heavier than Hind at the same numeric weight. Record the confirmed value in this change.
+- [x] 4.1 On a Preview URL at ~375px, view a lavender primary button and a white secondary button and decide whether the base weight stays `font-medium`. **Verdict: stays `font-medium` (500)** — reads as medium, not bold, in Oswald on both surfaces. No change needed.
 - [ ] 4.2 Walk the 31 buttons that declare `font-body` (pagination `Anterior`/`Siguiente`, `Exportar CSV`, editor toolbars) and confirm each still reads correctly in Hind. For any that should flip to Oswald, remove the class; for those that stay, write the one-line reason at the site.
 - [ ] 4.3 Check the longest labels — `Reactivar mi plan`, `Cancelar mi plan`, `Exportar CSV` — for overflow. `buttonVariants` sets `whitespace-nowrap`, so a label that grows overflows silently instead of wrapping.
 
@@ -38,4 +38,4 @@
 - [x] 6.1 Run `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build`. Note in the PR that all four pass in either state — none of them lay out text, so they are not evidence the change works.
 - [ ] 6.2 Obtain a `code-review` verdict. No `security-review` expected: no database, auth, RLS, Stripe, webhook, cron or email surface is touched — state that explicitly rather than implying a verdict exists.
 - [ ] 6.3 Open the PR with the before/after screenshots at 375px, the confirmed weight from 4.1, and the `font-body` decisions from 4.2.
-- [ ] 6.4 Add a backlog row for the deferred token duplication: `tailwind.config.ts:67` hard-codes the `Oswald`/`Hind` stacks instead of referencing `var(--font-head)` / `var(--font-body)`, so the tokens live in two places and can drift.
+- [x] 6.4 Add a backlog row for the deferred token duplication: `tailwind.config.ts:67` hard-codes the `Oswald`/`Hind` stacks instead of referencing `var(--font-head)` / `var(--font-body)`, so the tokens live in two places and can drift.
