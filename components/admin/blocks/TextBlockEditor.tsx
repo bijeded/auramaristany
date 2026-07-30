@@ -188,7 +188,7 @@ export function TextBlockEditor({
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}><Heading3 size={15} /></button>
         <button type="button" className={btn(editor.isActive("heading", { level: 4 }))}
           onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
-          style={{ fontFamily: "var(--font-head)", fontSize: 13, fontWeight: 700 }}>H4</button>
+          style={{ fontSize: 13, fontWeight: 700 }}>H4</button>
         <button type="button" className={btn(editor.isActive("bulletList"))}
           onClick={() => editor.chain().focus().toggleBulletList().run()}><List size={15} /></button>
         <button type="button" className={btn(editor.isActive("orderedList"))}
