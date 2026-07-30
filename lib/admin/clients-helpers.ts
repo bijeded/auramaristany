@@ -2,6 +2,7 @@ import { contentProgressLabel } from "@/lib/portal/progress-display";
 import { cancellationReasonLabel, deriveCancellationState, isChurned } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { dayLabel, daysBetween } from "@/lib/admin/date-helpers";
+import { decodePlainText } from "@/lib/admin/plain-text";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
 /**
@@ -372,7 +373,11 @@ export function cancellationCell(
 ): CancellationCell | null {
   if (!isChurned(sub.status)) return null;
 
-  const detail = survey?.detail?.trim();
+  // `detail` se guardó con `sanitizePlainText`, que escapa entidades, y React
+  // escapa otra vez al pintar: sin decodificar aquí, quien escribió
+  // `no me "convence"` le llega a Aura como `no me &quot;convence&quot;`
+  // (regla 18). Sale a un nodo de texto de React y a ningún otro sitio.
+  const detail = survey ? decodePlainText(survey.detail ?? "").trim() : "";
   const reason = survey
     ? cancellationReasonLabel(survey.reason) + (detail ? ` · ${detail}` : "")
     : // Ausencia de encuesta, NO "Otro": una baja hecha desde el panel de

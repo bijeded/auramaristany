@@ -191,7 +191,13 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       .in("subscription_id", subIds)
       // Nada impide dos filas para una misma suscripción, así que se ordena y
       // se queda la primera: que decida la fecha, no el orden de inserción.
-      .order("created_at", { ascending: false });
+      // `nullsFirst: false` porque `created_at` es nullable (migración 011:
+      // `default now()`, sin `not null`) y Postgres pone los NULL primero en
+      // orden descendente — una fila sin fecha le ganaría a la más reciente.
+      .order("created_at", { ascending: false, nullsFirst: false });
+    // keep: ensanchamiento deliberado. `types.ts` tipa `reason` como
+    // `CancellationReason`, pero el CHECK de la base puede ir por delante de la
+    // unión y esta pantalla tiene que poder pintar el valor crudo (regla 8).
     for (const r of (surveyRows ?? []) as { subscription_id: string | null; reason: string; detail: string | null }[]) {
       if (r.subscription_id && !surveys.has(r.subscription_id)) {
         surveys.set(r.subscription_id, { reason: r.reason, detail: r.detail });

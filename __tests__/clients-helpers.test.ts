@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { cancellationCell, filterClients, isInactive, nextChargeCell, type ClientListRow } from "@/lib/admin/clients-helpers";
+import { sanitizePlainText } from "@/lib/admin/sanitize-html";
 
 const NOW = "2026-07-15";
 
@@ -541,6 +542,19 @@ describe("cancellationCell", () => {
   // la unión, la fila enseña el valor crudo en vez de quedarse en blanco.
   it("un motivo que el código todavía no conoce se enseña crudo", () => {
     expect(cancellationCell(churned, { reason: "se_mudo", detail: null })!.reason).toBe("se_mudo");
+  });
+
+  // Regla 18. El `detail` se guarda con `sanitizePlainText`, que escapa
+  // entidades, y React escapa otra vez al pintar: sin decodificar en medio,
+  // Aura lee `&quot;` en la pantalla. La prueba parte del valor TAL COMO QUEDA
+  // GUARDADO, no de texto limpio, porque partiendo de texto limpio pasa igual
+  // con el defecto puesto.
+  it("lo que la cliente escribió se lee como lo escribió, no en entidades", () => {
+    const stored = sanitizePlainText('Me mudé & ya no me "convence"');
+    const cell = cancellationCell(churned, { reason: "otro", detail: stored })!;
+    expect(cell.reason).toContain('Me mudé & ya no me "convence"');
+    expect(cell.reason).not.toContain("&amp;");
+    expect(cell.reason).not.toContain("&quot;");
   });
 
   it("un detalle vacío no ensucia la etiqueta", () => {
