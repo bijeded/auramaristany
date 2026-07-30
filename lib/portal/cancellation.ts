@@ -16,14 +16,10 @@ const REASON_LABELS: Record<CancellationReason, string> = {
 /**
  * Pinta un motivo de baja para que lo lea una persona.
  *
- * D18 — hoy NO tiene llamador, y se queda a propósito. El barrido de exports
- * muertos retiró los otros dos que estaban igual; éste no está muerto, está
- * temprano: lo único que enseñaría motivos a una persona es la vista de admin
- * sobre `cancellation_surveys`, que es un cambio aparte y planeado. Borrarlo
- * sólo significaría volver a escribirlo.
- *
- * Sin esta nota, la siguiente limpieza llega a la misma conclusión que ésta y
- * lo borra.
+ * Única tabla de etiquetas de motivo, y por eso la llama también "Razones de
+ * cancelación" en el dashboard en vez de escribir su propia copia: dos mapas
+ * del mismo enum son una tabla copiada (regla 8) y se separan en el siguiente
+ * motivo que se agregue.
  */
 export function cancellationReasonLabel(reason: CancellationReason): string {
   return REASON_LABELS[reason];
@@ -113,4 +109,36 @@ export function deriveCancellationState(input: {
   }
   if (ELIGIBLE_STATUSES.includes(input.status)) return { kind: "eligible" };
   return { kind: "none" };
+}
+
+/**
+ * ¿Esta suscripción TERMINÓ en baja?
+ *
+ * Segunda derivación al lado de `deriveCancellationState`, y a propósito. Las
+ * dos contestan preguntas distintas:
+ *
+ *   - `deriveCancellationState` → "¿qué puede hacer AHORA esta suscripción
+ *     viva?". Decide qué botones ve la cliente, y una fila terminal en
+ *     `canceled` se le cae hasta `none`.
+ *   - `isChurned` → "¿cómo TERMINÓ?". Es la pregunta histórica de las cartas de
+ *     fuga, y la primera no puede contestarla: pedirle el numerador devolvería
+ *     cero en silencio.
+ *
+ * Ninguna sirve para lo de la otra; no las unifiques. Ensanchar
+ * `deriveCancellationState` con un `churned` obligaría a sus tres llamadores a
+ * ramificar sobre un estado que ninguno puede encontrar.
+ *
+ * Basta con `status` porque `handleSubscriptionDeleted` ya separó los DOS
+ * finales antes de escribir la fila: `completed` a quien cumplió su plazo,
+ * `canceled` a quien se fue. Por eso ni `cancel_at_period_end` ni
+ * `completed_at` pueden cambiar la respuesta — quien se gradúa las trae puestas
+ * igual, y contarla como baja volvería el mejor desenlace de Aura su peor
+ * métrica (ADR 0003).
+ *
+ * Sí, hoy es una comparación. La función existe por el NOMBRE y por lo que fija
+ * su matriz de pruebas: en línea, cada `=== "canceled"` suelto es una copia que
+ * se separa el día que un segundo estado terminal cuente como baja.
+ */
+export function isChurned(status: SubscriptionStatus): boolean {
+  return status === "canceled";
 }

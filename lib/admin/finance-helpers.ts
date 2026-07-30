@@ -1,5 +1,5 @@
-import { deriveCancellationState } from "@/lib/portal/cancellation";
-import type { SubscriptionStatus } from "@/lib/supabase/types";
+import { cancellationReasonLabel, deriveCancellationState, isChurned } from "@/lib/portal/cancellation";
+import type { CancellationReason, SubscriptionStatus } from "@/lib/supabase/types";
 
 export interface FinanceSubRow {
   current_period_end: string | null; // ISO
@@ -256,6 +256,148 @@ export interface PaymentRow {
 }
 
 export type PaymentStatusFilter = "todos" | "paid" | "open" | "void" | "uncollectible";
+
+// ---------------------------------------------------------------------------
+// dashboard-cancellation-charts: groupChurnByVariant + groupCancellationReasons
+// ---------------------------------------------------------------------------
+
+/** Fila de suscripción para "Cancelaciones por variante". Sin importe: la carta
+ *  cuenta personas que se fueron, no pesos. */
+export interface ChurnSubRow {
+  status: SubscriptionStatus;
+  variant_name: string;
+}
+
+export interface VariantChurn {
+  variant: string;
+  churned: number;
+  /** Denominador: cuántas llegaron a ser clientes de esta variante, jamás. */
+  everSubscribed: number;
+  /** `churned / everSubscribed` en porcentaje entero. */
+  rate: number;
+}
+
+export interface ReasonCount {
+  reason: CancellationReason;
+  label: string;
+  count: number;
+  /** Parte del total de encuestas, en porcentaje entero. */
+  share: number;
+}
+
+/**
+ * Los estados que cuentan como "alguna vez fue cliente" — el denominador de la
+ * tasa de fuga.
+ *
+ * `Record<string, true>` y consulta con default `false`, no una unión: es la
+ * regla 8 al pie. El CHECK de `subscriptions.status` trae NUEVE valores
+ * (migración 017) y un estado que exista en la base y no aquí tiene que caerse
+ * de los dos lados dejando la carta en pie, nunca tumbarla ni blanquearla.
+ *
+ * `incomplete` e `incomplete_expired` quedan FUERA, y esto es la parte que
+ * carga el peso: son checkouts abandonados. Nadie fue cliente, nadie recibió
+ * contenido y no hay de dónde irse. Contarlos infla cada denominador con gente
+ * que nunca llegó y arrastra toda tasa hacia cero — la carta leería "aquí no se
+ * va nadie" justo cuando la fuga es peor. Están nombrados y comentados en vez
+ * de simplemente ausentes para que nadie lea la omisión como un descuido.
+ *
+ * `completed` sí cuenta: quien se gradúa fue cliente de verdad, sólo que no se
+ * fue. Del numerador la excluye `isChurned`.
+ *
+ * `unpaid` cuenta AQUÍ y no en el numerador: el listado de clientes ya archiva
+ * `past_due` y `unpaid` juntas bajo "Vencidas" y pinta `unpaid` como "Impaga"
+ * en ámbar. Tratarla como baja contradiría un filtro que Aura ya usa, y
+ * duplicaría a las que acaben cancelando de verdad con su fila `pago_fallido`.
+ */
+const EVER_SUBSCRIBED: Record<string, true> = {
+  active: true,
+  trialing: true,
+  past_due: true,
+  unpaid: true,
+  paused: true,
+  completed: true,
+  canceled: true,
+};
+
+/**
+ * Bajas y tasa de fuga por variante, histórico completo.
+ *
+ * Cifra de PERSONAS de los dos lados, pero de dos poblaciones distintas: el
+ * numerador cuenta quién se fue y el denominador quién llegó (graduadas
+ * incluidas). No es una cifra de dinero — una baja no devuelve lo cobrado
+ * (ADR 0004).
+ *
+ * La consulta no filtra nada: reparte aquí, donde está probado. El numerador
+ * sale SIEMPRE de `isChurned`, nunca de un `status === "canceled"` en línea.
+ */
+export function groupChurnByVariant(rows: ChurnSubRow[]): VariantChurn[] {
+  const tally = new Map<string, { churned: number; everSubscribed: number }>();
+
+  for (const row of rows) {
+    if (!EVER_SUBSCRIBED[row.status]) continue;   // checkout abandonado o estado que no conocemos
+    const bucket = tally.get(row.variant_name) ?? { churned: 0, everSubscribed: 0 };
+    bucket.everSubscribed += 1;
+    if (isChurned(row.status)) bucket.churned += 1;
+    tally.set(row.variant_name, bucket);
+  }
+
+  return Array.from(tally.entries())
+    .map(([variant, t]) => ({
+      variant,
+      churned: t.churned,
+      everSubscribed: t.everSubscribed,
+      rate: Math.round((t.churned / t.everSubscribed) * 100),
+    }))
+    // Sin bajas no hay fila: una barra de cero no es "fuga cero", es ruido.
+    .filter((r) => r.churned > 0)
+    // Por VOLUMEN, no por tasa: la barra mide cuánta gente se fue y el
+    // porcentaje aporta el contexto que el volumen esconde. El desempate por
+    // nombre hace el orden estable — sin él, dos variantes empatadas se
+    // intercambian entre recargas según el orden de inserción del Map.
+    .sort((a, b) => b.churned - a.churned || a.variant.localeCompare(b.variant, "es"));
+}
+
+/**
+ * Reparto de motivos de baja, histórico completo.
+ *
+ * Incluye `pago_fallido` —baja involuntaria que escribe el webhook cuando el
+ * dunning agota reintentos— porque es el único motivo con remedio operativo: se
+ * persigue una tarjeta nueva, no un cambio de opinión.
+ *
+ * Las etiquetas vienen de `cancellationReasonLabel`, no de una segunda tabla
+ * escrita para esta carta (regla 8).
+ */
+export function groupCancellationReasons(rows: { reason: CancellationReason }[]): ReasonCount[] {
+  if (rows.length === 0) return [];
+
+  const counts = new Map<CancellationReason, number>();
+  for (const row of rows) counts.set(row.reason, (counts.get(row.reason) ?? 0) + 1);
+
+  return Array.from(counts.entries())
+    .map(([reason, count]) => ({
+      reason,
+      label: cancellationReasonLabel(reason),
+      count,
+      share: Math.round((count / rows.length) * 100),
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"));
+}
+
+/**
+ * El texto de la fila: `"3 (25%)"`.
+ *
+ * Vive aquí y no en `VariantBarList` para que el componente siga sin saber qué
+ * carta está pintando — recibe `value` (la barra) y `display` (ya formateado), y
+ * no necesita ni un `formatMXN` opcional ni una bandera de "¿soy la del
+ * dinero?".
+ *
+ * Enteros a propósito: una tasa es la forma del problema, no una cifra
+ * contable, y `24.7%` promete una precisión que el tamaño de la muestra no
+ * sostiene.
+ */
+export function countWithShare(count: number, pct: number): string {
+  return `${count} (${pct}%)`;
+}
 
 export function filterPaymentsByStatus(
   rows: PaymentRow[],
