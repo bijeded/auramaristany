@@ -40,4 +40,4 @@
 
 - [x] 6.1 `code-review` verdict obtained: APPROVED WITH WARNINGS; all 3 warnings + 2 suggestions fixed in commit d427d32 (no `security-review`: no auth, RLS, service-role, validation, Stripe or webhook surface, and no new rendering sink)
 - [x] 6.2 Conventional Commit on a branch, PR opened, CI green, merge
-- [ ] 6.3 `/opsx:sync` + `openspec validate`, then `/opsx:archive`
+- [x] 6.3 `/opsx:sync` + `openspec validate`, then `/opsx:archive`
