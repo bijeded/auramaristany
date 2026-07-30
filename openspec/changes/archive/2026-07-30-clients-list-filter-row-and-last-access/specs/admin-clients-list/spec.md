@@ -104,7 +104,7 @@ The client list SHALL present "Sin actividad" as one option of the single status
 
 Which clients match is unchanged; only the control that selects the filter has changed.
 
-#### Scenario: Selecting the option filters to quiet active clients
+#### Scenario: Selecting the pill filters to quiet active clients
 - **WHEN** the admin selects "Sin actividad" in the status filter
 - **THEN** the list shows only clients with an active or trialing subscription whose last activity is ≥10 days ago (or who never logged)
 
@@ -113,11 +113,11 @@ Which clients match is unchanged; only the control that selects the filter has c
 - **AND** the "Sin actividad" filter is selected
 - **THEN** that client is not shown
 
-#### Scenario: Option is exclusive with the other status options
+#### Scenario: Pill is exclusive with status pills
 - **WHEN** "Activas" is selected and the admin selects "Sin actividad"
 - **THEN** the status filter holds "Sin actividad" only, and "Activas" is no longer applied
 
-#### Scenario: Clearing filters resets the selection
+#### Scenario: Clearing filters resets the pill
 - **WHEN** "Sin actividad" is selected and the admin clicks "Limpiar filtros"
 - **THEN** the status filter returns to its unfiltered value and all clients matching the remaining filters are shown
 
@@ -146,11 +146,11 @@ Both cohorts are still `active` and still training, which is precisely why they 
 - **WHEN** a client's `active` subscription has `completed_at` set but `cancel_at_period_end = false`
 - **THEN** she appears in neither cohort option, because nothing is scheduled to end
 
-#### Scenario: Options are exclusive with the rest of the group
+#### Scenario: Pills are exclusive with the existing group
 - **WHEN** "Activas" is selected and the admin selects "En cancelación"
 - **THEN** the status filter holds "En cancelación" only
 
-#### Scenario: Clearing filters resets the selection
+#### Scenario: Clearing filters resets the new pills
 - **WHEN** "Último mes" is selected and the admin clicks "Limpiar filtros"
 - **THEN** the status filter returns to its unfiltered value and all clients matching the remaining filters are shown
 
