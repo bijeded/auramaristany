@@ -85,9 +85,24 @@ export interface RecentPaymentRow {
   status: string;            // 'paid' | 'open' | 'void' | 'uncollectible'
 }
 
+/**
+ * Fila de invoice para la tarjeta "Ingresos por variante".
+ *
+ * Deliberadamente SIN `invoice_date`: esa cifra es histórica completa, sin
+ * ventana, así que la fecha no participa. `FinanceInvoiceRow` (que sí la lleva)
+ * es de la ventana de 12 meses de "Ingresos por mes" y no debe reutilizarse
+ * aquí — compartir el tipo invitaría a compartir la consulta, y ésa es
+ * justamente la que no puede cambiar de significado.
+ */
+export interface FinanceVariantInvoiceRow {
+  amount_paid: number;       // en pesos
+  variant_name: string;
+}
+
 export interface MonthRevenue { key: string; label: string; total: number }
 export interface VariantCount { variant: string; count: number }
 export interface ProgramRevenue { program: string; total: number }
+export interface VariantRevenue { variant: string; total: number }
 
 // ---------------------------------------------------------------------------
 // Task 1: formatMXN
@@ -164,6 +179,56 @@ export function groupRevenueByProgram(invoices: FinanceInvoiceRow[]): ProgramRev
   return Array.from(totals.entries())
     .map(([program, total]) => ({ program, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+// ---------------------------------------------------------------------------
+// dashboard-revenue-by-variant: groupRevenueByVariant + orderRevenueByClientsOrder
+// ---------------------------------------------------------------------------
+
+/**
+ * Ingreso histórico por variante. Cifra de DINERO (ADR 0004): cuenta lo que se
+ * cobró, sin importar si la suscripción que lo produjo sigue viva. Su tarjeta
+ * vecina, "Clientes por variante", es cifra de PERSONAS y cuenta acceso actual;
+ * que las dos discrepen es intencional, no un desajuste que haya que cuadrar.
+ */
+export function groupRevenueByVariant(invoices: FinanceVariantInvoiceRow[]): VariantRevenue[] {
+  const totals = new Map<string, number>();
+  for (const inv of invoices) totals.set(inv.variant_name, (totals.get(inv.variant_name) ?? 0) + inv.amount_paid);
+  return Array.from(totals.entries())
+    .map(([variant, total]) => ({ variant, total }))
+    // Una variante que suma 0 no es "ingreso cero": es una fila con una barra
+    // invisible. La tarjeta lista sólo lo que tiene ingreso.
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Ordena el ingreso siguiendo el orden de la tarjeta de clientes, y agrega al
+ * final las variantes que sólo existen del lado del dinero (clientes ya
+ * terminados, ingreso histórico vivo) por total descendente.
+ *
+ * El orden compartido es lo que hace legible la comparación entre las dos
+ * tarjetas: ordenarlas por separado, cada una por su propia medida, produce dos
+ * listas que comparten etiquetas y sugieren una correspondencia fila-a-fila que
+ * no existe. La alineación vale arriba, donde está el traslape, y se pierde
+ * abajo — a propósito.
+ */
+export function orderRevenueByClientsOrder(
+  revenue: VariantRevenue[],
+  clientsOrder: VariantCount[]
+): VariantRevenue[] {
+  const byVariant = new Map(revenue.map((r) => [r.variant, r]));
+  const shared: VariantRevenue[] = [];
+
+  for (const c of clientsOrder) {
+    const row = byVariant.get(c.variant);
+    if (!row) continue;   // tiene clientes pero aún no factura: no va en esta tarjeta
+    shared.push(row);
+    byVariant.delete(c.variant);
+  }
+
+  const revenueOnly = Array.from(byVariant.values()).sort((a, b) => b.total - a.total);
+  return [...shared, ...revenueOnly];
 }
 
 // ---------------------------------------------------------------------------

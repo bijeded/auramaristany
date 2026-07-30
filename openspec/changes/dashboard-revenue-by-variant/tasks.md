@@ -9,7 +9,7 @@
 - [ ] 2.2 Add `VariantRevenue { variant: string; total: number }` and implement `groupRevenueByVariant` in `lib/admin/finance-helpers.ts`, mirroring `groupClientsByVariant`. Tests green.
 - [ ] 2.3 Write failing tests for `orderRevenueByClientsOrder(revenue, clientsOrder)`: shared variants follow the clients order regardless of their totals; a clients-order variant with no revenue is omitted; revenue-only variants are appended after the shared ones sorted by total descending; empty revenue and empty clients order each return sensibly.
 - [ ] 2.4 Implement `orderRevenueByClientsOrder` in `lib/admin/finance-helpers.ts`. Tests green.
-- [ ] 2.5 Delete `groupRevenueByProgram`, the `ProgramRevenue` interface, and their block in `__tests__/finance-helpers.test.ts`. Confirm no remaining references (`rg 'groupRevenueByProgram|ProgramRevenue\b' lib app components __tests__`).
+> Deleting `groupRevenueByProgram` is deliberately **not** in this group: `app/admin/dashboard/page.tsx` still imports it until task 4.4, so a commit removing it here would not typecheck. It runs as task 4.7 instead.
 
 ## 3. Query
 
@@ -24,6 +24,7 @@
 - [ ] 4.4 Replace the "Ingresos por programa" card with "Ingresos por variante": heading plus the grand total via `formatMXN`, a subtitle stating the all-time window, and `<VariantBarList fill="var(--rosa-bar)" …>` with `display={formatMXN(total)}` and its own empty message. Wire the data through `getRevenueByVariantAllTime` → `groupRevenueByVariant` → `orderRevenueByClientsOrder(…, clientsByVariant)`; add the query to the existing `Promise.all`.
 - [ ] 4.5 Keep the flex row's `alignItems: "stretch"` so the two cards stay equal height with uneven lists; do not switch to `flex-start` or distribute rows.
 - [ ] 4.6 Confirm no `#9982f4` literal remains anywhere in `app/` or `components/`.
+- [ ] 4.7 Now that no caller remains, delete `groupRevenueByProgram`, the `ProgramRevenue` interface, and their block in `__tests__/finance-helpers.test.ts`. Confirm no remaining references (`rg 'groupRevenueByProgram|ProgramRevenue\b' lib app components __tests__`).
 
 ## 5. Verification
 
