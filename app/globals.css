@@ -20,6 +20,14 @@
   --error: #e05c5c;
   --error-tint: rgba(224, 92, 92, 0.10);
   --exito: #4caf7d;
+  /* Verde de --exito pero legible como TEXTO: #4caf7d sobre blanco da 2.71:1 y
+     no alcanza ni el 3:1 de texto grande. Los fondos teñidos siguen usando
+     --exito; las cifras y el texto usan éste. */
+  --exito-text: #2f7d54;
+  /* Ámbar de "todavía puede cobrar" (pausada, impaga, incompleta). Estaba
+     repetido a mano como #9a7b1f en cinco archivos. 4.07:1 sobre blanco. */
+  --ambar: #9a7b1f;
+  --ambar-tint: rgba(240, 198, 116, 0.18);
   --font-head: 'Oswald', system-ui, sans-serif;
   --font-body: 'Hind', system-ui, sans-serif;
   --r-card: 12px;

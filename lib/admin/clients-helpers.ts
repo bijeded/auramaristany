@@ -82,6 +82,49 @@ export type StatusFilter =
   | "Sin actividad"
   | null;
 
+/**
+ * Las etiquetas de las dos cohortes que están terminando, nombradas porque las
+ * usan tres sitios: las pills, el validador de la URL y los enlaces de las
+ * tarjetas del dashboard. Como literales repetidos, un cambio de nombre en las
+ * pills dejaría los enlaces apuntando a un filtro que ya no existe.
+ */
+export const COHORT_FILTER = {
+  /** Plazo fijo en su último mes ya pagado: se gradúa. */
+  completing: "Último mes",
+  /** Baja voluntaria agotando su periodo. */
+  cancelling: "En cancelación",
+} as const;
+
+/**
+ * Las pills de estado, en el orden en que se muestran. Vive aquí y no dentro del
+ * componente porque `parseStatusFilter` necesita la misma lista para validar lo
+ * que llega por la URL: dos copias serían dos listas que se separan.
+ */
+export const STATUS_FILTERS: Exclude<StatusFilter, null>[] = [
+  "Activas",
+  "Vencidas",
+  "Canceladas",
+  "Completadas",
+  COHORT_FILTER.completing,
+  COHORT_FILTER.cancelling,
+  "Sin actividad",
+];
+
+/**
+ * Traduce el `?status=` de la URL a un filtro válido, o a null.
+ *
+ * D17 — las tarjetas "Terminan" y "Cancelaciones" del dashboard enlazan aquí con
+ * la cohorte ya seleccionada, así que el valor entra por la barra de direcciones.
+ * NO se puede pasar tal cual al estado: `StatusFilter` es una unión cerrada y
+ * cualquiera puede escribir lo que quiera ahí. Lo desconocido se ignora y la
+ * lista sale sin filtrar, que es lo que un enlace roto debería hacer.
+ */
+export function parseStatusFilter(raw: string | string[] | undefined): StatusFilter {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  return STATUS_FILTERS.find((f) => f === value) ?? null;
+}
+
 /** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
 export const INACTIVITY_THRESHOLD_DAYS = 10;
 
@@ -265,9 +308,10 @@ export function canDeleteClient(
  * se acuerde de esta pantalla, y entonces un status nuevo debe verse raro, no
  * borrar la lista de clientes de Aura.
  */
-// Ámbar = "todavía puede cobrar". Se nombra porque ahora lo usan tres entradas
-// y un hex repetido a mano es un hex que acaba divergiendo.
-const AMBAR = { bg: "rgba(240,198,116,.18)", color: "#9a7b1f" };
+// Ámbar = "todavía puede cobrar". Vive en globals.css porque el hex estaba
+// repetido a mano en cinco archivos; quedan tres por convertir (payment-status,
+// SubscriptionCard, ClientDetailTabs), anotados en BACKLOG.
+const AMBAR = { bg: "var(--ambar-tint)", color: "var(--ambar)" };
 
 const STATUS_PRESENTATION: Record<string, { label: string; bg: string; color: string }> = {
   active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
