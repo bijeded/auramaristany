@@ -1,9 +1,10 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { logAndGeneric } from "./errors";
-import type { CancellationReason, SubscriptionStatus } from "@/lib/supabase/types";
+import type { SubscriptionStatus } from "@/lib/supabase/types";
 import type {
   ChurnSubRow,
+  ReasonSurveyRow,
   FinanceSubRow,
   FinanceInvoiceRow,
   FinanceVariantInvoiceRow,
@@ -175,7 +176,7 @@ export async function getChurnByVariantAllTime(): Promise<ChurnSubRow[]> {
  * Cliente RLS-aware, sin service-role: la migración 011 ya le da `select` al
  * admin vía `is_admin()`, y la ruta entra por `requireAdminPage()`.
  */
-export async function getCancellationReasonsAllTime(): Promise<{ reason: CancellationReason }[]> {
+export async function getCancellationReasonsAllTime(): Promise<ReasonSurveyRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("cancellation_surveys").select("reason");
 
@@ -184,7 +185,7 @@ export async function getCancellationReasonsAllTime(): Promise<{ reason: Cancell
     return [];
   }
 
-  return (data ?? []) as { reason: CancellationReason }[];
+  return (data ?? []) as ReasonSurveyRow[];
 }
 
 export async function getPastDueCount(): Promise<number> {

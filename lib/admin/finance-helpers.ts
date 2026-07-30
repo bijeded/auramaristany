@@ -277,6 +277,12 @@ export interface VariantChurn {
   rate: number;
 }
 
+/** Fila de encuesta para "Razones de cancelación". Sólo el motivo: `detail` es
+ *  texto libre y un agregado no tiene dónde ponerlo (regla 18). */
+export interface ReasonSurveyRow {
+  reason: CancellationReason;
+}
+
 export interface ReasonCount {
   reason: CancellationReason;
   label: string;
@@ -370,7 +376,7 @@ export function groupChurnByVariant(rows: ChurnSubRow[]): VariantChurn[] {
  * Las etiquetas vienen de `cancellationReasonLabel`, no de una segunda tabla
  * escrita para esta carta (regla 8).
  */
-export function groupCancellationReasons(rows: { reason: CancellationReason }[]): ReasonCount[] {
+export function groupCancellationReasons(rows: ReasonSurveyRow[]): ReasonCount[] {
   if (rows.length === 0) return [];
 
   const counts = new Map<CancellationReason, number>();
