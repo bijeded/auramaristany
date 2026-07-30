@@ -39,4 +39,4 @@
 - [x] 6.2 Smoke on a Preview URL: hand-set `cancel_at_period_end = true` (and separately `completed_at`) on one real `active` row, confirm MRR drops by that row's `price_mxn`, the row moves out of "Renuevan" into the right ending card, and "Suscripciones activas" is unchanged — the mocked unit tests never talk to Supabase
 - [x] 6.3 Restore the hand-edited row to its original values and confirm the dashboard returns to its previous figures
 - [x] 6.4 Verify both new pills against that same row, including the click-through from each dashboard card
-- [ ] 6.5 `openspec validate d17-dashboard-renewal-cohorts`, then `/opsx:sync`, update `BACKLOG.md` (close D17, note the deferred `CANCELABLE_STATUSES` duplication), and open the PR
+- [x] 6.5 `openspec validate d17-dashboard-renewal-cohorts`, then `/opsx:sync`, update `BACKLOG.md` (close D17, note the deferred `CANCELABLE_STATUSES` duplication), and open the PR
