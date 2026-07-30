@@ -21,7 +21,7 @@ None.
 ### Modified Capabilities
 - `portal-subscription-management`: the exit survey gains a reason for declining to answer, and the "cancel while skipping the survey" scenario changes what it records — `prefiero_no_decir` instead of `otro`.
 
-> Deliberately **not** modified: `admin-cancellation-analytics`. Its requirements already say labels come from `cancellationReasonLabel` and that reasons with no rows are absent, so a new enum value needs no spec change there. (That capability also does not exist in `openspec/specs/` yet — `dashboard-cancellation-charts` is merged but not archived — so a delta against it would have nothing to modify.)
+> Deliberately **not** modified: `admin-cancellation-analytics`. Its requirements are reason-agnostic — labels come from `cancellationReasonLabel`, reasons with no rows are absent, and `pago_fallido` is named as included — so a widened enum satisfies them unchanged and the chart gains a bar without the spec gaining a word.
 
 ## Impact
 

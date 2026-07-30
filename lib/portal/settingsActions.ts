@@ -112,7 +112,7 @@ export async function cancelSubscription(input: { reason?: string; detail?: stri
   //
   // OJO, ése es el precio de tragarse el error: si el valor no está en el CHECK
   // de `cancellation_surveys.reason`, el insert se rechaza y la fila se pierde
-  // EN SILENCIO —ni la clienta, ni Aura, ni CI ven nada—. Por eso la migración
+  // EN SILENCIO —ni el cliente, ni Aura, ni CI ven nada—. Por eso la migración
   // que agrega un motivo va SIEMPRE antes que el código que lo nombra (D19,
   // migración 019). No "arregles" esto propagando el error: lo correcto es no
   // desplegar un valor que la base no acepta.

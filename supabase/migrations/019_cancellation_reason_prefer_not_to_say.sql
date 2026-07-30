@@ -8,14 +8,14 @@
 --
 -- Daba igual mientras nadie leyera la columna. Ya no: la tarjeta "Razones de
 -- cancelación" del dashboard pinta esa barra, y ahí dentro van dos poblaciones
--- que piden respuestas opuestas —un motivo que la lista no cubre, y una
--- clienta que decidió no darlo—.
+-- que piden respuestas opuestas —un motivo que la lista no cubre, y un
+-- cliente que decidió no darlo—.
 --
 -- OJO al orden: esta migración va ANTES que el código que nombra el valor. Al
 -- revés, el CHECK rechaza el insert y `cancelSubscription` se traga ese error a
 -- propósito (Stripe corre primero y la encuesta es telemetría best-effort, para
 -- que un fallo aquí no deje una baja huérfana). O sea que la fila se pierde EN
--- SILENCIO: ni la clienta, ni Aura, ni CI ven nada.
+-- SILENCIO: ni el cliente, ni Aura, ni CI ven nada.
 --
 -- El CHECK original es inline en el `create table` de la 011, así que Postgres
 -- le puso el nombre por defecto `cancellation_surveys_reason_check`. VERIFICAR

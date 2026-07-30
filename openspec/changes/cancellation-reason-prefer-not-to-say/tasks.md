@@ -2,7 +2,9 @@
 
 - [ ] 1.1 Write `supabase/migrations/019_cancellation_reason_prefer_not_to_say.sql`: drop and recreate the `cancellation_surveys.reason` `CHECK` with `prefiero_no_decir` added to the existing seven. Comment says why the value exists — declining to answer is not "Otro" — so the next reader does not re-merge them.
 - [ ] 1.2 Apply it via the Supabase Management API. **SQL on ONE single line** — the pipeline eats newlines, so a `--` comment silently comments out everything after it and returns `[]` as though it worked.
-- [ ] 1.3 Verify against the real database, not the file: read the constraint back and confirm it lists eight values.
+- [ ] 1.3 Verify against the real database, not the file. Run the `pg_constraint` query **before and after** and paste both into the PR:
+      `select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid = 'cancellation_surveys'::regclass and contype = 'c';`
+      The **before** proves the constraint's real name matches what the migration drops; the **after** must show **exactly one** reason check, listing eight values. The after alone cannot distinguish "renamed correctly" from "a second constraint was created alongside the old one" — which is the migration's silent failure mode, and the one a comment in the SQL cannot prevent.
 - [ ] 1.4 Probe the write path end to end under a **client** session (not service-role): insert a row with `reason = 'prefiero_no_decir'`, confirm migration 011's insert policy (`profile_id = auth.uid() and source = 'voluntary' and reason <> 'pago_fallido'`) accepts it, then delete the probe row. This is the one check that proves the policy and the `CHECK` agree.
 - [ ] 1.5 Record in the PR when 1.2–1.4 ran and what they returned (rule 11).
 

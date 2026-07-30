@@ -56,7 +56,9 @@ Asking a client who declined to answer to elaborate is a contradiction. `DETAIL_
 
 ### D5 — No spec delta for `admin-cancellation-analytics`
 
-That capability's requirements already state labels come from `cancellationReasonLabel` and that reasons with no rows are absent, so a new enum value needs no requirement change. It also does not exist in `openspec/specs/` yet — `dashboard-cancellation-charts` is merged but unarchived — so a delta would have nothing to modify.
+That capability's requirements are written to be **reason-agnostic**: labels come from `cancellationReasonLabel`, reasons with no rows are absent, and `pago_fallido` is named as included. A widened enum satisfies all three unchanged, so there is no requirement to modify — the chart gains a bar without the spec gaining a word.
+
+(An earlier draft of this design justified the omission by saying the capability did not exist in `openspec/specs/` yet. It does — `dashboard-cancellation-charts` was archived and its deltas synced. The conclusion was right for the wrong reason.)
 
 The chart is verified anyway during runtime verification: the new bar must appear once a cancellation uses it.
 
@@ -79,4 +81,5 @@ Rollback: the app change reverts cleanly; the widened `CHECK` can stay, since it
 ## Open Questions
 
 - Should "Prefiero no decir" sit last in the radio list or immediately after "Otro"? Taken as last; a UI judgement worth one look at the rendered modal.
+- **The modal's default selection changes, and this was not intended when the change was scoped.** `reason === null` was both the initial state *and* the hardcoded radio's `checked` condition, so the modal opened with "Prefiero no decir" already selected. With that radio gone it opens with nothing selected. This reads as the better default for an optional survey — a pre-ticked answer is a nudge, and the confirm path records the same value anyway — but it is a behaviour change, not a styling one, and runtime verification 5.2 confirms it deliberately.
 - Does Aura want the "Otro" bar annotated on the dashboard to say it includes pre-change declines? Deferred — it is a chart-copy decision, not part of this change, and it stops mattering as old rows age out.
