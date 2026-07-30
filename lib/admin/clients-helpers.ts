@@ -368,6 +368,10 @@ const NO_REASON_RECORDED = "Sin motivo registrado";
  * vació esta pantalla una vez.
  */
 export function cancellationCell(
+  // `completed_at` y `cancel_at_period_end` se piden y NO se leen, a propósito:
+  // son justo las dos columnas de las que esta decisión no debe depender, y las
+  // que fijan las tres pruebas negativas. Que estén en la firma hace visible
+  // cualquier edición futura que empiece a mirarlas.
   sub: { status: SubStatus; completed_at: string | null; cancel_at_period_end: boolean },
   survey: CancellationSurveyLike | null
 ): CancellationCell | null {

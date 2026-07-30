@@ -185,7 +185,7 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
   const subIds = ((rawSubs ?? []) as RawSub[]).map((s) => s.id);
   const surveys = new Map<string, CancellationSurveyLike>();
   if (subIds.length > 0) {
-    const { data: surveyRows } = await supabase
+    const { data: surveyRows, error: surveyError } = await supabase
       .from("cancellation_surveys")
       .select("subscription_id, reason, detail, created_at")
       .in("subscription_id", subIds)
@@ -195,6 +195,14 @@ export async function getClientDetail(clientId: string): Promise<ClientDetail | 
       // `default now()`, sin `not null`) y Postgres pone los NULL primero en
       // orden descendente — una fila sin fecha le ganaría a la más reciente.
       .order("created_at", { ascending: false, nullsFirst: false });
+    // Aquí SÍ importa mirar el error, y no es simetría con el bloque de arriba:
+    // cuando los peldaños fallan la ficha enseña un guion, pero cuando esto
+    // falla enseña "Sin motivo registrado", que es una AFIRMACIÓN —"esta baja
+    // no dejó encuesta"— indistinguible de la verdadera. Una lectura rota se
+    // le estaría contando a Aura como un hecho sobre su cliente.
+    if (surveyError) {
+      console.error("[getClientDetail] cancellation_surveys read failed", surveyError);
+    }
     // keep: ensanchamiento deliberado. `types.ts` tipa `reason` como
     // `CancellationReason`, pero el CHECK de la base puede ir por delante de la
     // unión y esta pantalla tiene que poder pintar el valor crudo (regla 8).
