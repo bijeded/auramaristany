@@ -1,7 +1,8 @@
 import { contentProgressLabel } from "@/lib/portal/progress-display";
-import { deriveCancellationState } from "@/lib/portal/cancellation";
+import { cancellationReasonLabel, deriveCancellationState, isChurned } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { dayLabel, daysBetween } from "@/lib/admin/date-helpers";
+import { decodePlainText } from "@/lib/admin/plain-text";
 import { formatMXN } from "@/lib/admin/finance-helpers";
 
 /**
@@ -329,6 +330,66 @@ export function statusBadge(status: string): { label: string; bg: string; color:
       color: "var(--gris-texto)",
     }
   );
+}
+
+/** La fila de encuesta de salida, tal como llega de `cancellation_surveys`. */
+export interface CancellationSurveyLike {
+  /** `string` y no `CancellationReason` a propósito: es un valor de la base, y
+   *  el CHECK puede ir por delante de la unión. `cancellationReasonLabel` ya
+   *  sabe caer al valor crudo. */
+  reason: string;
+  detail: string | null;
+}
+
+export interface CancellationCell {
+  badge: { label: string; bg: string; color: string };
+  reason: string;
+}
+
+const NO_REASON_RECORDED = "Sin motivo registrado";
+
+/**
+ * Cómo anuncia la ficha que una cliente se fue — insignia y motivo, o nada.
+ *
+ * La condición es `isChurned` y NADA más, y ahí está el riesgo entero de esta
+ * pantalla. `cancel_at_period_end` vale true para TRES poblaciones: la que se
+ * va en su periodo de gracia, la que está en su último mes pagado y la que ya
+ * se graduó. Mirarlo a él —o a `completed_at`, que L2b escribía sin cancelar
+ * nada en Stripe— pintaría "Cancelada" sobre quien TERMINÓ su programa, o sea
+ * convertiría el mejor desenlace de Aura en su peor métrica (ADR 0003, 0004).
+ * Por eso los tres casos negativos están fijados uno por uno en las pruebas.
+ *
+ * `deriveCancellationState` no sirve aquí y no es un descuido: contesta "¿qué
+ * puede hacer AHORA esta suscripción viva?" y deja caer hasta `none` una fila
+ * terminal en `canceled`. Preguntarle por la baja devolvería nada, en silencio.
+ *
+ * La insignia sale de `statusBadge`, la misma que pinta el listado: una tabla
+ * de presentación propia aquí sería la tabla copiada de la regla 8, que ya
+ * vació esta pantalla una vez.
+ */
+export function cancellationCell(
+  // `completed_at` y `cancel_at_period_end` se piden y NO se leen, a propósito:
+  // son justo las dos columnas de las que esta decisión no debe depender, y las
+  // que fijan las tres pruebas negativas. Que estén en la firma hace visible
+  // cualquier edición futura que empiece a mirarlas.
+  sub: { status: SubStatus; completed_at: string | null; cancel_at_period_end: boolean },
+  survey: CancellationSurveyLike | null
+): CancellationCell | null {
+  if (!isChurned(sub.status)) return null;
+
+  // `detail` se guardó con `sanitizePlainText`, que escapa entidades, y React
+  // escapa otra vez al pintar: sin decodificar aquí, quien escribió
+  // `no me "convence"` le llega a Aura como `no me &quot;convence&quot;`
+  // (regla 18). Sale a un nodo de texto de React y a ningún otro sitio.
+  const detail = survey ? decodePlainText(survey.detail ?? "").trim() : "";
+  const reason = survey
+    ? cancellationReasonLabel(survey.reason) + (detail ? ` · ${detail}` : "")
+    : // Ausencia de encuesta, NO "Otro": una baja hecha desde el panel de
+      // Stripe, o anterior a la migración 011, nunca dejó fila. Se distingue a
+      // propósito de `prefiero_no_decir`, que sí es una respuesta.
+      NO_REASON_RECORDED;
+
+  return { badge: statusBadge(sub.status), reason };
 }
 
 function csvCell(value: string): string {

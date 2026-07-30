@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeRichText, sanitizePlainTextBody } from "@/lib/admin/sanitize-html";
+import { sanitizeRichText, sanitizePlainTextBody, sanitizePlainText } from "@/lib/admin/sanitize-html";
+import { decodePlainText } from "@/lib/admin/plain-text";
 
 describe("sanitizeRichText", () => {
   it("elimina <script>", () => {
@@ -104,5 +105,31 @@ describe("sanitizePlainTextBody", () => {
 
   it("recorta espacios en los extremos", () => {
     expect(sanitizePlainTextBody("  Hola  ")).toBe("Hola");
+  });
+});
+
+// El decode extraído. Vive aparte de `sanitizePlainTextBody` porque lo importan
+// módulos que acaban en el bundle del navegador (`clients-helpers` →
+// `ClientDetailTabs`, marcado "use client"), y `sanitize-html.ts` arrastraría
+// la librería entera con él.
+describe("decodePlainText", () => {
+  it("deshace el escape que `sanitizePlainText` dejó puesto", () => {
+    const stored = sanitizePlainText('Ana & "Bea" <3');
+    expect(decodePlainText(stored)).toBe('Ana & "Bea" <3');
+  });
+
+  it("`&amp;` va al final: no decodifica dos veces", () => {
+    expect(decodePlainText("&amp;lt;")).toBe("&lt;");
+  });
+
+  // ⚠ Esto NO es un defecto: es la invariante, fijada para que se lea. Lo que
+  // sale de aquí puede volver a tener forma de HTML, así que sólo puede llegar
+  // a sinks que escapan —texto en React, `<Text>` de React Email— y nunca a
+  // `dangerouslySetInnerHTML` ni al cuerpo HTML crudo de un correo. La prueba
+  // existe para que quien la rompa tenga que borrarla a mano.
+  it("INVARIANTE: el valor decodificado puede tener forma de HTML", () => {
+    expect(decodePlainText("&lt;script&gt;alert(1)&lt;/script&gt;")).toBe(
+      "<script>alert(1)</script>"
+    );
   });
 });

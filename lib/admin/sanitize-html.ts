@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { decodePlainText } from "./plain-text";
 
 // Formas seguras y ancladas (A8). El navegador normaliza hex → rgb(r, g, b) al
 // serializar estilos inline (CSSStyleDeclaration), así que ambas deben pasar.
@@ -22,8 +23,10 @@ export function sanitizePlainText(input: string): string {
 // cuerpos de los mensajes automáticos). `sanitizePlainText` escapa `&`, `<`,
 // `>`, `"` y `'` a entidades; como el portal y el email pintan el cuerpo con
 // React (que ya escapa), un `&amp;` almacenado se vería literal en pantalla.
-// Aquí se deshace ese escape una sola vez: `&amp;` va al final para que
-// `&amp;lt;` quede en `&lt;` y no en `<`.
+// Aquí se deshace ese escape una sola vez, delegando en `decodePlainText`: esa
+// mitad la necesitan también los LECTORES de estas columnas (la ficha de
+// cliente pinta el `detail` de la encuesta), y escondida aquí dentro no la veía
+// ninguno.
 //
 // ⚠ INVARIANTE: al decodificar, el valor guardado puede volver a tener forma de
 // HTML (un `<script>` escrito a mano queda como texto literal `<script>`). Una
@@ -31,12 +34,7 @@ export function sanitizePlainText(input: string): string {
 // ni al cuerpo HTML crudo de un email — sólo a sinks que escapan: texto en React
 // (`white-space: pre-line`) y `<Text>{body}</Text>` de React Email.
 export function sanitizePlainTextBody(input: string): string {
-  return sanitizePlainText(input)
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&");
+  return decodePlainText(sanitizePlainText(input));
 }
 
 // Whitelist conservadora para el output de Tiptap (starter-kit + enlaces + color A8).
