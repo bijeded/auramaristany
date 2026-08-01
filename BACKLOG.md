@@ -7,7 +7,7 @@ Living list of **pending** work. **Each item has a stable ID** to launch it dire
 /opsx:explore "L9 — admin UI for prices"   # when it still needs defining
 ```
 
-**When closing an item:** `/opsx:archive` → **delete its row and section here** → re-index codebase-memory in `fast` mode.
+**When closing an item:** `/opsx:archive` → **delete its row and section here**.
 Closed work is not summarized here — the durable record is `openspec/changes/archive/`, `docs/adr/*.md`, and the review rules in `CLAUDE.md`.
 
 **Size:** `S` ≈ hours · `M` ≈ ~1 day · `L` ≈ several days.
@@ -25,7 +25,7 @@ Closed work is not summarized here — the durable record is `openspec/changes/a
 | **L3** | Onboarding question set | S | Blocked (Aura defines them) |
 | **L5** | Real WhatsApp | S | Blocked (Aura's number) |
 | **L11** | Turn the A4 automated rules on | S | Blocked (L6 + Aura's content) |
-| **L8** | production-checklist | M | At the end |
+| **L8** | Pre-launch verification | M | At the end |
 | **L9** | Admin UI for plans/prices? | L | Decision pending |
 | **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
 | **A8** | Color and background in the text editor | M | Pending |
@@ -62,10 +62,42 @@ A4 shipped with both rules `is_active = false`. Enabling them is a deliberate, o
   `update automated_messages set is_active = true where rule = '<rule>';` (or the Activar button in `/admin/automated-messages`).
 - **Carries A4's task 9.3**, the one smoke that could not run pre-launch: the send path is unit-tested and dry-run-verified but has never delivered a real message. On the first enabled rule, confirm a client receives the in-app message **and** the email, then re-run the cron the next day and confirm **nothing** is re-sent (the `automated_notices` dedupe).
 
-### L8 · production-checklist — `M` · at the end
-Run the `production-checklist` skill before opening to real clients (includes the `npm audit` vulnerability gate).
+### L8 · Pre-launch verification — `M` · at the end
+The full pass before opening to real clients. Runs **once**, not per PR — CI is the per-PR gate. Pre-conditions: launch-milestone changes archived · CI green on `main` · deployed to Production · production env vars set in Vercel.
+
+Classify every finding: **BLOCKER** (must not launch) · **WARNING** (fix before or shortly after) · **NOTE** (post-launch). Finish with an explicit `READY TO LAUNCH: YES/NO`.
+
+**1 · Environment, config, dependencies**
+- All 11+ env vars from `CLAUDE.md` → "Environment variables" set in Vercel Production — **not just locally**; `DEV_DATE` **absent**.
+- No `.env`/`.env.local` committed; **`npm audit` clean of high/critical** (unfixable transitive advisories documented as NOTES, never silently ignored); `package-lock.json` in sync with `package.json`.
+- gitleaks green **and a full-history scan run at least once** — the per-PR scan only sees new commits.
+
+**2 · CI gate actually enforced on `main`**
+```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh api repos/$REPO/branches/main/protection -H "Accept: application/vnd.github+json" --jq '.required_status_checks'
+```
+Must return the CI check name, not `null`. Confirm the workflow covers every command in `CLAUDE.md` → CI, and that a green run exists on the current `main` commit.
+
+**3 · Performance + accessibility baseline**
+- Lighthouse on the critical flow: Performance ≥75 · Accessibility ≥90 · Best Practices ≥90 · SEO ≥80. Below threshold = WARNING; Performance <50 = BLOCKER. Record the numbers as the regression baseline.
+- Verify against the real UI, not just the score: keyboard reachable + visible focus + logical order, no traps · labels on icon-only controls · **contrast measured against the actual track** (see `docs/adr/0005`, and `D27` is still open) · form errors announced, not color-only · tap targets ≥44px (the documented `kg | lb` 32px exception aside).
+
+**4 · Error tracking** — currently **none**. Decide deliberately: wire something up, or accept as a WARNING that production failures stay invisible until Aura reports them. If wired: trigger a test error, confirm it lands, set a spike alert.
+
+**5 · Database** — every migration applied to Production **explicitly** (never assumed to auto-run on deploy), and a Supabase backup taken **before** launch.
+
+**6 · Security basics** — HTTPS enforced · auth required on every route holding client data · no admin/debug route publicly reachable · no verbose errors or stack traces to the client (rule 6) · rate limiting on the auth endpoints · CORS not `*`.
 - **Carried over from D11:** tighten the baseline CSP to a **nonce-based** `script-src`/`style-src` (today both keep `'unsafe-inline'`).
-- **Wants D15 closed first** so `openspec validate --specs --strict` starts from green.
+
+**7 · Domain and routing** — `app.auramaristany.com` resolves · SSL valid and not expiring within 30 days · `www`/non-`www` behave · 404 and 500 render real pages, not blank screens or Next defaults.
+
+**8 · Smoke test in Production** (human step) — the full client flow end-to-end **with a real account, not a seed one**, and confirm the emails in that flow actually send. Overlaps `L4`; this is the post-cleanup repeat on live config.
+
+**9 · Operational readiness** — the rollback path is understood, uptime alerting exists, and the deploy process is written in `CLAUDE.md` rather than only in your head.
+
+- **Wants D15 closed first** so the specs start from green.
+- Skipped by capability, noted here so nobody re-derives it: no PWA/offline/installable, no native wrapper → no manifest, service-worker, store-metadata or on-device checks.
 
 ### L9 · Admin UI for plans/prices? — `L` · decision pending
 Decide whether to build a UI to manage variants/prices or keep the script + SQL approach.
@@ -103,10 +135,10 @@ These three are one root cause (no single-statement transaction) and should be c
 
 | ID | Item | Size | Note |
 |----|------|:----:|------|
-| **D15** | 1 main spec fails `openspec validate --specs --strict` | XS | ~~`admin-richtext-color`, `portal-exercise-display`, `portal-performance-display`~~ → **only `admin-richtext-color` remains** (`18 passed, 1 failed`). The two portal specs were given real Purpose sections during the `thin-weight-unit-toggle` archive, which the archive command **blocked on** — this is not optional cleanup, a missing Purpose aborts `openspec archive` for any change touching that spec. No `## Purpose`, which the strict validator requires. Pre-existing, harmless at runtime, but the noise would hide a real spec regression. One paragraph. **Do it before L8** so that gate starts green. ⚠ The archive command seeds `TBD - update Purpose after archive` — write a real one. (`admin-dashboard-kpis` was fixed during the D17 archive.) |
+| **D15** | `admin-richtext-color` has no `## Purpose` | XS | The last main spec missing one (`portal-exercise-display` and `portal-performance-display` got real Purpose sections during the `thin-weight-unit-toggle` archive; `admin-dashboard-kpis` during the D17 archive). **Not optional cleanup:** a missing Purpose **blocks the delta-spec sync that `/opsx:archive` performs**, for any change touching that spec — that is how the other two came to be fixed, mid-archive and under pressure. (Archive itself doesn't police spec structure; the merge into `openspec/specs/` does.) Harmless at runtime; one paragraph to write. **Do it before L8.** ⚠ Archiving seeds the placeholder `TBD - update Purpose after archive` — write a real one instead of leaving it. |
 | **D14** | `requireAdminPage()` missing on 5 admin pages | S | From L2a security review. Defense-in-depth only — **not exploitable**: `getRedirectPath` sends no-session and `role === 'client'` away from `/admin`, and the matcher covers it. But `app/admin/content/page.tsx` and the four `content/[programId]/series/**` pages rely on middleware alone, unlike the other seven. Systematic fix is a guard in `app/admin/layout.tsx` — blocked on that layout being `"use client"` (it uses `usePathname`), so it needs splitting into a server wrapper + client nav. |
 | **D24** | Client-list filter is write-only after the first render | S | From the D17 review, deliberately deferred. `initialStatus` seeds `useState`, so `?status=` is read **once**: a soft navigation between two `?status=` URLs that keeps `ClientsTable` mounted ignores the new value, and changing the filter leaves the URL stale — the filter is linkable in neither direction. Fix is to drive `estado` from `useSearchParams` + `router.replace`. ⚠ **Restated after PR #49:** the status filter is now a `<select>`, not seven pills, so the fix is *smaller* than when this was written (one controlled `value`, not seven active-state buttons) — but it still also touches the **program pills**, which remain pills and have the same write-only behaviour. |
-| **D28** | Demo subscriptions carry synthetic Stripe ids, so no Stripe-touching flow can be smoke-tested | S | `seed-demo.ts` writes `sub_seed_NNN` / `cus_seed_NNN`, which do not exist in Stripe — `GET /v1/subscriptions/sub_seed_002` → `No such subscription`. So **cancel and reactivate cannot be exercised on demo data at all**: `cancelSubscription` calls Stripe first, the call 404s, and the client sees the generic error. Correct behaviour (Stripe is the source of truth, so no survey row is written for a cancellation that did not happen) but it means every smoke card for those flows is unrunnable, and the only workaround is registering a fresh client through real test-mode checkout each time. ⚠ This is the trap `CLAUDE.md` → Skills already warns about ("a card has asked for a Stripe subscription that didn't exist") and it has now been sprung twice; **D8** is the same shape from the other side (no `trialing` sub exists to look at). Fix: create real test-mode subscriptions in the seed for a handful of clients, or add a documented "make me a cancellable client" script. |
+| **D28** | Demo subscriptions carry synthetic Stripe ids, so no Stripe-touching flow can be smoke-tested | S | `seed-demo.ts` writes `sub_seed_NNN` / `cus_seed_NNN`, which do not exist in Stripe — `GET /v1/subscriptions/sub_seed_002` → `No such subscription`. So **cancel and reactivate cannot be exercised on demo data at all**: `cancelSubscription` calls Stripe first, the call 404s, and the client sees the generic error. Correct behaviour (Stripe is the source of truth, so no survey row is written for a cancellation that did not happen) but it means every smoke card for those flows is unrunnable, and the only workaround is registering a fresh client through real test-mode checkout each time. ⚠ **Sprung twice now, so state the rule in place: every step of a manual smoke check must be possible with the data that actually exists, and non-destructive** — one card asked for a Stripe subscription that didn't exist, another told the reader to delete a client for real; **D8** is the same shape from the other side (no `trialing` sub exists to look at). Fix: create real test-mode subscriptions in the seed for a handful of clients, or add a documented "make me a cancellable client" script. |
 | **D26** | `CANCELABLE_STATUSES` duplicates `ELIGIBLE_STATUSES` | XS | `lib/portal/settingsActions.ts` declares its own `["active","trialing","past_due"]` alongside the identical list in `lib/portal/cancellation.ts` — a **genuine** duplication, same question ("may she cancel?"). ⚠ *Unlike* `ACCESS_STATES` and `BILLING_STATUSES`, which answer **different** questions with a coincidentally identical list — those must NOT be merged. |
 | **D20** | `onboarding_questions_admin_write` has no `with check` | XS | From D18's security review. `for all using (is_admin())` with no `with check`, contrary to the RLS rule in `CLAUDE.md`. Functionally equivalent for `update` (Postgres falls back to `using`), but D18 made that policy the sole guard for a new callable entry point (`reorder_onboarding_questions`). New migration — **never edit 001**. |
 | **D27** | Two bar fills still fail the WCAG contrast floor | XS | From the `dashboard-revenue-by-variant` review. `components/admin/RevenueBarChart.tsx:25` (bar fill) and `components/portal/PerformanceChart.tsx:63` (line + dot stroke) hard-code `#9982f4`, which is **2.81:1 against the `--gris-claro` track** — under the 3:1 WCAG 1.4.11 floor for graphical objects. It passed inspection for months because against *white* it reads 3.06:1, and "lavender on white" is how anyone describes those cards. The dashboard variant cards were fixed (moved to `--lavanda-dark`, 4.22:1); these two were left alone because that change's scope named them must-not-touch. Rule now recorded in `docs/adr/0005-bar-fill-contrast-measured-against-the-track.md`: **measure the fill against its track, not the card.** ⚠ `components/admin/blocks/TextBlockEditor.tsx:17` also holds `#9982f4` but is a colour-picker swatch whose value is stored as content — a literal is arguably correct there; decide, don't convert reflexively. |
@@ -135,5 +167,5 @@ These three are one root cause (no single-statement transaction) and should be c
 2. **Then — the real S/M debts:** `D24` (client-list filter linkability) · `D14` (admin layout guard split) · `D28` (demo data cannot exercise any Stripe-touching flow — it blocks smoke-testing cancel/reactivate, and has now cost two unrunnable smoke cards).
 3. **Transactionality, as one change:** `D2` + `D13` + `D16` — one Postgres RPC pattern closes all three.
 4. **In parallel, waiting on Aura:** `L1` pricing · `L3` onboarding questions · `L5` WhatsApp · `L7` (needs Aura's list).
-5. **Launch close-out, in order:** `L4` smoke → `L6` demo cleanup → `L11` turn the A4 rules on (one at a time) → `L8` production-checklist.
+5. **Launch close-out, in order:** `L4` smoke → `L6` demo cleanup → `L11` turn the A4 rules on (one at a time) → `L8` pre-launch verification.
 6. **After launch, on demand:** `A8` editor colors · `L9` prices UI decision · `A13` message builder (wait for Aura's third-rule request).
