@@ -1,37 +1,91 @@
 schema: spec-driven
 
 context: |
-  Aura Maristany — health coaching platform (women 40+). Sells programs as recurring
-  monthly subscriptions.
-  Stack: Next.js 14 App Router + TypeScript, Supabase (PostgreSQL + RLS + Auth + Storage),
-  Stripe (MXN, apiVersion 2026-05-27.dahlia), Tailwind + shadcn/ui, Tiptap, Resend, Recharts,
-  dnd-kit, zod, Vitest. Deploy on Vercel; DB on Supabase Cloud.
-  Conventions: neutral Mexican Spanish in the UI ('cliente', not 'clienta'); pure functions
-  (with tests, AAA pattern) kept separate from server-only queries; Server Components by
-  default, mutations via server actions; RLS is the security boundary, service-role only
-  after requireAdmin(); identity always from getUser(); validate input with zod + sanitize-html;
-  Conventional Commits.
-  Migrations: numbered SQL in supabase/migrations/ (001-010 applied); never edit an applied
-  one, add a new one. months_elapsed is the immutable arbiter of access (incremented by
-  invoice.paid, never computed from dates).
-  Deployment restriction: main = Production for the live demo (app.auramaristany.com) that
-  Aura sees; WIP goes on branches/Preview. See CLAUDE.md, SPEC.md, and handoff.md for details.
+  Aura Maristany — holistic health coaching for women 40+, sold as recurring monthly
+  subscriptions in MXN. Next.js 14 App Router + TypeScript, Supabase (Postgres + RLS +
+  Auth + Storage), Stripe, Tailwind + shadcn/ui, Tiptap, Resend, Recharts, dnd-kit, zod,
+  Vitest. Deployed on Vercel; DB on Supabase Cloud.
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+  Sources of truth — read them, don't restate them in artifacts:
+    CLAUDE.md          how we work: conventions + the 21 framework review rules
+    openspec/specs/*   what the system does today
+    docs/adr/*.md      why the hard decisions went the way they did
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Four domain facts that artifacts get wrong, because nothing in tsc, lint, the tests
+  or the build catches them:
+  - Portal access = active/trialing/past_due via lib/content/subscription-access.ts.
+    months_elapsed answers a DIFFERENT question — which content month the client sees —
+    and is incremented by invoice.paid, never computed from dates.
+  - "Is this subscription ending?" has exactly one derivation: deriveCancellationState.
+  - The content grid is 4 weeks x 7 weekdays, addressed by (week_number, day_of_week).
+    A date before current_period_start has no cell at all.
+  - Money figures exclude subscriptions that won't be charged again; people figures
+    include them. Picking the wrong side is invisible to every test, because the
+    row-set is identical either way.
+
+  UI language is neutral Mexican Spanish: 'cliente', never 'clienta'. Applies to every
+  user-facing string, email, and error message.
+
+rules:
+  proposal:
+    - State non-goals explicitly. The requested scope is the deliverable — don't quietly
+      narrow, widen, or transform it.
+    - Name every CLAUDE.md review rule the change touches, by number.
+    - Declare whether the change touches a sensitive surface (auth, RLS, service-role,
+      webhooks, money, migrations) or has fan-out (cron, email, backfill). That
+      declaration sets the review and verification obligations for the whole change.
+    - A new KPI or money figure declares which side of the money/people split it is on
+      before it is written.
+
+  specs:
+    - Every spec file has a real "## Purpose" section. A missing one blocks the
+      delta-spec sync that /opsx:archive performs.
+    - Enumerate surfaces by the shape of the content, not by one property spelling or
+      one author. "Everywhere authored free text renders" is the real surface list; the
+      client writes her own day notes, so "text Aura wrote" excludes them by definition.
+    - Derive a status or enum union from lib/supabase/types.ts; never recopy the values.
+      A union narrower than the DB CHECK is a defect no test can see.
+    - An options list rendered by a component comes entirely from one exported constant.
+    - Never assert that two duplicated copies must stay identical — that records a
+      defect instead of fixing it. Unify them.
+
+  design:
+    - Write one only when there is a real architectural choice; otherwise say so and
+      skip it.
+    - A lifecycle state spread across columns gets exactly one derivation, named here,
+      with its precedence stated.
+    - Name the single source of truth for every enum, status list, or design token the
+      change introduces, and where its DB CHECK lives.
+
+  tasks:
+    - "New pure logic is test-first: failing test, then code, then refactor. Helpers
+      get tests; server-only queries do not."
+    - A bug fix starts with a test that fails for the stated reason.
+    - Adding a column, function, or CHECK gets an explicit task to apply the migration
+      and verify it against the real database before merge (CLAUDE.md review rule 11).
+    - Touching the DB, Stripe, email, or the cron gets an explicit runtime-verification
+      task (CLAUDE.md -> Verification).
+    - Manual smoke steps must be possible with the data that actually exists, and must
+      be non-destructive.
+    - The last task is a review pass in a fresh context, not a re-read of this one.
+
+operations:
+  apply:
+    guidance:
+      - Work the task list in order. Don't batch a migration task with the code that
+        depends on it.
+      - Green tsc, lint, tests and build do not verify anything outside the repo. The
+        database, Stripe, Vercel config and real data are all outside that gate.
+      - Never push to main — branch, Preview URL, PR, green CI. main is the live demo
+        Aura sees.
+      - "Report honestly: if a task is blocked or a step was skipped, say so instead
+        of narrowing the scope silently."
+  archive:
+    guidance:
+      - Say yes to the delta-spec sync. /opsx:archive does not merge the deltas into
+        openspec/specs/ on its own, and an unsynced archive leaves the main specs
+        describing a system that no longer exists, with no change folder left to notice.
+
+# Per-artifact rules apply only to their artifact; context reaches every artifact plus
+# the apply and archive operations. Valid artifact ids: proposal · specs · design · tasks.
+# Valid operation ids: apply · archive (guidance is the only field).
