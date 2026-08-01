@@ -1,0 +1,35 @@
+{
+  "$comment": [
+    "Goes to .claude/settings.json (checked in, shared). Tool-layer guardrails for the rules",
+    "in CLAUDE.md that were previously advisory only.",
+    "These are PREFIX matches on the command string, so they are a speed bump, not a proof.",
+    "The binding control on main is GitHub branch protection with enforce_admins: true."
+  ],
+
+  "permissions": {
+    "deny": [
+      "Bash(git push origin main:*)",
+      "Bash(git push origin HEAD:main:*)",
+      "Bash(git push -u origin main:*)",
+      "Bash(git push --set-upstream origin main:*)",
+      "Bash(git push origin +main:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --delete:*)",
+
+      "Edit(./.env.local)",
+      "Edit(./.env*.local)",
+
+      "Edit(./design-handoff-aura/**)"
+    ],
+
+    "$comment_ask": [
+      "Deliberately NOT here: git push (any branch) and gh pr merge. Prompting on those",
+      "would reintroduce a stop at every merge, which is the thing the single-gate",
+      "workflow removed on purpose."
+    ],
+    "ask": [
+      "Edit(./supabase/migrations/**)"
+    ]
+  }
+}
