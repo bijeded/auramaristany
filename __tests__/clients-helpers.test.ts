@@ -268,7 +268,7 @@ describe("canDeleteClient", () => {
 });
 
 import { clientsToCSV, statusBadge } from "@/lib/admin/clients-helpers";
-import { parseStatusFilter, STATUS_FILTERS } from "@/lib/admin/clients-helpers";
+import { parseStatusFilter, STATUS_FILTERS, parseProgramFilter, buildClientFilterQuery } from "@/lib/admin/clients-helpers";
 
 // La base acepta NUEVE status desde la migración 017 —se ensanchó a propósito,
 // para que espejar a Stripe no fuera rechazado— y la UI sólo modelaba seis. Los
@@ -459,6 +459,58 @@ describe("parseStatusFilter", () => {
   it("tolera que llegue repetido", () => {
     expect(parseStatusFilter(["Activas", "Canceladas"])).toBe("Activas");
     expect(parseStatusFilter([])).toBeNull();
+  });
+});
+
+// D24 — el programa también entra por la URL. Sus nombres salen de los datos, no
+// de una constante, así que la lista válida la pone quien llama.
+describe("parseProgramFilter", () => {
+  const programs = ["Todas", "CuarentaMás", "Fuerza & Movilidad"];
+
+  it("acepta un programa que existe", () => {
+    expect(parseProgramFilter("CuarentaMás", programs)).toBe("CuarentaMás");
+  });
+
+  it("lo desconocido, vacío o ausente cae a Todas", () => {
+    expect(parseProgramFilter("NoExiste", programs)).toBe("Todas");
+    expect(parseProgramFilter("", programs)).toBe("Todas");
+    expect(parseProgramFilter(undefined, programs)).toBe("Todas");
+    expect(parseProgramFilter(null, programs)).toBe("Todas");
+  });
+
+  it("con varios valores toma el primero", () => {
+    expect(parseProgramFilter(["CuarentaMás", "NoExiste"], programs)).toBe("CuarentaMás");
+  });
+});
+
+// D24 — el filtro vive en la URL; esto es lo único que la escribe.
+describe("buildClientFilterQuery", () => {
+  it("escribe ambos filtros", () => {
+    const q = new URLSearchParams(buildClientFilterQuery({ status: "Activas", program: "CuarentaMás" }, ""));
+    expect(q.get("status")).toBe("Activas");
+    expect(q.get("program")).toBe("CuarentaMás");
+  });
+
+  it("sin filtro quita el parámetro y deja el otro", () => {
+    const q = new URLSearchParams(
+      buildClientFilterQuery({ status: null, program: "CuarentaMás" }, "status=Activas&program=Otro")
+    );
+    expect(q.has("status")).toBe(false);
+    expect(q.get("program")).toBe("CuarentaMás");
+    expect(buildClientFilterQuery({ status: null, program: "Todas" }, "status=Activas&program=X")).toBe("");
+  });
+
+  it("conserva parámetros ajenos", () => {
+    const q = new URLSearchParams(buildClientFilterQuery({ status: "Activas", program: "Todas" }, "foo=1"));
+    expect(q.get("foo")).toBe("1");
+  });
+
+  it("acentos, espacios y & sobreviven la ida y vuelta", () => {
+    const q = new URLSearchParams(
+      buildClientFilterQuery({ status: "En cancelación", program: "Fuerza & Movilidad" }, "")
+    );
+    expect(parseStatusFilter(q.get("status") ?? undefined)).toBe("En cancelación");
+    expect(parseProgramFilter(q.get("program"), ["Todas", "Fuerza & Movilidad"])).toBe("Fuerza & Movilidad");
   });
 });
 

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Search, Trash2, Download } from "lucide-react";
 import {
   filterClients, clientsToCSV, canDeleteClient,
-  nextChargeCell, statusBadge, STATUS_FILTERS, parseStatusFilter, isInactive, INACTIVITY_THRESHOLD_DAYS,
+  nextChargeCell, statusBadge, STATUS_FILTERS, parseStatusFilter, parseProgramFilter, buildClientFilterQuery,
+  isInactive, INACTIVITY_THRESHOLD_DAYS,
   type ClientListRow, type StatusFilter,
 } from "@/lib/admin/clients-helpers";
 import { paginate } from "@/lib/admin/pagination";
@@ -14,26 +15,38 @@ import { dayLabel, relativeDayLabel } from "@/lib/admin/date-helpers";
 export function ClientsTable({
   rows,
   now,
-  initialStatus = null,
 }: {
   rows: ClientListRow[];
   now: string;
-  /** D17 — cohorte preseleccionada al llegar desde una tarjeta del dashboard. */
-  initialStatus?: StatusFilter;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [q, setQ] = useState("");
-  const [prog, setProg] = useState("Todas");
-  const [estado, setEstado] = useState<StatusFilter>(initialStatus);
-  const [page, setPage] = useState(1);
 
   const programs = useMemo(() => ["Todas", ...Array.from(new Set(rows.map((r) => r.program_name))).sort()], [rows]);
+  // D24 — estado y programa se LEEN de la URL en cada render, sin copia en
+  // useState: la copia sembrada una sola vez era justo lo que dejaba el filtro
+  // sordo a la navegación y la URL desactualizada al cambiarlo.
+  const estado = parseStatusFilter(searchParams.get("status") ?? undefined);
+  const prog = parseProgramFilter(searchParams.get("program"), programs);
+
+  // La página pertenece a una combinación de filtros: si la URL cambia de
+  // filtros (clic, enlace o atrás/adelante), la clave ya no coincide y se
+  // vuelve a la 1 sin un efecto de por medio.
+  const filterKey = `${estado ?? ""}|${prog}|${q}`;
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const page = pageState.key === filterKey ? pageState.page : 1;
+  const setPage = (p: number) => setPageState({ key: filterKey, page: p });
+
   const activas = rows.filter((r) => r.status === "active").length;
   const filtered = filterClients(rows, { query: q, program: prog, status: estado, now });
   const { items, totalPages, page: current } = paginate(filtered, page);
 
-  function resetPage<T>(setter: (v: T) => void) {
-    return (v: T) => { setter(v); setPage(1); };
+  // replace y no push: cada clic en un filtro no debe apilar historial.
+  function setFilters(next: { status: StatusFilter; program: string }) {
+    const query = buildClientFilterQuery(next, searchParams.toString());
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
   function exportCSV() {
@@ -71,7 +84,7 @@ export function ClientsTable({
         <div className="flex gap-2 items-center">
           <div style={{ position: "relative", width: 260 }}>
             <span style={{ position: "absolute", left: 12, top: 11 }}><Search size={17} color="var(--gris-suave)" /></span>
-            <input value={q} onChange={(e) => resetPage(setQ)(e.target.value)} placeholder="Buscar por nombre o correo..."
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre o correo..."
               className="font-body" style={{ width: "100%", padding: "10px 12px 10px 36px", borderRadius: 10, border: "1px solid var(--gris-linea)", fontSize: 14 }} />
           </div>
           <button onClick={exportCSV} className="font-body flex items-center gap-2"
@@ -90,7 +103,7 @@ export function ClientsTable({
           insensible a cuántos programas existan. */}
       <div className="flex gap-2 flex-wrap items-center" style={{ marginBottom: 20 }}>
         {programs.map((f) => (
-          <button key={f} className={"pill " + (prog === f ? "active" : "")} aria-pressed={prog === f} onClick={() => resetPage(setProg)(f)}>{f}</button>
+          <button key={f} className={"pill " + (prog === f ? "active" : "")} aria-pressed={prog === f} onClick={() => setFilters({ status: estado, program: f })}>{f}</button>
         ))}
         {/* Las opciones salen ENTERAS de STATUS_FILTERS. La única escrita a mano
             es el centinela de "sin filtro", que no es un valor de filtro sino su
@@ -104,7 +117,7 @@ export function ClientsTable({
             // parseStatusFilter y no un cast: es el mismo validador por el que
             // pasa el deep link de D17, así que el select y la URL comparten un
             // solo parser y el centinela "" cae a null por la misma vía.
-            onChange={(e) => resetPage(setEstado)(parseStatusFilter(e.target.value))}
+            onChange={(e) => setFilters({ status: parseStatusFilter(e.target.value), program: prog })}
             className="font-body"
             style={{
               minHeight: 44, borderRadius: 999, border: "1px solid var(--gris-linea)",
@@ -123,7 +136,7 @@ export function ClientsTable({
       {filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: 48 }}>
           <p className="font-body" style={{ color: "var(--gris-texto)", fontSize: 14, marginBottom: 12 }}>No hay clientes con esos filtros.</p>
-          <button onClick={() => { setQ(""); setProg("Todas"); setEstado(null); setPage(1); }}
+          <button onClick={() => { setQ(""); setFilters({ status: null, program: "Todas" }); }}
             className="font-body" style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 10, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
             Limpiar filtros
           </button>
