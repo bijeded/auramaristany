@@ -151,7 +151,8 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
     .from("program_day_blocks")
     .select("day_id, block_type, content")
     .in("day_id", dayIds)
-    .eq("block_type", "exercise_list");
+    .eq("block_type", "exercise_list")
+    .order("sort_order");
 
   // SDK types the simple select; cast to ExBlockRow[] for the local interface (content structure).
   const blocks = (rawBlocks ?? []) as ExBlockRow[];
@@ -166,8 +167,17 @@ export async function getPerformanceData(userId: string): Promise<PerfExercise[]
     }
   }
 
+  // Orden de plantilla por día: bloques ya vienen por sort_order.
+  const orderByDay = new Map<string, string[]>();
+  for (const b of blocks) {
+    const ids = orderByDay.get(b.day_id) ?? [];
+    for (const ex of b.content?.exercises ?? []) ids.push(ex.id);
+    orderByDay.set(b.day_id, ids);
+  }
+
   const perfLogs: LogForPerf[] = logs.map((l) => ({
     logDate: l.log_date,
+    exerciseOrder: orderByDay.get(l.program_day_id) ?? [],
     exercisesDone: l.exercises_done,
   }));
 
