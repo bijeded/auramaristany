@@ -35,6 +35,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { CancellationReason } from '../lib/supabase/types'
 import Stripe from 'stripe'
 import { STRIPE_BACKED, SEED_METADATA, isSeedCustomer, stripeSeedParams } from './stripe-seed'
+import { planHistory, type SeedDay } from './history-seed'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -116,6 +117,61 @@ function addDays(date: Date, n: number): Date {
 
 /** Medianoche UTC de hoy: el ancla de toda la aritmética de periodos. */
 const TODAY = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00.000Z')
+
+// ── Historial sembrado ──────────────────────────────────────────────────────
+
+/** Cliente con historial de Mes 1 (sigue el contenido que Aura capturó). */
+const HISTORY_CLIENT = 'sofia.ramirez@test.aura.mx'
+
+/**
+ * Lee el Mes 1 (ordinal 1) de la variante — sólo lectura del catálogo — y
+ * siembra los `progress_logs` de los días ya pasados del periodo.
+ * Con service-role no hay RLS: `published` se filtra a mano (regla 12).
+ */
+async function seedMonthOneHistory(userId: string, subscriptionId: string, variantId: string, periodStart: Date): Promise<number> {
+  const { data: map, error: mapErr } = await supabase
+    .from('variant_series_map')
+    .select('series_id, program_series!inner ( published )')
+    .eq('program_variant_id', variantId)
+    .eq('ordinal', 1)
+    .eq('program_series.published', true)
+    .maybeSingle()
+  if (mapErr) throw mapErr
+  if (!map) return 0
+
+  const { data: dayRows, error: dayErr } = await supabase
+    .from('program_days')
+    .select('id, week_number, day_of_week')
+    .eq('series_id', map.series_id)
+    .eq('published', true)
+  if (dayErr) throw dayErr
+  if (!dayRows?.length) return 0
+
+  const { data: blocks, error: blkErr } = await supabase
+    .from('program_day_blocks')
+    .select('day_id, sort_order, content')
+    .in('day_id', dayRows.map((d) => d.id))
+    .eq('block_type', 'exercise_list')
+    .order('sort_order')
+  if (blkErr) throw blkErr
+
+  const days: SeedDay[] = dayRows.map((d) => ({
+    ...d,
+    exercises: (blocks ?? [])
+      .filter((b) => b.day_id === d.id)
+      // keep: `content` es jsonb; la forma de exercise_list la valida content-validation.ts al guardar.
+      .flatMap((b) => ((b.content as { exercises?: SeedDay['exercises'] }).exercises ?? []))
+      .map((e) => ({ id: e.id, sets: e.sets, reps: e.reps, metrics: e.metrics ?? [] })),
+  }))
+
+  const logs = planHistory({ periodStart, today: TODAY, days })
+  if (!logs.length) return 0
+  const { error: logErr } = await supabase.from('progress_logs').insert(
+    logs.map((l) => ({ ...l, profile_id: userId, subscription_id: subscriptionId }))
+  )
+  if (logErr) throw logErr
+  return logs.length
+}
 
 // ── Catálogo ────────────────────────────────────────────────────────────────
 
@@ -232,7 +288,7 @@ type ClientDef = {
 const clients: ClientDef[] = [
   // ── CuarentaMás Principiante · Poco tiempo ────────────────────────────────
   { name: 'Gabriela Torres Mendoza', email: 'gaby.torres@test.aura.mx', phone: '5215512340001', variantId: VARIANT.CM_PRINC_POCO, scenario: 'active', monthsElapsed: 2, dayOffset: 12, profession: 'Maestra de primaria' },
-  { name: 'Sofía Ramírez Luna', email: 'sofia.ramirez@test.aura.mx', phone: '5215512340002', variantId: VARIANT.CM_PRINC_POCO, scenario: 'active', monthsElapsed: 1, dayOffset: 5, profession: 'Contadora' },
+  { name: 'Sofía Ramírez Luna', email: 'sofia.ramirez@test.aura.mx', phone: '5215512340002', variantId: VARIANT.CM_PRINC_POCO, scenario: 'active', monthsElapsed: 1, dayOffset: 25, profession: 'Contadora' },
   { name: 'Verónica Salas Beltrán', email: 'vero.salas@test.aura.mx', phone: '5215512340003', variantId: VARIANT.CM_PRINC_POCO, scenario: 'trialing', monthsElapsed: 1, dayOffset: 3, profession: 'Estilista' },
 
   // ── CuarentaMás Principiante · Tiempo suficiente ──────────────────────────
@@ -593,6 +649,11 @@ async function main() {
         completed_at: enrollment.toISOString(),
       })
       if (orErr) throw orErr
+    }
+
+    if (c.email === HISTORY_CLIENT) {
+      const logged = await seedMonthOneHistory(userId, subRow.id, c.variantId, periodStart)
+      process.stdout.write(` (historial: ${logged} días)`)
     }
 
     process.stdout.write(' ✓\n')
