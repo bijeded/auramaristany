@@ -21,6 +21,10 @@ export interface ExerciseMeta {
 
 export interface LogForPerf {
   logDate: string; // "YYYY-MM-DD"
+  // Ids de ejercicio del día en orden de plantilla (bloques por sort_order,
+  // luego el arreglo). Define el orden de los chips: las llaves de un jsonb
+  // no conservan el orden de inserción.
+  exerciseOrder: string[];
   exercisesDone: ExercisesDone | null;
 }
 
@@ -94,9 +98,10 @@ export function buildPerformanceSeries(
 
   for (const log of sorted) {
     const done = log.exercisesDone ?? {};
-    for (const [exId, entry] of Object.entries(done)) {
+    for (const exId of log.exerciseOrder) {
+      const entry = done[exId];
       const m = meta.get(exId);
-      if (!m) continue;
+      if (!entry || !m) continue;
 
       const key = normalizeName(m.name);
       let g = groups.get(key);

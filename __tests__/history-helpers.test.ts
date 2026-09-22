@@ -59,8 +59,8 @@ describe("buildPerformanceSeries", () => {
   ]);
   it("builds points per exercise sorted by date", () => {
     const logs: LogForPerf[] = [
-      { logDate: "2026-06-05", exercisesDone: { ex1: { completed: true, series: [{ reps_done: 10, weight_kg: 20 }] } } },
-      { logDate: "2026-06-01", exercisesDone: { ex1: { completed: true, series: [{ reps_done: 8, weight_kg: 15 }] } } },
+      { logDate: "2026-06-05", exerciseOrder: ["ex1"], exercisesDone: { ex1: { completed: true, series: [{ reps_done: 10, weight_kg: 20 }] } } },
+      { logDate: "2026-06-01", exerciseOrder: ["ex1"], exercisesDone: { ex1: { completed: true, series: [{ reps_done: 8, weight_kg: 15 }] } } },
     ];
     const result = buildPerformanceSeries(logs, meta);
     expect(result).toHaveLength(1);
@@ -70,13 +70,13 @@ describe("buildPerformanceSeries", () => {
   });
   it("skips exercises not present in meta (not in current month defs)", () => {
     const logs: LogForPerf[] = [
-      { logDate: "2026-06-01", exercisesDone: { unknown: { completed: true, series: [{ reps_done: 5 }] } } },
+      { logDate: "2026-06-01", exerciseOrder: ["unknown"], exercisesDone: { unknown: { completed: true, series: [{ reps_done: 5 }] } } },
     ];
     expect(buildPerformanceSeries(logs, meta)).toEqual([]);
   });
   it("omits days with no numeric value for any metric", () => {
     const logs: LogForPerf[] = [
-      { logDate: "2026-06-01", exercisesDone: { ex1: { completed: false, series: [{ reps_done: null, weight_kg: null }] } } },
+      { logDate: "2026-06-01", exerciseOrder: ["ex1"], exercisesDone: { ex1: { completed: false, series: [{ reps_done: null, weight_kg: null }] } } },
     ];
     expect(buildPerformanceSeries(logs, meta)[0]?.points ?? []).toEqual([]);
   });
@@ -88,8 +88,8 @@ describe("buildPerformanceSeries", () => {
       ["uuid-b", { name: " sentadilla ", metrics: ["reps_done"] }],
     ]);
     const logs: LogForPerf[] = [
-      { logDate: "2026-06-01", exercisesDone: { "uuid-a": { completed: true, series: [{ weight_kg: 20 }] } } },
-      { logDate: "2026-06-08", exercisesDone: { "uuid-b": { completed: true, series: [{ reps_done: 12 }] } } },
+      { logDate: "2026-06-01", exerciseOrder: ["uuid-a"], exercisesDone: { "uuid-a": { completed: true, series: [{ weight_kg: 20 }] } } },
+      { logDate: "2026-06-08", exerciseOrder: ["uuid-b"], exercisesDone: { "uuid-b": { completed: true, series: [{ reps_done: 12 }] } } },
     ];
     const result = buildPerformanceSeries(logs, nameMeta);
     expect(result).toHaveLength(1);
@@ -99,4 +99,39 @@ describe("buildPerformanceSeries", () => {
     expect(result[0].points[0].values.weight_kg).toBe(20);
     expect(result[0].points[1].values.reps_done).toBe(12);
   });
+  describe("chip order", () => {
+    const ex = (name: string): ExerciseMeta => ({ name, metrics: ["reps_done"] });
+    const done = (...ids: string[]) =>
+      Object.fromEntries(ids.map((id) => [id, { completed: true, series: [{ reps_done: 10 }] }]));
+    const names = (logs: LogForPerf[], meta: Map<string, ExerciseMeta>) =>
+      buildPerformanceSeries(logs, meta).map((e) => e.name);
+
+    it("follows the day's template order, not the stored key order", () => {
+      // UUIDs sort in reverse of the template; jsonb returns keys sorted this way.
+      const meta = new Map([["ccc", ex("1. A")], ["bbb", ex("2. B")], ["aaa", ex("3. C")]]);
+      const logs: LogForPerf[] = [
+        { logDate: "2026-06-01", exerciseOrder: ["ccc", "bbb", "aaa"], exercisesDone: done("aaa", "bbb", "ccc") },
+      ];
+      expect(names(logs, meta)).toEqual(["1. A", "2. B", "3. C"]);
+    });
+
+    it("appends a later day's new exercises after the first day's", () => {
+      const meta = new Map([["a1", ex("A")], ["b1", ex("B")], ["c2", ex("C")], ["a2", ex("A")]]);
+      const logs: LogForPerf[] = [
+        { logDate: "2026-06-08", exerciseOrder: ["c2", "a2"], exercisesDone: done("a2", "c2") },
+        { logDate: "2026-06-01", exerciseOrder: ["a1", "b1"], exercisesDone: done("a1", "b1") },
+      ];
+      expect(names(logs, meta)).toEqual(["A", "B", "C"]);
+    });
+
+    it("puts the oldest day first regardless of weekday", () => {
+      const meta = new Map([["m", ex("M")], ["t", ex("T")]]);
+      const logs: LogForPerf[] = [
+        { logDate: "2026-06-08", exerciseOrder: ["m"], exercisesDone: done("m") }, // Monday
+        { logDate: "2026-06-04", exerciseOrder: ["t"], exercisesDone: done("t") }, // Thursday
+      ];
+      expect(names(logs, meta)).toEqual(["T", "M"]);
+    });
+  });
 });
+
