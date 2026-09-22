@@ -126,6 +126,35 @@ export function parseStatusFilter(raw: string | string[] | undefined): StatusFil
   return STATUS_FILTERS.find((f) => f === value) ?? null;
 }
 
+/**
+ * D24 — traduce el `?program=` de la URL a un programa existente, o a "Todas".
+ * Los nombres salen de los datos, así que la lista válida la pone quien llama.
+ */
+export function parseProgramFilter(
+  raw: string | string[] | null | undefined,
+  programs: readonly string[]
+): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return "Todas";
+  return programs.find((p) => p === value) ?? "Todas";
+}
+
+/**
+ * D24 — la URL es la única fuente de los filtros de estado y programa. Escribe
+ * ambos sobre la query actual; el valor "sin filtro" quita su parámetro.
+ */
+export function buildClientFilterQuery(
+  filters: { status: StatusFilter; program: string },
+  current: string | URLSearchParams
+): string {
+  const q = new URLSearchParams(current);
+  if (filters.status) q.set("status", filters.status);
+  else q.delete("status");
+  if (filters.program && filters.program !== "Todas") q.set("program", filters.program);
+  else q.delete("program");
+  return q.toString();
+}
+
 /** Umbral por defecto (en días) para el filtro "Sin actividad". Reutilizable por A4. */
 export const INACTIVITY_THRESHOLD_DAYS = 10;
 
