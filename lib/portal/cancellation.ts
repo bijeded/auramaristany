@@ -51,13 +51,12 @@ export function reasonRequiresDetail(reason: CancellationReason): boolean {
  * Client-facing survey options — order matters for the radio list.
  * `pago_fallido` is system-only and deliberately excluded.
  *
- * D19 — la lista COMPLETA del modal sale de aquí, incluida "Prefiero no decir",
- * que va al final: se lee como el cierre de una lista de motivos, no como uno
- * más. Vivía escrita a mano en `CancelSubscriptionSection` como un octavo radio
- * modelado con `reason === null`, o sea una segunda lista de opciones mantenida
- * aparte de ésta — la tabla copiada de la regla 8, en JSX. Por eso el modal
- * acabó ofreciendo un valor que el CHECK de la base no aceptaba, y por eso no
- * se agrega ninguna opción al componente: se agregan aquí.
+ * D19 — la lista COMPLETA del modal sale de aquí; ninguna opción se escribe a
+ * mano en `CancelSubscriptionSection` (regla 8).
+ *
+ * `prefiero_no_decir` NO está aquí a propósito: declinar es confirmar sin
+ * elegir, y ese valor lo asigna sólo `cancelSubscription`. Como el esquema zod
+ * deriva de esta lista, tampoco se acepta enviado por el cliente.
  */
 export const CLIENT_FACING_REASONS = [
   "precio_muy_caro",
@@ -66,7 +65,6 @@ export const CLIENT_FACING_REASONS = [
   "no_veo_resultados",
   "encontre_otra_opcion",
   "otro",
-  "prefiero_no_decir",
 ] as const satisfies readonly CancellationReason[];
 
 /**

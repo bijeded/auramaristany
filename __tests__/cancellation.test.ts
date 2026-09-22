@@ -39,10 +39,10 @@ describe("CANCELLATION_REASON_OPTIONS", () => {
     expect(values).not.toContain("pago_fallido");
   });
 
-  it("lists the seven client-facing reasons in order, con 'prefiero no decir' al final", () => {
-    // El orden importa: es el de la lista de radios. "Prefiero no decir" va al
-    // final porque se lee como el cierre de una lista de motivos, no como uno
-    // más de ellos.
+  it("lists the six client-facing reasons in order, sin 'prefiero no decir'", () => {
+    // El orden importa: es el de la lista de radios. "Prefiero no decir" ya no
+    // es un radio: declinar es confirmar sin elegir, y ese valor lo asigna
+    // sólo el servidor.
     expect(CANCELLATION_REASON_OPTIONS.map((o) => o.value)).toEqual([
       "precio_muy_caro",
       "no_tengo_tiempo",
@@ -50,16 +50,7 @@ describe("CANCELLATION_REASON_OPTIONS", () => {
       "no_veo_resultados",
       "encontre_otra_opcion",
       "otro",
-      "prefiero_no_decir",
     ]);
-    // D19 — la lista del modal sale ENTERA de aquí. "Prefiero no decir" vivía
-    // como un octavo radio escrito a mano en el componente, fuera de esta
-    // constante y modelado con `reason === null`: una segunda lista mantenida
-    // a mano junto a la de verdad. Por eso el modal llegó a ofrecer un valor
-    // que la base no podía guardar. La etiqueta se comprueba aquí mismo — un
-    // `toContain` aparte no podría fallar mientras este `toEqual` pase.
-    expect(CANCELLATION_REASON_OPTIONS.find((o) => o.value === "prefiero_no_decir")?.label)
-      .toBe("Prefiero no decir");
   });
 });
 
