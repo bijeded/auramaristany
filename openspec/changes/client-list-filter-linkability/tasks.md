@@ -17,8 +17,8 @@
 ## 3. Verification
 
 - [x] 3.1 Run `npx tsc --noEmit && npm run lint && npm run test:run && npm run build`; all green.
-- [ ] 3.2 Read-only manual smoke on the Preview URL with seeded data: select "Activas" → URL has `status=Activas`; click a program pill → URL gains `program=`; choose "Todos los estados" → `status` removed, `program` kept; copy URL into a new tab → same filters shown; dashboard "Terminan (próx. 7 días)" → cohort preselected; browser Back/Forward between two filtered client-list URLs → select follows; `?program=NoExiste` → "Todas" pressed; three filter changes then Back → leaves the client list; filter row still renders at ~375px.
+- [x] 3.2 Read-only manual smoke on the Preview URL with seeded data: select "Activas" → URL has `status=Activas`; click a program pill → URL gains `program=`; choose "Todos los estados" → `status` removed, `program` kept; copy URL into a new tab → same filters shown; dashboard "Terminan (próx. 7 días)" → cohort preselected; browser Back/Forward between two filtered client-list URLs → select follows; `?program=NoExiste` → "Todas" pressed; three filter changes then Back → leaves the client list; filter row still renders at ~375px.
 
 ## 4. PR handoff
 
-- [ ] 4.1 Open PR from `task/client-list-filter-linkability` titled `fix(admin): make client-list filters linkable (D24)`. Body: no sensitive surface (no `/security-review`); silent-defect flag — touches the status-filter parsing/options path (enum-union surface, rule 8), though `STATUS_FILTERS` and the union are unchanged; no money/people aggregation, cancellation state, migration, RLS or DB `CHECK`. Squash-merge on green CI.
+- [x] 4.1 Open PR from `task/client-list-filter-linkability` titled `fix(admin): make client-list filters linkable (D24)`. Body: no sensitive surface (no `/security-review`); silent-defect flag — touches the status-filter parsing/options path (enum-union surface, rule 8), though `STATUS_FILTERS` and the union are unchanged; no money/people aggregation, cancellation state, migration, RLS or DB `CHECK`. Squash-merge on green CI.
