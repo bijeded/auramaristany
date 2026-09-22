@@ -32,4 +32,4 @@
 ## 5. Review and handoff
 
 - [x] 5.1 `/security-review` (sensitive surface: Stripe money, webhooks); address or dismiss each finding in the PR body. **Result:** no findings (cleanup scoped to server-only `seed` metadata; script unreachable from the app; no secret logged; live-key guard before any write).
-- [ ] 5.2 Open the PR from `task/demo-seed-test-mode-subscriptions` with the runtime verification results and the silent-defect flag: touches money aggregation input (invoices) and cancellation state (grace client); no enum/union, migration, RLS or CHECK change. Squash-merge on green CI.
+- [x] 5.2 Open the PR from `task/demo-seed-test-mode-subscriptions` with the runtime verification results and the silent-defect flag: touches money aggregation input (invoices) and cancellation state (grace client); no enum/union, migration, RLS or CHECK change. Squash-merge on green CI. **Result:** PR #71, CI green, squash-merged as `953468d`.
