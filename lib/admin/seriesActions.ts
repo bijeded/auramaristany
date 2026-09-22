@@ -298,64 +298,41 @@ export async function updateSeries(
     return { error: "Variante no válida." };
   }
 
-  // Reconciliación borrar-e-insertar: NO es atómica. Se leen los mapeos actuales
-  // antes de borrar para poder restaurarlos si la inserción falla — sin eso, un
-  // 23505 (posición ocupada, un error que el admin provoca a diario) dejaría la
-  // serie mapeada a CERO variantes: invisible en todos los currículos e
-  // irrecuperable desde el editor. Misma familia que D2 (saveBlocks).
-  const { data: rawPrevious, error: readError } = await supabase
-    .from("variant_series_map")
-    .select("program_variant_id, series_id, ordinal")
-    .eq("series_id", seriesId);
+  // Mapeos y metadatos en UNA llamada (021): borrar e insertar en llamadas
+  // sueltas podía dejar la serie mapeada a CERO variantes si el insert fallaba
+  // tras un delete ya confirmado (D13). Dentro de la función, un 23505 deshace
+  // también el delete y el update de título/`published`.
+  // keep: rpc tipado en el CLIENTE, no en el método — `Functions` de types.ts
+  // se queda vacío (regla 10) y sacar `supabase.rpc` lo desligaría de `this`.
+  const client = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: {
+        p_series_id: string;
+        p_mappings: { program_variant_id: string; ordinal: number }[];
+        p_title: string;
+        p_description: string | null;
+        p_published: boolean;
+      }
+    ) => Promise<{ error: { code?: string; message: string } | null }>;
+  };
+  const { error } = await client.rpc("update_series_with_mappings", {
+    p_series_id: seriesId,
+    p_mappings: input.mappings.map((m) => ({ program_variant_id: m.variantId, ordinal: m.ordinal })),
+    p_title: input.title,
+    p_description: input.description ?? null,
+    p_published: input.published,
+  });
 
-  if (readError) return { error: logAndGeneric("updateSeries.readMap", readError) };
-  const previous = (rawPrevious ?? []) as {
-    program_variant_id: string;
-    series_id: string;
-    ordinal: number;
-  }[];
-
-  const { error: deleteMapError } = await supabase
-    .from("variant_series_map")
-    .delete()
-    .eq("series_id", seriesId);
-
-  if (deleteMapError) return { error: logAndGeneric("updateSeries.deleteMap", deleteMapError) };
-
-  const { error: insertMapError } = await supabase
-    .from("variant_series_map")
-    .insert(toRows(seriesId, input.mappings));
-
-  if (insertMapError) {
-    if (previous.length > 0) {
-      const { error: restoreError } = await supabase
-        .from("variant_series_map")
-        .insert(previous);
-      if (restoreError) logAndGeneric("updateSeries.restoreMap", restoreError);
-    }
-    if ((insertMapError as { code?: string }).code === "23505") {
+  if (error) {
+    if (error.code === "23505") {
       return {
         error: await positionTakenMessage(supabase, input.mappings, seriesId),
         field: "ordinal",
       };
     }
-    return { error: logAndGeneric("updateSeries.insertMap", insertMapError) };
+    return { error: logAndGeneric("updateSeries", error) };
   }
-
-  // Los metadatos se escriben DESPUÉS de que el mapeo cuadre: si se hicieran
-  // antes, un 23505 devolvería "esta variante ya tiene un Mes N" — que implica
-  // que no se guardó nada — con el título y `published` ya persistidos, y
-  // `published` puede haber puesto contenido en vivo.
-  const { error: updateError } = await supabase
-    .from("program_series")
-    .update({
-      title: input.title,
-      description: input.description ?? null,
-      published: input.published,
-    })
-    .eq("id", seriesId);
-
-  if (updateError) return { error: logAndGeneric("updateSeries.update", updateError) };
 
   revalidatePath(`/admin/content/${programId}`);
   return {};

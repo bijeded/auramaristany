@@ -34,24 +34,23 @@ export async function savePillarBlocks(pillarId: string, blocks: SaveBlockInput[
     const v = validateBlock(b);
     if (!v.ok) return { error: v.error };
   }
-  const { error: delErr } = await supabase.from("program_pillar_blocks").delete().eq("pillar_id", pillarId);
-  if (delErr) return { error: logAndGeneric("savePillarBlocks.delete", delErr) };
-  if (blocks.length > 0) {
-    const { error } = await supabase.from("program_pillar_blocks").insert(
-      blocks.map((b, i) => ({
-        pillar_id: pillarId,
-        block_type: b.block_type,
-        sort_order: i,
-        // content is Record<string,unknown> at the interface boundary; cast to Json for the DB insert.
-        content: (
-          b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
-            ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
-            : b.content
-        ) as Json,
-      }))
-    );
-    if (error) return { error: logAndGeneric("savePillarBlocks.insert", error) };
-  }
+  const rows = blocks.map((b, i) => ({
+    block_type: b.block_type,
+    sort_order: i,
+    // content is Record<string,unknown> at the interface boundary; cast to Json for the DB insert.
+    content: (
+      b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
+        ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
+        : b.content
+    ) as Json,
+  }));
+  // Borrar e insertar en UNA llamada (021), ver saveBlocks (D2).
+  // keep: rpc tipado en el CLIENTE, no en el método (regla 10).
+  const client = supabase as unknown as {
+    rpc: (fn: string, args: { p_pillar_id: string; p_blocks: typeof rows }) => Promise<{ error: { message: string } | null }>;
+  };
+  const { error } = await client.rpc("save_pillar_blocks", { p_pillar_id: pillarId, p_blocks: rows });
+  if (error) return { error: logAndGeneric("savePillarBlocks", error) };
   revalidatePath("/portal/pilares");
   return {};
 }
