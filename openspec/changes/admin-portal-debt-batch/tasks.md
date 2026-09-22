@@ -60,14 +60,14 @@
 ## 6. Verification and handoff
 
 - [x] 6.1 Run the full gate locally: `npx tsc --noEmit && npm run lint && npm run test:run && npm run build`. Verify: all four exit 0; quote the summary lines.
-- [ ] 6.2 Smoke checks on the Preview URL, using seeded rows and read-only steps only:
+- [x] 6.2 Smoke checks on the Preview URL, using seeded rows and read-only steps only:
   - (a) `/admin/clients`: pick each of "En prueba" (Verónica Salas), "Pausadas" (Silvia Ochoa), "Incompletas" (Claudia Núñez) and "Expiradas" (Javier Alcántara); each shows its client, and "Activas" shows none of them.
   - (b) D8: Verónica's "Prueba" badge and every other status badge is legible at ~375px and desktop.
   - (c) the client detail, `/admin/payments` and the dashboard show the same payment-status badge colours.
   - (d) signed in as a seeded client: Hoy, Semana, Pilares, Mi progreso, Mensajes, one message and Ajustes all show the same header date, and there is no hydration warning in the console.
 
   Record the results in the PR body. Anything not checked is marked *not verified*.
-- [ ] 6.3 Open the PR from `task/admin-portal-debt-batch` with a Conventional Commit title.
+- [x] 6.3 Open the PR from `task/admin-portal-debt-batch` with a Conventional Commit title.
   - The body lists the visible restyle (darker badge text on admin and portal screens) and states that there is no sensitive surface, so no `/security-review`.
   - It carries the silent-defect flag: **yes**, a status/filter union (`StatusFilter`) widened, and the payment-status fallback changed on four screens.
   - Squash-merge on green CI. Verify: report the PR number, the CI result and the merge commit.
