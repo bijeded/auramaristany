@@ -17,6 +17,11 @@
  * envejezca. Los estados "vivos" quedan con el día de hoy dentro de su periodo
  * vigente; los "muertos" con el periodo ya cerrado.
  *
+ * Stripe (D28): unos pocos clientes (`scripts/stripe-seed.ts` → STRIPE_BACKED)
+ * llevan una suscripción REAL en modo test, para probar cancelar y reactivar.
+ * Cada corrida borra primero los clientes de Stripe que sembró la anterior.
+ * Exige una llave `sk_test_`.
+ *
  * Resultado:
  *   - Admin: hola@auramaristany.com / 09876543
  *   - 32 clientes (contraseña 12345678, correos @test.aura.mx)
@@ -28,6 +33,8 @@ import { createClient } from '@supabase/supabase-js'
 // entera cuando llega un motivo nuevo (regla 8). D19 agregó 'prefiero_no_decir'
 // y la copia no se habría enterado.
 import type { CancellationReason } from '../lib/supabase/types'
+import Stripe from 'stripe'
+import { STRIPE_BACKED, SEED_METADATA, isSeedCustomer, stripeSeedParams } from './stripe-seed'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -41,6 +48,15 @@ if (!DRY_RUN && (!SUPABASE_URL || !SERVICE_ROLE_KEY)) {
 
 // En `--dry-run` no se abre ninguna conexión: el cliente se construye con un
 // destino inerte y nada lo llega a usar.
+// D28 — el seed crea objetos reales en Stripe para unos pocos clientes. Sólo en
+// modo test: con una llave live crearía suscripciones de verdad. Se comprueba
+// antes de tocar nada; `--dry-run` no construye cliente de Stripe.
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? ''
+if (!DRY_RUN && !STRIPE_SECRET_KEY.startsWith('sk_test_')) {
+  console.error('STRIPE_SECRET_KEY no es una llave de modo test (sk_test_…). El seed no toca Stripe live.')
+  process.exit(1)
+}
+
 const supabase = createClient(
   DRY_RUN ? SUPABASE_URL || 'http://localhost' : SUPABASE_URL,
   DRY_RUN ? SERVICE_ROLE_KEY || 'dry-run' : SERVICE_ROLE_KEY,
@@ -282,18 +298,20 @@ function computeDates(c: ClientDef) {
 
 /** Tabla en Markdown, lista para copiar a la demo. */
 function printTable() {
-  console.log('| # | Cliente | Correo | Variante | Estado | Mes | Alta | Periodo vigente | Motivo de baja |')
-  console.log('|---|---------|--------|----------|--------|-----|------|-----------------|----------------|')
+  console.log('| # | Cliente | Correo | Variante | Estado | Mes | Alta | Periodo vigente | Motivo de baja | Stripe real |')
+  console.log('|---|---------|--------|----------|--------|-----|------|-----------------|----------------|-------------|')
   clients.forEach((c, i) => {
     const day = (d: Date) => d.toISOString().split('T')[0]
     if (c.scenario === 'no_subscription') {
-      console.log(`| ${i + 1} | ${c.name} | ${c.email} | — | ${SCENARIO_LABEL[c.scenario]} | — | — | — | — |`)
+      console.log(`| ${i + 1} | ${c.name} | ${c.email} | — | ${SCENARIO_LABEL[c.scenario]} | — | — | — | — | — |`)
       return
     }
     const { periodStart, periodEnd, enrollment } = computeDates(c)
     const reason = c.cancellation ? c.cancellation.reason : '—'
+    const flow = STRIPE_BACKED[c.email]
+    const stripeLabel = flow === 'cancel' ? 'Sí — probar cancelar' : flow === 'reactivate' ? 'Sí — probar reactivar' : '—'
     console.log(
-      `| ${i + 1} | ${c.name} | ${c.email} | ${VARIANT_LABEL[c.variantId]} | ${SCENARIO_LABEL[c.scenario]} | ${c.monthsElapsed} | ${day(enrollment)} | ${day(periodStart)} → ${day(periodEnd)} | ${reason} |`
+      `| ${i + 1} | ${c.name} | ${c.email} | ${VARIANT_LABEL[c.variantId]} | ${SCENARIO_LABEL[c.scenario]} | ${c.monthsElapsed} | ${day(enrollment)} | ${day(periodStart)} → ${day(periodEnd)} | ${reason} | ${stripeLabel} |`
     )
   })
   console.log()
@@ -359,6 +377,82 @@ async function main() {
   }
   console.log(`     ${totalDeleted} usuario(s) eliminado(s).`)
 
+  // 2b. STRIPE (D28) — DESPUÉS de vaciar la base, a propósito: los
+  //     `customer.subscription.deleted` que dispara el borrado llegan al webhook
+  //     de la demo y, sin fila, no hacen nada. Antes de vaciarla marcarían las
+  //     suscripciones como canceladas y mandarían el correo de "terminó".
+  //     Y ANTES de crear usuarios: si Stripe falla, el seed aborta sin clientes
+  //     a medias y basta con volver a correrlo.
+  console.log('2b/6 Stripe: borrando clientes de corridas anteriores y creando los nuevos...')
+  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2026-05-27.dahlia' })
+  let staleDeleted = 0
+  // `list`, no `search`: search es eventualmente consistente y una segunda
+  // corrida seguida no vería lo que la primera acaba de crear.
+  for await (const customer of stripe.customers.list({ limit: 100 })) {
+    if (!isSeedCustomer(customer)) continue
+    await stripe.customers.del(customer.id)
+    staleDeleted++
+  }
+  console.log(`     ${staleDeleted} cliente(s) de Stripe de corridas anteriores eliminado(s).`)
+
+  const { data: variantRows, error: variantErr } = await supabase
+    .from('program_variants')
+    .select('id, stripe_price_id')
+  if (variantErr) throw variantErr
+  const priceByVariant = new Map((variantRows ?? []).map((v) => [v.id as string, v.stripe_price_id as string | null]))
+
+  type StripeBacking = {
+    customerId: string
+    subscriptionId: string
+    status: string
+    periodStart: Date
+    periodEnd: Date
+    cancelAtPeriodEnd: boolean
+  }
+  const stripeBacking = new Map<string, StripeBacking>()
+  for (const c of clients) {
+    const { periodStart, periodEnd } = computeDates(c)
+    const params = stripeSeedParams({ email: c.email, periodStart, periodEnd, today: TODAY })
+    if (!params) continue
+    const price = priceByVariant.get(c.variantId)
+    if (!price) throw new Error(`La variante ${c.variantId} no tiene stripe_price_id (corre seed-stripe.ts)`)
+
+    const customer = await stripe.customers.create({
+      email: c.email,
+      name: c.name,
+      // `pm_card_visa` es un token de prueba: Stripe adjunta una tarjeta nueva
+      // con su propio id, que es el que se usa como método por defecto.
+      payment_method: 'pm_card_visa',
+      metadata: SEED_METADATA,
+    })
+    const [card] = (await stripe.paymentMethods.list({ customer: customer.id, limit: 1 })).data
+    // Retroactiva al periodo que el seed ya calcula, sin facturar el tramo
+    // retroactivo: sembrar no cobra nada y no dispara `invoice.paid` (D1, D2).
+    let sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price }],
+      default_payment_method: card.id,
+      backdate_start_date: params.backdateStartDate,
+      billing_cycle_anchor: params.billingCycleAnchor,
+      proration_behavior: 'none',
+      metadata: SEED_METADATA,
+    })
+    if (params.cancelAtPeriodEnd) {
+      // D3 — la gracia se produce en Stripe, no sólo en la fila.
+      sub = await stripe.subscriptions.update(sub.id, { cancel_at_period_end: true })
+    }
+    const item = sub.items.data[0]
+    stripeBacking.set(c.email, {
+      customerId: customer.id,
+      subscriptionId: sub.id,
+      status: sub.status,
+      periodStart: new Date(item.current_period_start * 1000),
+      periodEnd: new Date(item.current_period_end * 1000),
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+    })
+    console.log(`     ✓ ${c.email} → ${sub.id} (${params.flow})`)
+  }
+
   // 3. PREGUNTA DE ONBOARDING (existente, no se crea ni borra)
   console.log('3/6  Buscando pregunta de onboarding activa...')
   const { data: qRow } = await supabase
@@ -395,8 +489,9 @@ async function main() {
     const c = clients[i]
     const n = String(i + 1).padStart(2, '0')
     const seq = String(i + 1).padStart(3, '0')
-    const cusId = `cus_seed_${seq}`
-    const subId = `sub_seed_${seq}`
+    const backing = stripeBacking.get(c.email)
+    const cusId = backing?.customerId ?? `cus_seed_${seq}`
+    const subId = backing?.subscriptionId ?? `sub_seed_${seq}`
     process.stdout.write(`     [${n}/${clients.length}] ${c.name}...`)
 
     const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
@@ -424,13 +519,18 @@ async function main() {
       continue
     }
 
-    const { periodStart, periodEnd, enrollment } = computeDates(c)
+    // Para los respaldados en Stripe, el periodo y el estado salen de la
+    // respuesta de Stripe: la fila dice lo mismo que dirá el webhook.
+    const computed = computeDates(c)
+    const periodStart = backing?.periodStart ?? computed.periodStart
+    const periodEnd = backing?.periodEnd ?? computed.periodEnd
+    const enrollment = computed.enrollment
 
     // ADR 0003/0004 — `completed_at` se sella cuando la completion queda
     // PROGRAMADA, y sólo tiene sentido junto a `cancel_at_period_end`. Una marca
     // sin cancelación real le prometería a la cliente que no se le cobrará.
     const completionScheduled = c.scenario === 'completing' || c.scenario === 'completed'
-    const cancelAtPeriodEnd = completionScheduled || c.scenario === 'grace'
+    const cancelAtPeriodEnd = backing?.cancelAtPeriodEnd ?? (completionScheduled || c.scenario === 'grace')
 
     const { data: subRow, error: subErr } = await supabase
       .from('subscriptions')
@@ -439,7 +539,7 @@ async function main() {
         program_variant_id: c.variantId,
         stripe_subscription_id: subId,
         stripe_customer_id: cusId,
-        status: SCENARIO_STATUS[c.scenario],
+        status: backing?.status ?? SCENARIO_STATUS[c.scenario],
         current_period_start: periodStart.toISOString(),
         current_period_end: periodEnd.toISOString(),
         cancel_at_period_end: cancelAtPeriodEnd,
