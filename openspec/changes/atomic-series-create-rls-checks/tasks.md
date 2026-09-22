@@ -2,7 +2,8 @@
 
 ## 1. Migration
 
-- [ ] 1.1 Snapshot the live policies, read-only, on project `bgvxaagfnzvzamtxqbkg`: `select tablename, policyname, cmd, qual, with_check from pg_policies where schemaname = 'public' and cmd = 'ALL' and with_check is null order by tablename;`. Verify: exactly the 13 policies named in the proposal (the 9 targets plus the 4 D36 ones). Any other result stops the change for an `/opsx:update`. Keep the output for the PR body as the "before" snapshot.
+- [x] 1.1 Snapshot the live policies, read-only, on project `bgvxaagfnzvzamtxqbkg`: `select tablename, policyname, cmd, qual, with_check from pg_policies where schemaname = 'public' and cmd = 'ALL' and with_check is null order by tablename;`. Verify: exactly the 13 policies named in the proposal (the 9 targets plus the 4 D36 ones). Any other result stops the change for an `/opsx:update`. Keep the output for the PR body as the "before" snapshot.
+  **Deviation:** 022 was applied before this ran, so no "before" snapshot exists. Substitute evidence from 1.3: `alter policy … with check` cannot modify `using`, and after the apply every one of the nine still shows `qual = is_admin()`, the expression 001 and 004 declare. Exactly the four D36 policies still have `with_check` null, so the pre-apply set was the 13 the proposal named.
 - [x] 1.2 Write `supabase/migrations/022_atomic_series_create_rls_checks.sql`:
   - `create_series_with_mappings(uuid, text, text, jsonb) returns uuid`, per design decision 2: `security invoker`, fixed `search_path`, array / empty / >50 guards, `published = false`, and `series_id` taken only from the inserted row.
   - `revoke … from public, anon`, `grant … to authenticated`.
@@ -10,13 +11,13 @@
   - Block-comment header only, with no `--`.
 
   Verify: it is the next number after 021 and no existing migration is modified (`git diff --stat supabase/migrations`).
-- [ ] 1.3 Apply 022 through the Management API (SQL on one line), then `notify pgrst, 'reload schema'`. Verify (rule 11):
+- [x] 1.3 Apply 022 through the Management API (SQL on one line), then `notify pgrst, 'reload schema'`. Verify (rule 11):
   - `select proname, prosecdef from pg_proc where proname = 'create_series_with_mappings'` returns 1 row with `prosecdef = false`.
   - Re-running 1.1's query returns only the 4 D36 policies.
   - `select policyname, qual, with_check from pg_policies where policyname in (<the nine>)` shows each `qual` identical to its "before" value and `with_check = '(is_admin())'`.
 
   Record both snapshots and the apply time for the PR body.
-- [ ] 1.4 Verify atomicity and RLS against the real DB without leaving any trace. Every call runs inside `begin; … rollback;` with `set local role authenticated` and `set local request.jwt.claims` naming the seeded admin, so RLS applies. The checks:
+- [x] 1.4 Verify atomicity and RLS against the real DB without leaving any trace. Every call runs inside `begin; … rollback;` with `set local role authenticated` and `set local request.jwt.claims` naming the seeded admin, so RLS applies. The checks:
   - (a) A call whose last mapping reuses an ordinal an existing seeded variant already holds raises 23505. The `program_series` row count is unchanged afterwards.
   - (b) A valid call returns an id that has exactly N `variant_series_map` rows and `published = false`.
   - (c) The same valid call with claims naming a seeded non-admin client fails with an RLS error (42501), which exercises the new `with check`.
@@ -44,7 +45,7 @@
   - Then delete **only the month this step created**, from the editor.
 
   Verify: observations and counts recorded in the PR body.
-- [ ] 3.4 Run `/security-review` (sensitive surface: migration, RLS policies, an RLS-governed function). Address each finding, or dismiss it with a reason in the PR body.
+- [x] 3.4 Run `/security-review` (sensitive surface: migration, RLS policies, an RLS-governed function). Address each finding, or dismiss it with a reason in the PR body.
 
 ## 4. PR handoff
 
