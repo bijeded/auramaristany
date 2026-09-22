@@ -10,9 +10,11 @@ The system SHALL allow a client with an `active`, `trialing`, or `past_due` subs
 
 Declining to answer SHALL be recorded as its own reason, `prefiero_no_decir`, and SHALL NOT be folded into `otro`. The two describe opposite situations — a reason the list does not cover, versus a client who chose not to give one — and they call for opposite responses from Aura. Because the survey feeds the admin's "Razones de cancelación" chart, conflating them puts two populations in one bar with no way to separate them afterwards.
 
+Declining SHALL be expressed only by confirming without selecting a reason. "Prefiero no decir" SHALL NOT be offered as a radio option, and the server action SHALL NOT accept `prefiero_no_decir` as a client-submitted reason; the server alone assigns it when no reason is sent.
+
 Every option in the modal's radio list SHALL come from `CANCELLATION_REASON_OPTIONS`. No option may be written directly into the component: a hand-maintained second list next to the real one is the same copied-table defect as two label maps, and it is what let the modal offer a choice the database could not store.
 
-`prefiero_no_decir` SHALL NOT require a `detail` — asking a client who declined to answer to elaborate is a contradiction — and SHALL be selectable by any client, unlike `pago_fallido`, which remains system-only.
+`prefiero_no_decir` and `pago_fallido` SHALL NOT be client-selectable; `prefiero_no_decir` is server-assigned on skip, `pago_fallido` is system-only.
 
 #### Scenario: Cancel with a selected reason
 - **WHEN** the client opens the cancel modal, selects a reason, and confirms
@@ -20,15 +22,23 @@ Every option in the modal's radio list SHALL come from `CANCELLATION_REASON_OPTI
 
 #### Scenario: Cancel while skipping the survey
 - **WHEN** the client confirms cancellation without selecting any reason
-- **THEN** the system still sets `cancel_at_period_end = true` in Stripe and records a `cancellation_surveys` row with `reason = 'prefiero_no_decir'` and no detail
+- **THEN** the system still sets `cancel_at_period_end = true` in Stripe and records a `cancellation_surveys` row with `reason = 'prefiero_no_decir'` and no detail, distinguishable from a row stored as `otro`
 
 #### Scenario: Client explicitly declines to give a reason
-- **WHEN** the client selects "Prefiero no decir" and confirms
+- **WHEN** the client confirms without selecting any option (the only way to decline now that "Prefiero no decir" is not a radio)
 - **THEN** the row is stored with `reason = 'prefiero_no_decir'`, and it is distinguishable from a row stored as `otro`
 
 #### Scenario: Declining to answer never asks for detail
-- **WHEN** the client selects "Prefiero no decir"
-- **THEN** no free-text field is shown, and any `detail` submitted alongside it is not stored
+- **WHEN** the client has not selected a reason
+- **THEN** no free-text field is shown, and the stored `prefiero_no_decir` row has no `detail`
+
+#### Scenario: The modal does not offer "Prefiero no decir"
+- **WHEN** the cancel modal renders its radio list
+- **THEN** the options are, in order, "Precio muy caro", "No tengo tiempo", "No logré el objetivo", "No veo resultados", "Encontré otra opción", "Otro" — and no "Prefiero no decir"
+
+#### Scenario: Client-submitted prefiero_no_decir is rejected
+- **WHEN** the cancel server action receives `reason = "prefiero_no_decir"` from the client
+- **THEN** it returns a generic error, makes no Stripe call, and inserts no row
 
 #### Scenario: The modal offers exactly the storable reasons
 - **WHEN** the cancel modal renders its radio list
