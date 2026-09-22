@@ -193,14 +193,6 @@ async function variantsBelongToProgram(
   return ((data ?? []) as { id: string }[]).length === variantIds.length;
 }
 
-function toRows(seriesId: string, mappings: SeriesMappingInput[]) {
-  return mappings.map((m) => ({
-    program_variant_id: m.variantId,
-    series_id: seriesId,
-    ordinal: m.ordinal,
-  }));
-}
-
 export async function createSeries(
   programId: string,
   data: CreateSeriesInput
@@ -224,42 +216,38 @@ export async function createSeries(
     return { error: "Variante no válida." };
   }
 
-  const { data: newSeries, error: seriesError } = await supabase
-    .from("program_series")
-    .insert({
-      program_id: programId,
-      title: input.title,
-      description: input.description ?? null,
-      published: false,
-    })
-    .select("id")
-    .single();
+  // Serie y mapeos en UNA llamada (022): insertarlos por separado y compensar
+  // con un delete podía dejar una serie sin variante si ese delete también
+  // fallaba — invisible e imposible de borrar desde el editor (D34). Dentro de
+  // la función, un 23505 deshace también el insert de la serie.
+  // keep: rpc tipado en el CLIENTE, no en el método — `Functions` de types.ts
+  // se queda vacío (regla 10) y sacar `supabase.rpc` lo desligaría de `this`.
+  const client = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: {
+        p_program_id: string;
+        p_title: string;
+        p_description: string | null;
+        p_mappings: { program_variant_id: string; ordinal: number }[];
+      }
+    ) => Promise<{ data: string | null; error: { code?: string; message: string } | null }>;
+  };
+  const { error } = await client.rpc("create_series_with_mappings", {
+    p_program_id: programId,
+    p_title: input.title,
+    p_description: input.description ?? null,
+    p_mappings: input.mappings.map((m) => ({ program_variant_id: m.variantId, ordinal: m.ordinal })),
+  });
 
-  if (seriesError) {
-    return { error: logAndGeneric("createSeries.insert", seriesError) };
-  }
-
-  const seriesId = (newSeries as { id: string }).id;
-  const { error: mapError } = await supabase
-    .from("variant_series_map")
-    .insert(toRows(seriesId, input.mappings));
-
-  if (mapError) {
-    // La serie ya se insertó; sin mapeo queda huérfana e invisible. Se borra
-    // para no dejar basura que el admin no puede ver ni eliminar.
-    const { error: rollbackError } = await supabase
-      .from("program_series")
-      .delete()
-      .eq("id", seriesId);
-    if (rollbackError) logAndGeneric("createSeries.rollback", rollbackError);
-
-    if ((mapError as { code?: string }).code === "23505") {
+  if (error) {
+    if (error.code === "23505") {
       return {
         error: await positionTakenMessage(supabase, input.mappings),
         field: "ordinal",
       };
     }
-    return { error: logAndGeneric("createSeries.map", mapError) };
+    return { error: logAndGeneric("createSeries", error) };
   }
 
   revalidatePath(`/admin/content/${programId}`);

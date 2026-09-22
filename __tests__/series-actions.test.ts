@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ─── Fake Supabase ──────────────────────────────────────────────────
 const calls: { table: string; op: string; payload?: unknown }[] = [];
-let insertSeriesError: { code: string; message: string } | null = null;
-let insertMapError: { code: string; message: string } | null = null;
 
 let previousMappings: MapRow[] = [];
 let seriesDays: { id: string }[] = [];
@@ -69,19 +67,7 @@ const fakeSupabase = {
     },
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
-      if (table === "program_series") {
-        return {
-          select: () => ({
-            single: () =>
-              Promise.resolve({
-                data: insertSeriesError ? null : { id: "new-series-id" },
-                error: insertSeriesError,
-              }),
-          }),
-        };
-      }
-      // variant_series_map — se await directamente sin .select().single()
-      return { error: insertMapError };
+      return { error: null };
     },
     update: (payload: unknown) => {
       calls.push({ table, op: "update", payload });
@@ -114,6 +100,7 @@ vi.mock("@/lib/admin/auth", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { createSeries, updateSeries, deleteSeries } from "@/lib/admin/seriesActions";
+import { ADMIN_GENERIC_ERROR } from "@/lib/admin/errors";
 
 type MapRow = { program_variant_id: string; series_id: string; ordinal: number };
 
@@ -138,8 +125,6 @@ beforeEach(() => {
   calls.length = 0;
   rpcCalls.length = 0;
   rpcError = null;
-  insertSeriesError = null;
-  insertMapError = null;
   previousMappings = [];
   seriesDays = [];
   conflictRows = [];
@@ -154,7 +139,9 @@ beforeEach(() => {
 
 // ─── createSeries ───────────────────────────────────────────────────
 describe("createSeries", () => {
-  it("inserta la serie y un mapeo por variante, cada uno con su posición", async () => {
+  const writes = () => calls.filter((c) => c.op !== "select");
+
+  it("crea la serie y sus mapeos en UNA llamada rpc, cada mapeo con su posición", async () => {
     const result = await createSeries(PROG_ID, {
       title: "Fundamentos",
       description: null,
@@ -165,13 +152,39 @@ describe("createSeries", () => {
     });
 
     expect(result.error).toBeUndefined();
-    const mapInsert = calls.find(
-      (c) => c.table === "variant_series_map" && c.op === "insert"
-    );
-    expect(mapInsert!.payload as MapRow[]).toEqual([
-      { program_variant_id: V1, series_id: "new-series-id", ordinal: 1 },
-      { program_variant_id: V2, series_id: "new-series-id", ordinal: 1 },
-    ]);
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toEqual({
+      fn: "create_series_with_mappings",
+      args: {
+        p_program_id: PROG_ID,
+        p_title: "Fundamentos",
+        p_description: null,
+        p_mappings: [
+          { program_variant_id: V1, ordinal: 1 },
+          { program_variant_id: V2, ordinal: 1 },
+        ],
+      },
+    });
+  });
+
+  it("no inserta ni borra con llamadas sueltas", async () => {
+    // Insertar la serie y luego el mapeo por separado, compensando con un
+    // delete, podía dejar una serie SIN variante si ese delete también
+    // fallaba: invisible e imposible de borrar desde el editor (D34).
+    await createSeries(PROG_ID, {
+      title: "T",
+      description: null,
+      mappings: [
+        { variantId: V3, ordinal: 4 },
+        { variantId: V4, ordinal: 9 },
+      ],
+    });
+
+    expect(writes()).toHaveLength(0);
+    // Cada fila lleva SU posición: v4 conserva la suya en vez de heredar la de v3.
+    expect(
+      (rpcCalls[0].args.p_mappings as { ordinal: number }[]).map((r) => r.ordinal)
+    ).toEqual([4, 9]);
   });
 
   it("la serie ya no lleva número: la posición vive en el mapeo", async () => {
@@ -181,11 +194,8 @@ describe("createSeries", () => {
       mappings: [{ variantId: V1, ordinal: 3 }],
     });
 
-    const seriesInsert = calls.find(
-      (c) => c.table === "program_series" && c.op === "insert"
-    );
-    expect(seriesInsert!.payload).not.toHaveProperty("series_number");
-    expect(seriesInsert!.payload).not.toHaveProperty("ordinal");
+    expect(rpcCalls[0].args).not.toHaveProperty("p_series_number");
+    expect(rpcCalls[0].args).not.toHaveProperty("p_ordinal");
   });
 
   it("rechaza una serie sin variantes y no escribe nada", async () => {
@@ -199,10 +209,11 @@ describe("createSeries", () => {
     // se puede representar en ningún currículo.
     expect(result.error).toBe("Elige al menos una variante para esta serie.");
     expect(calls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 
-  it("traduce el 23505 del mapeo a un error de posición ocupada", async () => {
-    insertMapError = { code: "23505", message: "unique violation" };
+  it("traduce el 23505 del rpc a un error de posición ocupada", async () => {
+    rpcError = { code: "23505", message: "unique violation" };
     conflictRows = [
       {
         program_variant_id: V1,
@@ -226,22 +237,22 @@ describe("createSeries", () => {
     // Discriminador explícito: el modal lo pinta inline en el campo Mes #, sin
     // buscar texto dentro del mensaje.
     expect(result.field).toBe("ordinal");
+    // Sin compensación a mano: la transacción ya deshizo el insert de la serie.
+    expect(writes()).toHaveLength(0);
   });
 
-  it("borra la serie si el mapeo falla, para no dejarla huérfana e invisible", async () => {
-    insertMapError = { code: "23505", message: "unique violation" };
+  it("devuelve un error genérico si el rpc falla por otra causa", async () => {
+    rpcError = { code: "22023", message: "demasiados mapeos: 51" };
 
-    await createSeries(PROG_ID, {
-      title: "Dup",
+    const result = await createSeries(PROG_ID, {
+      title: "T",
       description: null,
-      mappings: [{ variantId: V1, ordinal: 2 }],
+      mappings: [{ variantId: V1, ordinal: 1 }],
     });
 
-    // Sin mapeo la serie no aparece en ningún currículo: el admin no podría
-    // verla para borrarla.
-    expect(
-      calls.find((c) => c.table === "program_series" && c.op === "delete")
-    ).toBeTruthy();
+    expect(result.error).toBe(ADMIN_GENERIC_ERROR);
+    expect(result.field).toBeUndefined();
+    expect(writes()).toHaveLength(0);
   });
 
   it("acepta los ids sembrados a mano del catálogo, que no son uuid RFC 4122", async () => {
@@ -270,6 +281,7 @@ describe("createSeries", () => {
 
     expect(result.error).toBe("Variante no válida.");
     expect(calls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 
   it("rechaza una variante que no pertenece al programa, sin escribir nada", async () => {
@@ -285,9 +297,9 @@ describe("createSeries", () => {
     });
 
     expect(result.error).toBe("Variante no válida.");
-    // Ni la serie ni el mapeo: se rechaza ANTES de tocar la BD, así que no hay
-    // nada que revertir.
-    expect(calls.filter((c) => c.op === "insert")).toHaveLength(0);
+    // Se rechaza ANTES de tocar la BD, así que no hay nada que revertir.
+    expect(writes()).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 });
 
