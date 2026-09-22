@@ -1,32 +1,15 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/auth/LogoutButton";
-import {
-  LayoutDashboard,
-  Users,
-  BookOpen,
-  MessageCircle,
-  Bot,
-  Settings,
-} from "lucide-react";
+import { AdminSidebarNav } from "@/components/admin/AdminSidebarNav";
+import { requireAdminPage } from "@/lib/admin/auth";
 
-const NAV_ITEMS = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/clients", label: "Clientes", icon: Users },
-  { href: "/admin/content", label: "Contenido", icon: BookOpen },
-  { href: "/admin/messages", label: "Mensajes", icon: MessageCircle },
-  { href: "/admin/automated-messages", label: "Automáticos", icon: Bot },
-  { href: "/admin/onboarding-settings", label: "Onboarding", icon: Settings },
-] as const;
-
-export default function AdminLayout({
+// Red de seguridad: los layouts no se re-renderizan en navegación suave,
+// así que cada página admin conserva su propio requireAdminPage().
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  await requireAdminPage();
 
   return (
     <div className="flex" style={{ minHeight: "100dvh", background: "#f4f4f5" }}>
@@ -68,28 +51,7 @@ export default function AdminLayout({
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-col gap-0.5 p-3 flex-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-body transition-colors"
-                style={{
-                  fontSize: 14,
-                  fontWeight: active ? 600 : 400,
-                  color: active ? "var(--lavanda-dark)" : "var(--gris-texto)",
-                  background: active ? "var(--lavanda-tint)" : "transparent",
-                  textDecoration: "none",
-                }}
-              >
-                <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        <AdminSidebarNav />
 
         {/* Footer */}
         <div

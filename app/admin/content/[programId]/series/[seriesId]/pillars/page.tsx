@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import { getSeriesPillars, getAdminProgram } from "@/lib/admin/queries";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 export default async function PillarsPage({
   params,
 }: {
   params: Promise<{ programId: string; seriesId: string }>;
 }) {
+  await requireAdminPage();
   const { programId, seriesId } = await params;
   const result = await getAdminProgram(programId);
   if (!result) notFound();
