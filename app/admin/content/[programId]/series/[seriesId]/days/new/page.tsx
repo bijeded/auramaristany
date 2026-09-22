@@ -1,4 +1,5 @@
 import { DayEditorForm } from "@/components/admin/DayEditorForm";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 export default async function NewDayPage({
   params, searchParams,
@@ -6,6 +7,7 @@ export default async function NewDayPage({
   params: Promise<{ programId: string; seriesId: string }>;
   searchParams: Promise<{ week?: string; dow?: string }>;
 }) {
+  await requireAdminPage();
   const { programId, seriesId } = await params;
   const { week, dow } = await searchParams;
   return (

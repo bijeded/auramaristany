@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
 import { getDayWithBlocks } from "@/lib/admin/queries";
 import { DayEditorForm } from "@/components/admin/DayEditorForm";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 export default async function EditDayPage({
   params,
 }: {
   params: Promise<{ programId: string; seriesId: string; dayId: string }>;
 }) {
+  await requireAdminPage();
   const { programId, seriesId, dayId } = await params;
   const day = await getDayWithBlocks(dayId);
   if (!day) notFound();

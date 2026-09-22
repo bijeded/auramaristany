@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BookOpen, ChevronRight, AlertTriangle } from "lucide-react";
 import { getAdminPrograms } from "@/lib/admin/queries";
+import { requireAdminPage } from "@/lib/admin/auth";
 
 const BILLING_LABELS: Record<string, string> = {
   fixed_term_monthly: "Plazo fijo mensual",
@@ -8,6 +9,7 @@ const BILLING_LABELS: Record<string, string> = {
 };
 
 export default async function AdminContentPage() {
+  await requireAdminPage();
   const programs = await getAdminPrograms();
 
   return (
