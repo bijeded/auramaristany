@@ -28,7 +28,6 @@ Closed work is not summarized here — the durable record is `openspec/changes/a
 | **L8** | Pre-launch verification | M | At the end |
 | **L9** | Admin UI for plans/prices? | L | Decision pending |
 | **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
-| **A8** | Color and background in the text editor | M | Pending |
 | **D1–D32** | Deferred / technical debt | — | See below |
 
 ---
@@ -106,12 +105,6 @@ Decide whether to build a UI to manage variants/prices or keep the script + SQL 
 
 ## A · Aura's Requests
 
-### A8 · Color and background in the text editor — `M`
-Text color and background for the Text block (Tiptap).
-- **Touches:** MIT deps `@tiptap/extension-text-style` + `@tiptap/extension-color` + `@tiptap/extension-highlight` · text block editor in `components/admin/blocks/`.
-- **⚠ Gotcha:** `lib/admin/sanitize-html.ts` **strips styles** unless the whitelist is extended (`allowedStyles` with `color` / `background-color`). Without this, the color is lost on save and looks like a "bug".
-- **Still to decide:** palette limited to brand tokens (recommended) vs. free-form picker.
-
 ### A13 · Automated-message builder (own triggers) — `L` · nice-to-have, does NOT block launch
 Let Aura **create** automated messages, not just edit the two shipped ones.
 - **Why it's a separate change:** in A4 the DB row is only the *copy* — the **trigger is code** (`lib/admin/notice-rules.ts`). A newly created row would have no rule to fire it and would silently never send. Real create/delete requires Aura to author the **trigger** (window opens / N days inactive / N days before renewal / day N of the period) + a per-trigger dedupe strategy + preview & test-send.
@@ -168,4 +161,4 @@ These three are one root cause (no single-statement transaction) and should be c
 3. **Transactionality, as one change:** `D2` + `D13` + `D16` — one Postgres RPC pattern closes all three.
 4. **In parallel, waiting on Aura:** `L1` pricing · `L3` onboarding questions · `L5` WhatsApp · `L7` (needs Aura's list).
 5. **Launch close-out, in order:** `L4` smoke → `L6` demo cleanup → `L11` turn the A4 rules on (one at a time) → `L8` pre-launch verification.
-6. **After launch, on demand:** `A8` editor colors · `L9` prices UI decision · `A13` message builder (wait for Aura's third-rule request).
+6. **After launch, on demand:** `L9` prices UI decision · `A13` message builder (wait for Aura's third-rule request).
