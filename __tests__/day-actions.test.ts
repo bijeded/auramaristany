@@ -3,7 +3,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const calls: { table: string; op: string; payload?: unknown }[] = [];
 
+const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
+let rpcError: { code?: string; message: string } | null = null;
+
 const fakeSupabase = {
+  // `function` a propósito: el rpc real de supabase-js lee `this`. Un fake con
+  // arrow function ocultaría una llamada desligada de su receptor (regla 10).
+  rpc: function (this: unknown, fn: string, args: Record<string, unknown>) {
+    if (this !== fakeSupabase) throw new Error("rpc called without its receiver");
+    rpcCalls.push({ fn, args });
+    return Promise.resolve({ data: null, error: rpcError });
+  },
   from: (table: string) => ({
     insert: (payload: unknown) => {
       calls.push({ table, op: "insert", payload });
@@ -26,7 +36,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { saveDay, saveBlocks } from "@/lib/admin/dayActions";
 
-beforeEach(() => { calls.length = 0; });
+beforeEach(() => { calls.length = 0; rpcCalls.length = 0; rpcError = null; });
 
 describe("saveDay", () => {
   it("inserts when no id is provided", async () => {
@@ -49,14 +59,40 @@ describe("saveDay", () => {
 });
 
 describe("saveBlocks", () => {
-  it("deletes existing blocks then inserts the new list with sort_order", async () => {
-    await saveBlocks("d1", [
-      { block_type: "text", content: { html: "<p>a</p>" } },
-      { block_type: "cardio_zone2", content: {} },
+  it("writes the whole list in one rpc call with sanitized html and sort_order", async () => {
+    const res = await saveBlocks("d1", [
+      { block_type: "text", content: { html: '<p>a</p><script>x</script>' } },
+      { block_type: "youtube", content: { video_id: "abc", title: "t" } },
     ]);
-    expect(calls[0]).toMatchObject({ table: "program_day_blocks", op: "delete" });
-    const inserted = calls.find((c) => c.op === "insert");
-    expect(inserted?.table).toBe("program_day_blocks");
-    expect((inserted?.payload as unknown[]).length).toBe(2);
+    expect(res).toEqual({});
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].fn).toBe("save_day_blocks");
+    expect(rpcCalls[0].args.p_day_id).toBe("d1");
+    const blocks = rpcCalls[0].args.p_blocks as { block_type: string; sort_order: number; content: { html?: string } }[];
+    expect(blocks.map((b) => [b.block_type, b.sort_order])).toEqual([["text", 0], ["youtube", 1]]);
+    expect(blocks[0].content.html).not.toContain("<script>");
+  });
+
+  it("never deletes or inserts through separate calls", async () => {
+    await saveBlocks("d1", [{ block_type: "text", content: { html: "<p>a</p>" } }]);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("sends an empty list so an emptied day is saved", async () => {
+    await saveBlocks("d1", []);
+    expect(rpcCalls[0].args.p_blocks).toEqual([]);
+  });
+
+  it("returns a generic error when the rpc fails", async () => {
+    rpcError = { code: "23514", message: "violates check constraint" };
+    const res = await saveBlocks("d1", [{ block_type: "text", content: { html: "<p>a</p>" } }]);
+    expect(res.error).toBeTruthy();
+    expect(res.error).not.toContain("check constraint");
+  });
+
+  it("refuses an invalid block before calling the rpc", async () => {
+    const res = await saveBlocks("d1", [{ block_type: "nope", content: {} }]);
+    expect(res.error).toBeTruthy();
+    expect(rpcCalls).toHaveLength(0);
   });
 });

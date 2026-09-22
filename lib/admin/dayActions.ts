@@ -67,24 +67,26 @@ export async function saveBlocks(dayId: string, blocks: SaveBlockInput[]): Promi
     if (!v.ok) return { error: v.error };
   }
 
-  const { error: delError } = await supabase.from("program_day_blocks").delete().eq("day_id", dayId);
-  if (delError) return { error: logAndGeneric("saveBlocks.delete", delError) };
+  const rows = blocks.map((b, i) => ({
+    block_type: b.block_type,
+    sort_order: i,
+    // content is Record<string,unknown> at the interface boundary; cast to Json for the DB insert.
+    content: (
+      b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
+        ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
+        : b.content
+    ) as Json,
+  }));
 
-  if (blocks.length > 0) {
-    const rows = blocks.map((b, i) => ({
-      day_id: dayId,
-      block_type: b.block_type,
-      sort_order: i,
-      // content is Record<string,unknown> at the interface boundary; cast to Json for the DB insert.
-      content: (
-        b.block_type === "text" && typeof (b.content as { html?: unknown }).html === "string"
-          ? { ...b.content, html: sanitizeRichText((b.content as { html: string }).html) }
-          : b.content
-      ) as Json,
-    }));
-    const { error: insError } = await supabase.from("program_day_blocks").insert(rows);
-    if (insError) return { error: logAndGeneric("saveBlocks.insert", insError) };
-  }
+  // Borrar e insertar en UNA llamada (021): antes eran dos, cada una con su
+  // commit, y un insert fallido dejaba el día sin bloques (D2).
+  // keep: rpc tipado en el CLIENTE, no en el método — `Functions` de types.ts
+  // se queda vacío (regla 10) y sacar `supabase.rpc` lo desligaría de `this`.
+  const client = supabase as unknown as {
+    rpc: (fn: string, args: { p_day_id: string; p_blocks: typeof rows }) => Promise<{ error: { message: string } | null }>;
+  };
+  const { error } = await client.rpc("save_day_blocks", { p_day_id: dayId, p_blocks: rows });
+  if (error) return { error: logAndGeneric("saveBlocks", error) };
 
   revalidatePath("/portal/today");
   return {};

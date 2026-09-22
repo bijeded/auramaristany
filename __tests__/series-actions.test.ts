@@ -18,7 +18,16 @@ let conflictRows: {
   program_variants: { name: string } | null;
 }[] = [];
 
+const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
+let rpcError: { code?: string; message: string } | null = null;
+
 const fakeSupabase = {
+  // `function` a propósito: el rpc real lee `this` (regla 10).
+  rpc: function (this: unknown, fn: string, args: Record<string, unknown>) {
+    if (this !== fakeSupabase) throw new Error("rpc called without its receiver");
+    rpcCalls.push({ fn, args });
+    return Promise.resolve({ data: null, error: rpcError });
+  },
   from: (table: string) => ({
     // Encadenable como el builder de Supabase: .eq().eq().maybeSingle(),
     // .in(...) y también await directo sobre la cadena.
@@ -127,6 +136,8 @@ const PROG_ID = "00000000-0000-0000-0001-000000000001";
 
 beforeEach(() => {
   calls.length = 0;
+  rpcCalls.length = 0;
+  rpcError = null;
   insertSeriesError = null;
   insertMapError = null;
   previousMappings = [];
@@ -282,7 +293,9 @@ describe("createSeries", () => {
 
 // ─── updateSeries ───────────────────────────────────────────────────
 describe("updateSeries", () => {
-  it("actualiza los campos de la serie", async () => {
+  const writes = () => calls.filter((c) => c.op !== "select");
+
+  it("escribe mapeos y metadatos en UNA llamada rpc", async () => {
     const result = await updateSeries(SERIES_ID, PROG_ID, {
       title: "Mes actualizado",
       description: "Nueva desc",
@@ -291,21 +304,22 @@ describe("updateSeries", () => {
     });
 
     expect(result.error).toBeUndefined();
-    const upd = calls.find((c) => c.table === "program_series" && c.op === "update");
-    expect((upd?.payload as { title: string })?.title).toBe("Mes actualizado");
-    expect((upd?.payload as { published: boolean })?.published).toBe(true);
-
-    // El orden importa y es invisible salvo que se afirme: el mapeo primero.
-    const mapInsertIdx = calls.findIndex(
-      (c) => c.table === "variant_series_map" && c.op === "insert"
-    );
-    const updateIdx = calls.findIndex(
-      (c) => c.table === "program_series" && c.op === "update"
-    );
-    expect(mapInsertIdx).toBeLessThan(updateIdx);
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toEqual({
+      fn: "update_series_with_mappings",
+      args: {
+        p_series_id: SERIES_ID,
+        p_mappings: [{ program_variant_id: V1, ordinal: 1 }],
+        p_title: "Mes actualizado",
+        p_description: "Nueva desc",
+        p_published: true,
+      },
+    });
   });
 
-  it("reconcilia variantes: elimina viejos e inserta los nuevos con su posición", async () => {
+  it("no borra, inserta ni actualiza con llamadas sueltas", async () => {
+    // Borrar e insertar por separado era lo que dejaba la serie con CERO
+    // variantes si el insert fallaba tras un delete ya confirmado (D13).
     await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
@@ -316,18 +330,15 @@ describe("updateSeries", () => {
       ],
     });
 
-    expect(
-      calls.find((c) => c.table === "variant_series_map" && c.op === "delete")
-    ).toBeTruthy();
-    const mapInsert = calls.find(
-      (c) => c.table === "variant_series_map" && c.op === "insert"
-    );
+    expect(writes()).toHaveLength(0);
     // Cada fila lleva SU posición: v4 conserva la suya en vez de heredar la de v3.
-    expect((mapInsert!.payload as MapRow[]).map((r) => r.ordinal)).toEqual([4, 9]);
+    expect(
+      (rpcCalls[0].args.p_mappings as { ordinal: number }[]).map((r) => r.ordinal)
+    ).toEqual([4, 9]);
   });
 
-  it("traduce el 23505 del mapeo a un error de posición ocupada", async () => {
-    insertMapError = { code: "23505", message: "unique violation" };
+  it("traduce el 23505 del rpc a un error de posición ocupada", async () => {
+    rpcError = { code: "23505", message: "unique violation" };
     conflictRows = [
       {
         program_variant_id: V1,
@@ -346,35 +357,36 @@ describe("updateSeries", () => {
 
     expect(result.error).toBe("Strong & Fit Intermedio ya tiene un Mes 5.");
     expect(result.field).toBe("ordinal");
-    // Los metadatos se escriben DESPUÉS del mapeo: si se escribieran antes, el
-    // admin vería "esta variante ya tiene un Mes 5" (que implica que no se
-    // guardó nada) con el título y `published` ya persistidos.
-    expect(
-      calls.find((c) => c.table === "program_series" && c.op === "update")
-    ).toBeUndefined();
+    // Sin restauración a mano: la transacción ya deshizo el delete.
+    expect(writes()).toHaveLength(0);
   });
 
-  it("restaura los mapeos anteriores si la inserción falla", async () => {
-    // Sin esto, un 23505 (posición ocupada — un error que el admin provoca a
-    // diario) dejaría la serie mapeada a CERO variantes: invisible en todos los
-    // currículos e irrecuperable desde el editor.
-    previousMappings = [
-      { program_variant_id: V1, series_id: SERIES_ID, ordinal: 2 },
-    ];
-    insertMapError = { code: "23505", message: "unique violation" };
+  it("devuelve un error genérico si el rpc falla por otra causa", async () => {
+    rpcError = { code: "22023", message: "serie no actualizada: 0 filas" };
 
-    await updateSeries(SERIES_ID, PROG_ID, {
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
       title: "T",
       description: null,
       published: false,
-      mappings: [{ variantId: V3, ordinal: 5 }],
+      mappings: [{ variantId: V1, ordinal: 1 }],
     });
 
-    const mapInserts = calls.filter(
-      (c) => c.table === "variant_series_map" && c.op === "insert"
-    );
-    expect(mapInserts).toHaveLength(2);
-    expect(mapInserts[1].payload as MapRow[]).toEqual(previousMappings);
+    expect(result.error).toBeTruthy();
+    expect(result.error).not.toContain("filas");
+    expect(result.field).toBeUndefined();
+  });
+
+  it("no llama al rpc si la serie no es del programa", async () => {
+    seriesOwned = false;
+    const result = await updateSeries(SERIES_ID, PROG_ID, {
+      title: "T",
+      description: null,
+      published: false,
+      mappings: [{ variantId: V1, ordinal: 1 }],
+    });
+
+    expect(result.error).toBe("Serie no válida.");
+    expect(rpcCalls).toHaveLength(0);
   });
 
   it("rechaza dejar la serie sin variantes", async () => {
@@ -387,10 +399,10 @@ describe("updateSeries", () => {
 
     expect(result.error).toBe("Elige al menos una variante para esta serie.");
     expect(calls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 });
 
-// ─── deleteSeries ───────────────────────────────────────────────────
 describe("deleteSeries", () => {
   it("borra los días antes que la serie: program_days.series_id no tiene cascade", async () => {
     // Sin esto Postgres devuelve 23503 y NINGUNA serie con días se puede
