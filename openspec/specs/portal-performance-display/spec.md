@@ -9,7 +9,7 @@ Defines the Desempeño view, where the client sees her own progress over time fo
 ### Requirement: Weight chart display unit toggle
 The Desempeño performance view SHALL offer a `kg | lb` display toggle when the selected metric is weight (`weight_kg`). Default is kg. The toggle converts chart values, axis and tooltip labels at render time only; underlying series data and aggregation stay in kilograms.
 
-The toggle buttons SHALL render at a minimum height of 32px and a minimum width of 44px, matching the per-exercise toggle in `portal-exercise-display`. Both copies of this control MUST stay dimensionally identical; if they ever diverge, that is a defect, not a local styling choice.
+The toggle SHALL be the same control as the per-exercise toggle in `portal-exercise-display`. It has the same appearance, a minimum height of 32px, a minimum width of 44px, and the same pressed-state transition.
 
 #### Scenario: Switching the chart to lb
 - **WHEN** the client selects lb on the Peso chart
@@ -25,7 +25,11 @@ The toggle buttons SHALL render at a minimum height of 32px and a minimum width 
 
 #### Scenario: Toggle control height
 - **WHEN** the Desempeño view renders the Peso chart on mobile
-- **THEN** each `kg` / `lb` button is at least 32px tall and at least 44px wide, visually identical to the toggle on `/portal/today`
+- **THEN** each `kg` / `lb` button is at least 32px tall and at least 44px wide
+
+#### Scenario: Pressed state animates like the log-time toggle
+- **WHEN** the client switches the Desempeño toggle from kg to lb
+- **THEN** the pressed-state change animates, the same way it does on `/portal/today`, instead of snapping
 
 ### Requirement: The progress chart's line meets the graphical-object contrast floor
 
