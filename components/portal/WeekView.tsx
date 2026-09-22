@@ -14,15 +14,6 @@ function formatRowDate(isoDate: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function todayLabel(): string {
-  const s = new Date().toLocaleDateString("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 function RowContent({ row }: { row: WeekCalendarRow }) {
   const isRest = row.title === null;
   return (
@@ -78,10 +69,10 @@ function RowContent({ row }: { row: WeekCalendarRow }) {
   );
 }
 
-export function WeekView({ rows }: { rows: WeekCalendarRow[] | null }) {
+export function WeekView({ rows, dateLabel }: { rows: WeekCalendarRow[] | null; dateLabel: string }) {
   return (
     <div style={{ background: "var(--blanco)" }}>
-      <PortalHeader dateLabel={todayLabel()} />
+      <PortalHeader dateLabel={dateLabel} />
 
       <div className="px-4 pt-5 pb-8">
         <h1

@@ -2,7 +2,6 @@
 
 import { Clock, Dumbbell, Moon, CheckCircle2, Loader2 } from "lucide-react";
 import type { TodayContent, DayBlock } from "@/lib/content/queries";
-import { weekdayLabel } from "@/lib/admin/date-helpers";
 import { TextBlock } from "./blocks/TextBlock";
 import { YoutubeBlock } from "./blocks/YoutubeBlock";
 import { PdfBlock } from "./blocks/PdfBlock";
@@ -332,9 +331,12 @@ function BlockRenderer({
 
 export function TodayView({
   content,
+  dateLabel,
   booking = { hasFutureCall: false, nextCallDate: null },
 }: {
   content: TodayContent | null;
+  /** D12 — la fecha real de hoy, calculada en el servidor; ver `weekdayLabel`. */
+  dateLabel: string;
   booking?: AgendarBookingState;
 }) {
   const exerciseDefs = content?.blocks
@@ -355,7 +357,7 @@ export function TodayView({
   return (
     <div style={{ background: "var(--blanco)" }}>
       {/* Sticky top bar — always visible */}
-      <PortalHeader dateLabel={weekdayLabel(content?.effectiveDate)} />
+      <PortalHeader dateLabel={dateLabel} />
 
       {/* Scrollable content */}
       <div className="px-4 pt-4 pb-8">

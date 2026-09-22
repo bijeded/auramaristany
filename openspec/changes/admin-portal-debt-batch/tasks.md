@@ -43,13 +43,13 @@
 
 ## 4. Portal header date: D12 (widened)
 
-- [ ] 4.1 Add two tests to `__tests__/date-helpers.test.ts`. The first uses fake timers: with the system time set to 2026-06-08, `weekdayLabel()` returns "Lunes, 8 de junio". The second sets `DEV_DATE` and asserts `weekdayLabel()` still follows the system time. Verify: both pass (this pins existing behaviour).
-- [ ] 4.2 Give `TodayView`, `ProgressView` and `WeekView` a `dateLabel` prop and remove their clock reads (`todayLabel()`, and `weekdayLabel(content?.effectiveDate)` in `TodayView`). Verify: `npx tsc --noEmit` fails at each page that doesn't pass it yet.
-- [ ] 4.3 In each of the seven pages (`app/portal/{today,semana,pilares,history,messages,messages/[id],settings}/page.tsx`), compute `weekdayLabel()` and pass it down. Delete the three page-level `todayLabel()` functions, and drop `serverToday()` from `/pilares` if nothing else there needs it. Verify: `grep -rn "function todayLabel" app components` returns nothing, and `npx tsc --noEmit` passes.
+- [x] 4.1 Add two tests to `__tests__/date-helpers.test.ts`. The first uses fake timers: with the system time set to 2026-06-08, `weekdayLabel()` returns "Lunes, 8 de junio". The second sets `DEV_DATE` and asserts `weekdayLabel()` still follows the system time. Verify: both pass (this pins existing behaviour).
+- [x] 4.2 Give `TodayView`, `ProgressView` and `WeekView` a `dateLabel` prop and remove their clock reads (`todayLabel()`, and `weekdayLabel(content?.effectiveDate)` in `TodayView`). Verify: `npx tsc --noEmit` fails at each page that doesn't pass it yet.
+- [x] 4.3 In each of the seven pages (`app/portal/{today,semana,pilares,history,messages,messages/[id],settings}/page.tsx`), compute `weekdayLabel()` and pass it down. Delete the three page-level `todayLabel()` functions, and drop `serverToday()` from `/pilares` if nothing else there needs it. Verify: `grep -rn "function todayLabel" app components` returns nothing, and `npx tsc --noEmit` passes.
 
 ## 5. Backlog
 
-- [ ] 5.1 Update `BACKLOG.md`:
+- [x] 5.1 Update `BACKLOG.md`:
   - Remove D22, D8, D12, D30, D31 and D21.
   - Add **D37**: portal "today" is UTC and rolls over at 18:00 Mexico time; date labels set no `timeZone`; a platform-wide decision, since the specs mandate UTC day math.
   - Add **D38**: text-on-tint contrast outside badges, e.g. white on `--lavanda` 3.06:1 on `.pill.active` and the nav/message counters, the "Pilares del mes" link chip at 3.92:1, and icon tiles.
@@ -59,7 +59,7 @@
 
 ## 6. Verification and handoff
 
-- [ ] 6.1 Run the full gate locally: `npx tsc --noEmit && npm run lint && npm run test:run && npm run build`. Verify: all four exit 0; quote the summary lines.
+- [x] 6.1 Run the full gate locally: `npx tsc --noEmit && npm run lint && npm run test:run && npm run build`. Verify: all four exit 0; quote the summary lines.
 - [ ] 6.2 Smoke checks on the Preview URL, using seeded rows and read-only steps only:
   - (a) `/admin/clients`: pick each of "En prueba" (Verónica Salas), "Pausadas" (Silvia Ochoa), "Incompletas" (Claudia Núñez) and "Expiradas" (Javier Alcántara); each shows its client, and "Activas" shows none of them.
   - (b) D8: Verónica's "Prueba" badge and every other status badge is legible at ~375px and desktop.

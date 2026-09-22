@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getHistoryList, getPerformanceData } from "@/lib/content/history";
 import { ProgressView } from "@/components/portal/ProgressView";
+import { weekdayLabel } from "@/lib/admin/date-helpers";
 import type { PhotoItem } from "@/components/portal/PhotosTab";
 import { SIGNED_URL_TTL_SECONDS } from "@/lib/storage/signed-url";
 
@@ -41,5 +42,5 @@ export default async function HistoryPage() {
     }
   }
 
-  return <ProgressView performance={performance} history={history} photos={photos} />;
+  return <ProgressView performance={performance} history={history} photos={photos} dateLabel={weekdayLabel()} />;
 }
