@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, afterAll } from "vitest";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -9,12 +9,29 @@ import { sanitizeRichText } from "@/lib/admin/sanitize-html";
 
 // A8 regresión — pipeline real: el navegador normaliza hex → rgb() al serializar,
 // y el sanitizer debe dejar pasar esa forma (bug: portal sin colores).
+//
+// Cada editor se destruye al terminar su prueba: uno vivo deja un timer de
+// DOMObserver de ProseMirror que puede dispararse después de que jsdom se
+// desmonta ("document is not defined") y tumbar CI con todas las pruebas en verde.
+const editors: Editor[] = [];
+
 function makeEditor(content = "<p>hola mundo</p>") {
-  return new Editor({
+  const ed = new Editor({
     extensions: [StarterKit, TextStyle, Color, Highlight.configure({ multicolor: true })],
     content,
   });
+  editors.push(ed);
+  return ed;
 }
+
+afterEach(() => {
+  for (const ed of editors) if (!ed.isDestroyed) ed.destroy();
+});
+
+afterAll(() => {
+  // Guarda de la fuga: ningún editor sobrevive a la suite.
+  expect(editors.filter((ed) => !ed.isDestroyed)).toHaveLength(0);
+});
 
 describe("A8 pipeline Tiptap → sanitizer", () => {
   it("color de texto sobrevive el pipeline completo (forma rgb normalizada)", () => {
