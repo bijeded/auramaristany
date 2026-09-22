@@ -12,14 +12,7 @@ import { CancelSubscriptionSection } from "@/components/portal/settings/CancelSu
 import { GraduatedCard } from "@/components/portal/settings/GraduatedCard";
 import { deriveCancellationState } from "@/lib/portal/cancellation";
 import type { SubscriptionStatus } from "@/lib/supabase/types";
-import { serverToday } from "@/lib/content/server-today";
-
-// Etiqueta de fecha para el PortalHeader (respeta DEV_DATE en dev, como /pilares).
-function todayLabel(): string {
-  const base = serverToday();
-  const s = base.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
-  return s.charAt(0).toUpperCase() + s.slice(1); // "Martes, 16 de junio" (capitalizado como el resto)
-}
+import { weekdayLabel } from "@/lib/admin/date-helpers";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -52,7 +45,7 @@ export default async function PortalSettingsPage({
 
   return (
     <>
-      <PortalHeader dateLabel={todayLabel()} />
+      <PortalHeader dateLabel={weekdayLabel()} />
       <div className="p-5">
         <h1 className="font-head text-xl mb-2" style={{ color: "var(--negro)" }}>Mi cuenta</h1>
 

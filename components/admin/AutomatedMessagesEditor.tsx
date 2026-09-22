@@ -9,6 +9,7 @@ import {
 } from "@/lib/admin/automatedMessageActions";
 import { MESSAGE_BODY_MAX, MESSAGE_SUBJECT_MAX } from "@/lib/admin/message-helpers";
 import type { NoticeRule } from "@/lib/supabase/types";
+import { BADGE_TONE } from "@/lib/ui/badge-tones";
 
 export interface AutomatedMessageRow {
   rule: NoticeRule;
@@ -42,8 +43,7 @@ function Badge({ active }: { active: boolean }) {
         fontWeight: 600,
         padding: "2px 8px",
         borderRadius: 999,
-        background: active ? "var(--lavanda-soft)" : "var(--error-tint)",
-        color: active ? "var(--lavanda-dark)" : "var(--error)",
+        ...(active ? BADGE_TONE.lavender : BADGE_TONE.danger),
       }}
     >
       {active ? "Activo" : "Inactivo"}

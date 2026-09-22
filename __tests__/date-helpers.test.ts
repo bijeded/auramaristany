@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { monthKey, monthLabel, dayLabel, weekdayLabel, longDateLabel, relativeDayLabel } from "@/lib/admin/date-helpers";
 
 describe("monthKey", () => {
@@ -28,6 +28,28 @@ describe("weekdayLabel", () => {
   });
   it("default a hoy cuando no recibe iso (no truena)", () => {
     expect(typeof weekdayLabel()).toBe("string");
+  });
+
+  // D12 — los siete encabezados del portal llaman `weekdayLabel()` sin fecha:
+  // la de hoy según el reloj real, no la simulada de DEV_DATE.
+  describe("sin iso: el reloj real", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    });
+
+    it("sigue la hora del sistema", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-08T12:00:00"));
+      expect(weekdayLabel()).toBe("Lunes, 8 de junio");
+    });
+
+    it("ignora DEV_DATE", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-08T12:00:00"));
+      vi.stubEnv("DEV_DATE", "2026-01-15");
+      expect(weekdayLabel()).toBe("Lunes, 8 de junio");
+    });
   });
 });
 

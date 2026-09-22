@@ -29,6 +29,10 @@
   --lavanda-dark: #7a63d4;
   --lavanda-soft: #efeafe;
   --lavanda-tint: rgba(153, 130, 244, 0.10);
+  /* Lavanda de TEXTO de insignia (D8). --lavanda-dark sobre --lavanda-soft da
+     3.92:1 y la etiqueta es texto normal de 11.5px, que pide 4.5:1. Éste da
+     4.72:1 sobre --lavanda-soft. Misma tinta, más oscura. */
+  --lavanda-text: #6c53d0;
   --negro: #1a1a1a;
   --blanco: #ffffff;
   --gris-claro: #f5f5f5;
@@ -37,11 +41,19 @@
   --gris-suave: #9a9a9a;
   --error: #e05c5c;
   --error-tint: rgba(224, 92, 92, 0.10);
+  /* Rojo de TEXTO de insignia (D8): --error sobre --error-tint da 3.20:1. Éste
+     da 4.75:1 sobre el tinte. --error sigue pintando íconos y bordes. */
+  --error-text: #ce2727;
   --exito: #4caf7d;
+  /* Tinte verde de las insignias de éxito. Estaba escrito a mano como rgba en
+     cada insignia (D8); es el mismo valor, ahora con nombre. */
+  --exito-tint: rgba(76, 175, 125, 0.14);
   /* Verde de --exito pero legible como TEXTO: #4caf7d sobre blanco da 2.71:1 y
      no alcanza ni el 3:1 de texto grande. Los fondos teñidos siguen usando
-     --exito; las cifras y el texto usan éste. */
-  --exito-text: #2f7d54;
+     --exito; las cifras y el texto usan éste.
+     D8 — era #2f7d54, que daba 4.43:1 sobre --exito-tint: justo por debajo del
+     4.5:1 de la etiqueta. Éste da 4.79:1 sobre el tinte y 5.43:1 sobre blanco. */
+  --exito-text: #2d7750;
   /* Ámbar de "todavía puede cobrar" (pausada, impaga, incompleta). Estaba
      repetido a mano como #9a7b1f en cinco archivos. 4.07:1 sobre blanco.
      También es RELLENO de barra desde "Cancelaciones por variante", así que
@@ -50,6 +62,9 @@
      la tarjeta no sirve para una barra — la pista es su color adyacente. */
   --ambar: #9a7b1f;
   --ambar-tint: rgba(240, 198, 116, 0.18);
+  /* Ámbar de TEXTO de insignia (D8): --ambar sobre --ambar-tint da 3.70:1. Éste
+     da 4.75:1 sobre el tinte. --ambar sigue siendo el relleno de barra. */
+  --ambar-text: #856a1b;
   /* "Lleva días sin registrar" en la columna Último acceso del listado de
      clientes. Familia ámbar a propósito —es atención, no error: la cliente no
      tiene ningún problema de cobro, simplemente no ha entrado.

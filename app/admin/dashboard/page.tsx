@@ -23,7 +23,7 @@ import {
 import { RevenueBarChart } from "@/components/admin/RevenueBarChart";
 import { VariantBarList } from "@/components/admin/VariantBarList";
 import Link from "next/link";
-import { STATUS_LABEL } from "@/lib/admin/payment-status";
+import { paymentStatusBadge } from "@/lib/admin/payment-status";
 import { requireAdminPage } from "@/lib/admin/auth";
 import { COHORT_FILTER } from "@/lib/admin/clients-helpers";
 
@@ -272,7 +272,7 @@ export default async function AdminDashboardPage() {
               <tr><td colSpan={5} className="font-body" style={{ padding: "20px 22px", fontSize: 13, color: "var(--gris-texto)" }}>Aún no hay pagos registrados</td></tr>
             )}
             {recent.map((p, i) => {
-              const s = STATUS_LABEL[p.status] ?? STATUS_LABEL.open;
+              const s = paymentStatusBadge(p.status);
               return (
                 <tr key={i} style={{ borderTop: "1px solid var(--gris-linea)" }}>
                   <td className="font-body" style={{ padding: "13px 22px", fontSize: 13.5, color: "var(--gris-texto)" }}>

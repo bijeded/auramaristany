@@ -7,25 +7,24 @@ import { PhotosTab, type PhotoItem } from "./PhotosTab";
 import type { PerfExercise } from "@/lib/content/history-helpers";
 import type { HistoryListItem } from "@/lib/content/history";
 
-function todayLabel(): string {
-  const s = new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 export function ProgressView({
   performance,
   history,
   photos,
+  dateLabel,
 }: {
   performance: PerfExercise[];
   history: HistoryListItem[];
   photos: PhotoItem[];
+  /** D12 — viene del servidor: leer el reloj aquí daba un texto en el render
+   *  del servidor (UTC) y otro al hidratar en la zona del navegador. */
+  dateLabel: string;
 }) {
   const [tab, setTab] = useState<"desempeno" | "fotos">("desempeno");
 
   return (
     <div style={{ background: "var(--blanco)", minHeight: "100%" }}>
-      <PortalHeader dateLabel={todayLabel()} />
+      <PortalHeader dateLabel={dateLabel} />
 
       <div style={{ padding: "0 18px", borderBottom: "1px solid var(--gris-linea)" }}>
         <div className="flex gap-6">

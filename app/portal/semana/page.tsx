@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getWeekCalendar } from "@/lib/content/queries";
 import { WeekView } from "@/components/portal/WeekView";
+import { weekdayLabel } from "@/lib/admin/date-helpers";
 
 export default async function PortalSemanaPage() {
   const supabase = await createClient();
@@ -13,5 +14,5 @@ export default async function PortalSemanaPage() {
 
   const rows = await getWeekCalendar(user.id);
 
-  return <WeekView rows={rows} />;
+  return <WeekView rows={rows} dateLabel={weekdayLabel()} />;
 }

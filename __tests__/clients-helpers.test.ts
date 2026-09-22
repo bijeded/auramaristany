@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { cancellationCell, filterClients, isInactive, nextChargeCell, type ClientListRow } from "@/lib/admin/clients-helpers";
+import { cancellationCell, filterClients, isInactive, nextChargeCell, type ClientListRow, type StatusFilter } from "@/lib/admin/clients-helpers";
 import { sanitizePlainText } from "@/lib/admin/sanitize-html";
+import type { SubscriptionStatus } from "@/lib/supabase/types";
 
 const NOW = "2026-07-15";
 
@@ -86,6 +87,62 @@ describe("filterClients", () => {
       const r = filterClients(set, { query: "", program: "Todas", status: "Sin actividad", now: NOW });
       expect(r.map((x) => x.profile_id)).not.toContain("q3");
     });
+  });
+
+  // D22 — cuatro status que la base acepta y que ningún filtro alcanzaba: esas
+  // clientes sólo se veían con la lista sin filtrar. Cada opción es un solo
+  // status, sin plegarlo en "Activas" ni en "Canceladas".
+  describe("filtros de un solo status", () => {
+    const trialing = { ...base, profile_id: "s1", status: "trialing" as const };
+    const paused = { ...base, profile_id: "s2", status: "paused" as const };
+    const incomplete = { ...base, profile_id: "s3", status: "incomplete" as const };
+    const expired = { ...base, profile_id: "s4", status: "incomplete_expired" as const };
+    const quietTrialing = { ...base, profile_id: "s5", status: "trialing" as const, last_activity_date: null };
+    const set = [base, trialing, paused, incomplete, expired, quietTrialing, ...rows.slice(1)];
+    const ids = (status: StatusFilter) =>
+      filterClients(set, { query: "", program: "Todas", status, now: NOW }).map((x) => x.profile_id);
+
+    it("'En prueba' sólo trae trialing", () => {
+      expect(ids("En prueba")).toEqual(["s1", "s5"]);
+    });
+    it("'Pausadas' sólo trae paused", () => {
+      expect(ids("Pausadas")).toEqual(["s2"]);
+    });
+    it("'Incompletas' trae incomplete y no incomplete_expired", () => {
+      expect(ids("Incompletas")).toEqual(["s3"]);
+    });
+    it("'Expiradas' trae incomplete_expired y no incomplete", () => {
+      expect(ids("Expiradas")).toEqual(["s4"]);
+    });
+    it("una trialing sin actividad sale en 'En prueba' y 'Sin actividad', no en 'Activas'", () => {
+      expect(ids("En prueba")).toContain("s5");
+      expect(ids("Sin actividad")).toContain("s5");
+      expect(ids("Activas")).not.toContain("s5");
+    });
+  });
+
+  // Todo status que la base acepta tiene al menos un filtro que lo alcanza. El
+  // `satisfies` hace que `tsc` rompa este archivo si la unión de `types.ts` crece:
+  // el status nuevo tiene que aparecer aquí antes de que una fila desaparezca.
+  it("cada status que la base acepta lo alcanza algún filtro", () => {
+    const ALL = {
+      active: true,
+      trialing: true,
+      past_due: true,
+      canceled: true,
+      unpaid: true,
+      completed: true,
+      paused: true,
+      incomplete: true,
+      incomplete_expired: true,
+    } satisfies Record<SubscriptionStatus, true>;
+    const unreachable = (Object.keys(ALL) as SubscriptionStatus[]).filter((status) => {
+      const row = { ...base, status };
+      return !STATUS_FILTERS.some(
+        (f) => filterClients([row], { query: "", program: "Todas", status: f, now: NOW }).length === 1
+      );
+    });
+    expect(unreachable).toEqual([]);
   });
 
   // D17 — las dos cohortes que siguen ACTIVAS y entrenando, y que por eso no se
@@ -445,8 +502,13 @@ describe("parseStatusFilter", () => {
     expect(parseStatusFilter("En cancelación")).toBe("En cancelación");
   });
 
+  // D22 — "Pausadas" era aquí el ejemplo de valor inventado; ya es un filtro.
+  it("un enlace a ?status=Pausadas llega al estado", () => {
+    expect(parseStatusFilter("Pausadas")).toBe("Pausadas");
+  });
+
   it("un valor inventado no llega al estado: se ignora", () => {
-    expect(parseStatusFilter("Pausadas")).toBeNull();
+    expect(parseStatusFilter("Pausada")).toBeNull();
     expect(parseStatusFilter("'; drop table subscriptions; --")).toBeNull();
   });
 

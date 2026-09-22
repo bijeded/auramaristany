@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTodayContent } from "@/lib/content/queries";
 import { getBookingState } from "@/lib/content/booking-queries";
 import { TodayView } from "@/components/portal/TodayView";
+import { weekdayLabel } from "@/lib/admin/date-helpers";
 
 export default async function PortalTodayPage() {
   const supabase = await createClient();
@@ -16,5 +17,7 @@ export default async function PortalTodayPage() {
   // Estado de reserva para el bloque "agendar" (si el día lo incluye).
   const booking = await getBookingState(user.id);
 
-  return <TodayView content={content} booking={booking} />;
+  // D12 — el encabezado sigue el reloj real; el contenido del día sigue su
+  // propia fecha (que en dev puede ser DEV_DATE).
+  return <TodayView content={content} booking={booking} dateLabel={weekdayLabel()} />;
 }
