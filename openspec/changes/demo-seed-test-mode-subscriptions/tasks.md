@@ -21,7 +21,7 @@
 - [x] 3.1 Run `npx tsx --env-file=.env.local scripts/seed-demo.ts --dry-run`; confirm no network call and the table marks the 3 clients.
 - [x] 3.2 Run the seed against the demo DB and Stripe test mode; for each of the 3 rows, `GET /v1/subscriptions/<id>` matches the row's period, status and `cancel_at_period_end`. **Result (2026-09-22):** all 3 match on customer id, status, `cancel_at_period_end` and both period bounds; 0 Stripe invoices each.
 - [x] 3.3 Run the seed a second time; Stripe holds exactly 3 seed-tagged customers, and any non-seed test customer is untouched. Stripe webhook delivery log for both runs is all 2xx; no Stripe invoice exists for the seeded customers; the rows are unchanged after webhooks settle. **Result:** second run deleted the 3 previous seed customers; Stripe holds 3 seed-tagged of 12 total (9 non-seed untouched); all 24 events of the run `pending_webhooks=0`; rows re-verified after.
-- [ ] 3.4 Smoke on the Preview URL, seeded data only: log in as Gabriela Torres → cancel with a reason → grace state shown and survey row exists; log in as Adriana Ortega → reactivate → grace state gone. Non-destructive — a reseed restores both.
+- [x] 3.4 Smoke on the Preview URL, seeded data only: log in as Gabriela Torres → cancel with a reason → grace state shown and survey row exists; log in as Adriana Ortega → reactivate → grace state gone. Non-destructive — a reseed restores both. **Result (2026-09-22):** passed, run by the maintainer.
 - [x] 3.5 After 3.4, Gabriela's row period is unchanged by the `subscription.updated` webhook; admin dashboard money KPIs are unchanged from a synthetic-only seed. **Result:** webhook half verified directly — Stripe `cancel_at_period_end` true then false on Gabriela's sub; the live webhook mirrored both and the period stayed `2026-09-10 → 2026-10-10`; row restored. KPIs unchanged by construction: 133 invoices, all synthetic, no Stripe invoice exists.
 
 ## 4. Docs
@@ -31,5 +31,5 @@
 
 ## 5. Review and handoff
 
-- [ ] 5.1 `/security-review` (sensitive surface: Stripe money, webhooks); address or dismiss each finding in the PR body.
+- [x] 5.1 `/security-review` (sensitive surface: Stripe money, webhooks); address or dismiss each finding in the PR body. **Result:** no findings (cleanup scoped to server-only `seed` metadata; script unreachable from the app; no secret logged; live-key guard before any write).
 - [ ] 5.2 Open the PR from `task/demo-seed-test-mode-subscriptions` with the runtime verification results and the silent-defect flag: touches money aggregation input (invoices) and cancellation state (grace client); no enum/union, migration, RLS or CHECK change. Squash-merge on green CI.
