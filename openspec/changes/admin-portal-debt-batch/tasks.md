@@ -2,26 +2,26 @@
 
 ## 1. Client-list filters: D22 (widened)
 
-- [ ] 1.1 Write failing tests in `__tests__/clients-helpers.test.ts`, one per new option. Each asserts that "En prueba", "Pausadas", "Incompletas" and "Expiradas" match only their status. Include `incomplete` vs `incomplete_expired`, and a quiet `trialing` row that matches both "En prueba" and "Sin actividad" but not "Activas". Verify: `npm run test:run` fails because the filters don't exist yet.
-- [ ] 1.2 Write the exhaustiveness test: `const ALL = {…} satisfies Record<SubscriptionStatus, true>`, and for each status a recently-active row is returned by at least one entry of `STATUS_FILTERS`. Verify: it fails today on `trialing`, `paused`, `incomplete` and `incomplete_expired`.
-- [ ] 1.3 Add the four literals to `StatusFilter`, append them to `STATUS_FILTERS` after "Sin actividad", and add one status-equality guard each in `filterClients`. Verify: 1.1 and 1.2 pass, and every existing `clients-helpers` test still passes, so existing memberships are unchanged.
-- [ ] 1.4 Add a `parseStatusFilter` test showing `"Pausadas"` round-trips and an unknown value still yields `null`. Verify: `npm run test:run` is green.
+- [x] 1.1 Write failing tests in `__tests__/clients-helpers.test.ts`, one per new option. Each asserts that "En prueba", "Pausadas", "Incompletas" and "Expiradas" match only their status. Include `incomplete` vs `incomplete_expired`, and a quiet `trialing` row that matches both "En prueba" and "Sin actividad" but not "Activas". Verify: `npm run test:run` fails because the filters don't exist yet.
+- [x] 1.2 Write the exhaustiveness test: `const ALL = {…} satisfies Record<SubscriptionStatus, true>`, and for each status a recently-active row is returned by at least one entry of `STATUS_FILTERS`. Verify: it fails today on `trialing`, `paused`, `incomplete` and `incomplete_expired`.
+- [x] 1.3 Add the four literals to `StatusFilter`, append them to `STATUS_FILTERS` after "Sin actividad", and add one status-equality guard each in `filterClients`. Verify: 1.1 and 1.2 pass, and every existing `clients-helpers` test still passes, so existing memberships are unchanged.
+- [x] 1.4 Add a `parseStatusFilter` test showing `"Pausadas"` round-trips and an unknown value still yields `null`. Verify: `npm run test:run` is green.
 
 ## 2. First component render test: D30
 
-- [ ] 2.1 Create `__tests__/clients-table-status-select.test.tsx`. Render `ClientsTable` with `next/navigation` mocked (`useRouter`, `usePathname`, `useSearchParams`) and assert the status `<select>` option values equal `["", ...STATUS_FILTERS]` in order. Verify: the test passes, then fails when a literal `<option>` is added to the component temporarily. Revert that edit.
-- [ ] 2.2 If the `.tsx` test needs any Vitest config change, make it in this task and state why in the commit. Verify: `npm run test:run` picks up and passes the file with no other test affected.
+- [x] 2.1 Create `__tests__/clients-table-status-select.test.tsx`. Render `ClientsTable` with `next/navigation` mocked (`useRouter`, `usePathname`, `useSearchParams`) and assert the status `<select>` option values equal `["", ...STATUS_FILTERS]` in order. Verify: the test passes, then fails when a literal `<option>` is added to the component temporarily. Revert that edit.
+- [x] 2.2 If the `.tsx` test needs any Vitest config change, make it in this task and state why in the commit. Verify: `npm run test:run` picks up and passes the file with no other test affected.
 
 ## 3. Badge contrast: D8 (widened)
 
-- [ ] 3.1 Write failing tests for `lib/ui/contrast.ts`, test-first:
+- [x] 3.1 Write failing tests for `lib/ui/contrast.ts`, test-first:
   - `contrastRatio("#000000", "#ffffff") = 21`
   - `#767676` on white ≈ 4.54
   - `compositeOverWhite("rgba(76,175,125,.14)")` equals the expected hex
 
   Then implement the helper. Verify: the new tests pass.
-- [ ] 3.2 Create `lib/ui/badge-tones.ts` with `BADGE_TONE` (`success`, `lavender`, `danger`, `warning`, `neutral`), holding only `var(--…)` references. Write `__tests__/badge-contrast.test.ts`: it parses `:root` in `app/globals.css`, resolves each tone, and asserts ≥ 4.5:1 with the tone named on failure. Verify: it fails on four tones with today's tokens.
-- [ ] 3.3 In `app/globals.css`:
+- [x] 3.2 Create `lib/ui/badge-tones.ts` with `BADGE_TONE` (`success`, `lavender`, `danger`, `warning`, `neutral`), holding only `var(--…)` references. Write `__tests__/badge-contrast.test.ts`: it parses `:root` in `app/globals.css`, resolves each tone, and asserts ≥ 4.5:1 with the tone named on failure. Verify: it fails on four tones with today's tokens.
+- [x] 3.3 In `app/globals.css`:
   - add `--exito-tint` (today's success rgba)
   - add `--lavanda-text`, `--error-text` and `--ambar-text`
   - darken `--exito-text`
@@ -29,8 +29,8 @@
   - do not touch the base tokens
 
   Verify: `badge-contrast.test.ts` passes for all five tones.
-- [ ] 3.4 Write a failing test for `paymentStatusBadge(status)` in `lib/admin/payment-status.ts`: known statuses keep their label, and an unknown status returns itself in the neutral tone. Implement it. Verify: the test passes.
-- [ ] 3.5 Point every badge site at `BADGE_TONE`, labels unchanged:
+- [x] 3.4 Write a failing test for `paymentStatusBadge(status)` in `lib/admin/payment-status.ts`: known statuses keep their label, and an unknown status returns itself in the neutral tone. Implement it. Verify: the test passes.
+- [x] 3.5 Point every badge site at `BADGE_TONE`, labels unchanged:
   - `STATUS_PRESENTATION` and `AMBAR` in `lib/admin/clients-helpers.ts`
   - `lib/admin/payment-status.ts`
   - `components/portal/settings/SubscriptionCard.tsx`
@@ -38,8 +38,8 @@
   - `components/admin/AutomatedMessagesEditor.tsx`
   - `components/admin/OnboardingBuilder.tsx`
 
-  Verify: `grep -rn "rgba(76,175,125,.14)\|var(--ambar)\"\|var(--error)\" \|lavanda-dark)\"" components lib` finds no badge-site colour pair left, and the existing `statusBadge` tests pass.
-- [ ] 3.6 Route the four payment-status sites through `paymentStatusBadge`: `PaymentsTable`, `app/admin/dashboard/page.tsx`, `ClientDetailTabs` and `components/portal/settings/PaymentHistory.tsx`. Delete `PAY_STATUS` and the `?? STATUS_LABEL.x` fallbacks. Verify: `grep -rn "PAY_STATUS\|STATUS_LABEL\[" components app` returns nothing, and `npx tsc --noEmit` passes.
+  Verify: the grep `rgba(76,175,125,.14)|var(--ambar)"|var(--error)" |lavanda-dark)"` over `components lib` finds no colour pair left at the listed sites, and the existing `statusBadge` tests pass. (Updated during apply: the grep also hits plain text, icons and five more tinted chips in files this change does not name; those chips go to D38.)
+- [x] 3.6 Route the four payment-status sites through `paymentStatusBadge`: `PaymentsTable`, `app/admin/dashboard/page.tsx`, `ClientDetailTabs` and `components/portal/settings/PaymentHistory.tsx`. Delete `PAY_STATUS` and the `?? STATUS_LABEL.x` fallbacks. Verify: `grep -rn "PAY_STATUS\|STATUS_LABEL\[" components app` returns nothing, and `npx tsc --noEmit` passes.
 
 ## 4. Portal header date: D12 (widened)
 

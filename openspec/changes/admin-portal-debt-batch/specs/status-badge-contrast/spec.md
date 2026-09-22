@@ -31,14 +31,16 @@ The floor SHALL be checked automatically from the colour tokens themselves, so a
 
 ### Requirement: Every badge draws its colours from the shared tones
 
-Every badge of this shape, a short label on a tinted pill, SHALL take its colours from the shared tones and SHALL NOT write its own colour pair. That covers:
+Every status or label badge listed below SHALL take its colours from the shared tones and SHALL NOT write its own colour pair:
 - subscription status in the admin client list and client detail
 - subscription status on the client's portal subscription card
 - payment status in the payments table, the dashboard and the client detail
 - payment status in the client's portal payment history
 - the program chip on the client list
 - the active/inactive chip of an automated message
-- the question-type and inactive badges in the onboarding builder
+- the question-type, required and inactive badges in the onboarding builder
+
+Other chips of the same shape (the portal card's program chip, the workout-focus chip on Hoy and on a history day, the "Compartida en N" chip in the series list, and the habit counter on Desempeño) are not converted in this change; they are tracked as D38.
 
 A given payment status SHALL render with the same label and tone on every screen that shows it. A payment status with no entry SHALL show its raw value in the neutral tone on every screen. It SHALL NOT borrow another status's label.
 

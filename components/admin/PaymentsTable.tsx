@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatMXN, filterPaymentsByStatus, type PaymentRow, type PaymentStatusFilter } from "@/lib/admin/finance-helpers";
 import { paginate } from "@/lib/admin/pagination";
-import { STATUS_LABEL } from "@/lib/admin/payment-status";
+import { paymentStatusBadge } from "@/lib/admin/payment-status";
 
 const STATUS_FILTERS: { key: PaymentStatusFilter; label: string }[] = [
   { key: "todos", label: "Todos" },
@@ -64,7 +64,7 @@ export function PaymentsTable({ rows }: { rows: PaymentRow[] }) {
               </tr></thead>
               <tbody>
                 {items.map((p, i) => {
-                  const s = STATUS_LABEL[p.status] ?? STATUS_LABEL.open;
+                  const s = paymentStatusBadge(p.status);
                   return (
                     <tr key={i} style={{ borderTop: "1px solid var(--gris-linea)" }}>
                       <td className="font-body" style={{ padding: "13px 20px", fontSize: 13.5, color: "var(--gris-texto)" }}>{paymentDate(p.invoice_date)}</td>

@@ -9,6 +9,7 @@ import { GripVertical, Plus, Pencil } from "lucide-react";
 import { type QuestionType, type OnboardingQuestion } from "@/lib/admin/onboarding-helpers";
 import { reorderQuestions, setQuestionActive } from "@/lib/admin/onboardingActions";
 import { OnboardingQuestionEditor } from "./OnboardingQuestionEditor";
+import { BADGE_TONE } from "@/lib/ui/badge-tones";
 
 const TYPE_LABEL: Record<QuestionType, string> = {
   text: "Texto libre",
@@ -37,9 +38,9 @@ function SortableRow({ q, onEdit, onToggle }: {
         <div style={{ flex: 1 }}>
           <div className="font-body" style={{ fontWeight: 600, fontSize: 14 }}>{q.question_text}</div>
           <div className="flex gap-2" style={{ marginTop: 5 }}>
-            <Badge bg="var(--lavanda-soft)" color="var(--lavanda-dark)">{TYPE_LABEL[q.question_type]}</Badge>
-            {q.is_required && <Badge bg="var(--gris-claro)" color="var(--gris-texto)">Obligatoria</Badge>}
-            {!q.is_active && <Badge bg="var(--error-tint)" color="var(--error)">Inactiva</Badge>}
+            <Badge {...BADGE_TONE.lavender}>{TYPE_LABEL[q.question_type]}</Badge>
+            {q.is_required && <Badge {...BADGE_TONE.neutral}>Obligatoria</Badge>}
+            {!q.is_active && <Badge {...BADGE_TONE.danger}>Inactiva</Badge>}
           </div>
         </div>
         <button onClick={onToggle} className="font-body" style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", color: "var(--gris-texto)" }}>

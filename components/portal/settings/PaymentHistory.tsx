@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { AccountInvoice } from "@/lib/portal/account-queries";
-import { STATUS_LABEL } from "@/lib/admin/payment-status";
+import { paymentStatusBadge } from "@/lib/admin/payment-status";
 import { dayLabel } from "@/lib/admin/date-helpers";
 
 function formatMoney(mxn: number): string {
@@ -22,7 +22,7 @@ export function PaymentHistory({
     <div className="rounded-xl bg-white p-5" style={{ boxShadow: "var(--shadow-card)" }}>
       <div className="flex flex-col">
         {invoices.map((inv, i) => {
-          const badge = STATUS_LABEL[inv.status] ?? STATUS_LABEL.void;
+          const badge = paymentStatusBadge(inv.status);
           return (
             <div key={`${inv.invoice_date}-${i}`} className="flex items-center justify-between gap-3 py-3"
               style={{ borderTop: i === 0 ? "none" : "1px solid var(--gris-linea)" }}>

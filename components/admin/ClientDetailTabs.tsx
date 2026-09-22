@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { subscriptionProgressLabel, nextChargeCell, cancellationCell } from "@/lib/admin/clients-helpers";
 import { formatMXN } from "@/lib/admin/finance-helpers";
+import { paymentStatusBadge } from "@/lib/admin/payment-status";
 import { dayLabel, monthLabel, monthKey } from "@/lib/admin/date-helpers";
 import { normalizeWhatsappNumber, whatsappUrl } from "@/lib/admin/message-helpers";
 import { ClientPhotosTab } from "./ClientPhotosTab";
@@ -15,13 +16,6 @@ const TABS = [
   ["resumen", "Resumen"], ["onboarding", "Onboarding"], ["progreso", "Progreso"],
   ["fotos", "Fotos"], ["pagos", "Pagos"], ["mensajes", "Mensajes"],
 ] as const;
-
-const PAY_STATUS: Record<string, { label: string; bg: string; color: string }> = {
-  paid: { label: "Pagado", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  open: { label: "Pendiente", bg: "var(--ambar-tint)", color: "var(--ambar)" },
-  void: { label: "Anulado", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
-  uncollectible: { label: "Fallido", bg: "var(--error-tint)", color: "var(--error)" },
-};
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ background: "#fff", border: "1px solid var(--gris-linea)", borderRadius: 14, padding: 20, ...style }}>{children}</div>;
@@ -188,14 +182,14 @@ export function ClientDetailTabs({ detail }: { detail: ClientDetail }) {
               ))}</tr></thead>
               <tbody>
                 {detail.payments.map((p, i) => {
-                  const st = PAY_STATUS[p.status] ?? { label: p.status, bg: "var(--gris-claro)", color: "var(--gris-texto)" };
+                  const st = paymentStatusBadge(p.status);
                   return (
                     <tr key={i} style={{ borderTop: "1px solid var(--gris-linea)" }}>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5 }}>{dayLabel(p.date.slice(0, 10))}</td>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5, color: "var(--gris-texto)" }}>{monthLabel(monthKey(p.date.slice(0, 10)))}</td>
                       <td style={{ padding: "12px 20px", fontFamily: "var(--font-body)", fontSize: 13.5, fontWeight: 600 }}>{formatMXN(p.amount)}</td>
                       <td style={{ padding: "12px 20px" }}>
-                        <span className="font-body" style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: st.bg, color: st.color }}>{st.label}</span>
+                        <span className="font-body" style={{ fontSize: 11.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999, background: st.bg, color: st.color }}>{st.text}</span>
                       </td>
                     </tr>
                   );

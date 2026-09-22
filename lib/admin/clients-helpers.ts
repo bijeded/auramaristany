@@ -4,6 +4,7 @@ import type { SubscriptionStatus } from "@/lib/supabase/types";
 import { dayLabel, daysBetween } from "@/lib/admin/date-helpers";
 import { decodePlainText } from "@/lib/admin/plain-text";
 import { formatMXN } from "@/lib/admin/finance-helpers";
+import { BADGE_TONE } from "@/lib/ui/badge-tones";
 
 /**
  * La celda de cobro de una suscripción, para el listado Y para la ficha.
@@ -81,6 +82,10 @@ export type StatusFilter =
   | "Último mes"
   | "En cancelación"
   | "Sin actividad"
+  | "En prueba"
+  | "Pausadas"
+  | "Incompletas"
+  | "Expiradas"
   | null;
 
 /**
@@ -109,6 +114,12 @@ export const STATUS_FILTERS: Exclude<StatusFilter, null>[] = [
   COHORT_FILTER.completing,
   COHORT_FILTER.cancelling,
   "Sin actividad",
+  // D22 — un status cada una. Sin ellas, estas clientes sólo aparecían con la
+  // lista sin filtrar; la prueba de exhaustividad fija que ya no falte ninguno.
+  "En prueba",
+  "Pausadas",
+  "Incompletas",
+  "Expiradas",
 ];
 
 /**
@@ -208,6 +219,12 @@ export function filterClients(
     // L2c — terminar no es cancelar. Tiene su propio filtro para que Aura
     // pueda ver de un vistazo a quién ofrecerle Extra.
     if (opts.status === "Completadas" && r.status !== "completed") return false;
+    // D22 — un solo status cada una. `trialing` NO se pliega en "Activas" ni
+    // `incomplete_expired` en "Canceladas": esas dos pertenencias no cambian.
+    if (opts.status === "En prueba" && r.status !== "trialing") return false;
+    if (opts.status === "Pausadas" && r.status !== "paused") return false;
+    if (opts.status === "Incompletas" && r.status !== "incomplete") return false;
+    if (opts.status === "Expiradas" && r.status !== "incomplete_expired") return false;
     // D17 — las dos cohortes que siguen activas. La pertenencia se decide con la
     // MISMA derivación que el portal y el dashboard: `completed_at` a solas no
     // prueba nada (L2b lo escribía sin cancelar en Stripe), y leer la bandera
@@ -328,35 +345,31 @@ export function canDeleteClient(
  * se acuerde de esta pantalla, y entonces un status nuevo debe verse raro, no
  * borrar la lista de clientes de Aura.
  */
-// Ámbar = "todavía puede cobrar". Vive en globals.css porque el hex estaba
-// repetido a mano en cinco archivos; quedan tres por convertir (payment-status,
-// SubscriptionCard, ClientDetailTabs), anotados en BACKLOG.
-const AMBAR = { bg: "var(--ambar-tint)", color: "var(--ambar)" };
-
+// D8 — los colores salen de BADGE_TONE; ninguna insignia escribe su par a mano.
+// Ámbar = "todavía puede cobrar"; gris = ya terminó sin logro.
 const STATUS_PRESENTATION: Record<string, { label: string; bg: string; color: string }> = {
-  active: { label: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  trialing: { label: "Prueba", bg: "var(--lavanda-soft)", color: "var(--lavanda-dark)" },
-  past_due: { label: "Pago fallido", bg: "var(--error-tint)", color: "var(--error)" },
-  unpaid: { label: "Impaga", ...AMBAR },
-  canceled: { label: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
+  active: { label: "Activa", ...BADGE_TONE.success },
+  trialing: { label: "Prueba", ...BADGE_TONE.lavender },
+  past_due: { label: "Pago fallido", ...BADGE_TONE.danger },
+  unpaid: { label: "Impaga", ...BADGE_TONE.warning },
+  canceled: { label: "Cancelada", ...BADGE_TONE.neutral },
   // L2c — terminó el programa completo. Es un logro, no una baja: verde como
   // la activa, para que Aura no la lea de un vistazo como una cliente perdida.
-  completed: { label: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
+  completed: { label: "Completada", ...BADGE_TONE.success },
   // Los tres que la base ya aceptaba y aquí no existían. Ámbar los dos que
   // pueden volver a cobrar; gris el que murió sin llegar a cobrar nunca.
-  paused: { label: "Pausada", ...AMBAR },
-  incomplete: { label: "Incompleta", ...AMBAR },
-  incomplete_expired: { label: "Expirada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
+  paused: { label: "Pausada", ...BADGE_TONE.warning },
+  incomplete: { label: "Incompleta", ...BADGE_TONE.warning },
+  incomplete_expired: { label: "Expirada", ...BADGE_TONE.neutral },
 };
 
 export function statusBadge(status: string): { label: string; bg: string; color: string } {
   return (
     STATUS_PRESENTATION[status] ?? {
       // Se muestra el valor crudo: es feo a propósito, y es infinitamente mejor
-      // que una tabla en blanco. Mismo criterio que la celda de pagos de la ficha.
+      // que una tabla en blanco. Mismo criterio que `paymentStatusBadge`.
       label: status,
-      bg: "var(--gris-claro)",
-      color: "var(--gris-texto)",
+      ...BADGE_TONE.neutral,
     }
   );
 }

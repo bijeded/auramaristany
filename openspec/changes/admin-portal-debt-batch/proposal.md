@@ -21,6 +21,8 @@ Two further items are decided without code: D31 is accepted as-is and D21 is dro
   - the automated-message Activo/Inactivo chip
   - the onboarding-builder badges
 
+  Five more chips of the same shape, found during apply, measure 4.19:1 or worse but sit in files this change does not otherwise touch; they are added to D38 instead of converted here.
+
   All four payment-status sites use one lookup. It shows an unknown status as itself, where two sites currently mislabel it "Pendiente" and one "Anulado". The client detail's private copy of the map is deleted. **Visible restyle:** badge text gets darker on every screen above.
 - **D12, widened: every portal header shows the current real date.** All seven headers (Hoy, Semana, Pilares, Mi progreso, Mensajes, a single message, Ajustes) use the existing `weekdayLabel()` on the real clock. The five `todayLabel()` copies are removed. `/today` and `/pilares` stop deriving the header from `serverToday()`. This only affects local dev: `serverToday()` already ignores `DEV_DATE` in production. The label is computed in the server page and passed down, so no client component reads the clock.
 - **Backlog:**

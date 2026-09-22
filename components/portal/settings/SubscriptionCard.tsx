@@ -3,16 +3,19 @@ import { accountProgressLabel } from "@/lib/portal/account-queries";
 import { repeatMarker } from "@/lib/portal/progress-display";
 import { longDateLabel } from "@/lib/admin/date-helpers";
 import type { CancellationState } from "@/lib/portal/cancellation";
+import { BADGE_TONE } from "@/lib/ui/badge-tones";
 
+// D8 — colores de BADGE_TONE; las etiquetas son las del portal, a propósito
+// distintas de las del admin.
 const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> = {
-  active: { text: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  trialing: { text: "Prueba", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  past_due: { text: "Pago pendiente", bg: "var(--ambar-tint)", color: "var(--ambar)" },
-  canceled: { text: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
-  unpaid: { text: "Sin pagar", bg: "var(--error-tint)", color: "var(--error)" },
+  active: { text: "Activa", ...BADGE_TONE.success },
+  trialing: { text: "Prueba", ...BADGE_TONE.success },
+  past_due: { text: "Pago pendiente", ...BADGE_TONE.warning },
+  canceled: { text: "Cancelada", ...BADGE_TONE.neutral },
+  unpaid: { text: "Sin pagar", ...BADGE_TONE.danger },
   // L2c — terminar es un logro, no una baja. Sin esta entrada caía al fallback
   // `canceled` y le decía "Cancelada" a quien acaba de completar el programa.
-  completed: { text: "Completada", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
+  completed: { text: "Completada", ...BADGE_TONE.success },
 };
 
 function formatMoney(mxn: number): string {
