@@ -145,7 +145,6 @@ These three are one root cause (no single-statement transaction) and should be c
 | **D8** | Visually review `trialing` "Prueba" badge | XS | Badge added but unverified — no trialing sub in demo data. Check when one exists. |
 | **D29** | The `kg \| lb` toggle is hand-duplicated in two files | XS | From the `thin-weight-unit-toggle` review (PR #47). The same control is written twice — `UnitToggle` in `components/portal/blocks/ExerciseListBlock.tsx:38` (inline `style`) and an unnamed inline copy in `components/portal/PerformanceTab.tsx:95` (Tailwind `px-3 py-1` + `style`). They have **already drifted**: only the first carries `transition: "all 0.15s ease"`, so the pressed state animates on `/portal/today` and snaps on Desempeño. Dimensions still match, so nothing is broken today. ⚠ The `portal-performance-display` spec now asserts the two copies must stay dimensionally identical — that sentence is a **defect report, not a fix**: same duplicated-table failure class as review rule 8, applied to JSX styling instead of enum tables. Fix: one exported `WeightUnitToggle` consumed by both, then delete the assertion from the spec. |
 | **D12** | `todayLabel()` duplicated in 3 portal pages | XS | Byte-identical in `app/portal/messages/page.tsx`, `messages/[id]/page.tsx`, `settings/page.tsx` (`/pilares` builds the same label inline via `weekdayLabel`). Extract next time one of them is touched. |
-| **D6** | Typo in `.env.example` | XS | `noreply@auramristany.com` → `no-reply@auramaristany.com`. |
 | **D4** | 250-photo cap not race-safe | S | Acceptable for single-user. |
 | **D5** | `getSentMessages` loads all `message_recipients` | S | Scaling concern; fine for now. |
 | **D1** | Admin notes on the day's log | M | Deferred from Phase 3. |
@@ -156,7 +155,7 @@ These three are one root cause (no single-statement transaction) and should be c
 
 ## Suggested Sequence
 
-1. **Now — unblocked cleanup, cheapest first:** `D6` · `D20` · `D23` · `D25` · `D26` · `D27` (all XS, batchable into one or two changes) → `D15` (needed before `L8`). `D23` + `D27` are the same shape (a raw hex where a token belongs) and share a natural batch, but note they are **not** the same defect: `D23` is cosmetic duplication, `D27` is an accessibility failure.
+1. **Now — unblocked cleanup, cheapest first:** `D20` · `D23` · `D25` · `D26` · `D27` (all XS, batchable into one or two changes) → `D15` (needed before `L8`). `D23` + `D27` are the same shape (a raw hex where a token belongs) and share a natural batch, but note they are **not** the same defect: `D23` is cosmetic duplication, `D27` is an accessibility failure.
 2. **Then — the real S/M debts:** `D24` (client-list filter linkability) · `D14` (admin layout guard split) · `D28` (demo data cannot exercise any Stripe-touching flow — it blocks smoke-testing cancel/reactivate, and has now cost two unrunnable smoke cards).
 3. **Transactionality, as one change:** `D2` + `D13` + `D16` — one Postgres RPC pattern closes all three.
 4. **In parallel, waiting on Aura:** `L1` pricing · `L3` onboarding questions · `L5` WhatsApp · `L7` (needs Aura's list).

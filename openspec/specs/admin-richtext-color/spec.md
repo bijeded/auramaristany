@@ -1,5 +1,9 @@
 # admin-richtext-color
 
+## Purpose
+
+The formatting controls Aura uses to style text in the admin Text block editor: text color, background highlight, and underline. It also covers the sanitizer rule that lets those styles survive saving. Only hex (or browser-normalized `rgb()`) `color` and `background-color` declarations are kept, so a styled block round-trips through save, re-edit and the portal, and no other inline style can get into stored content.
+
 ## Requirements
 
 ### Requirement: Text color and background highlight in the Text block editor

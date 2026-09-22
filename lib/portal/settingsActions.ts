@@ -6,16 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { validatePhone } from "@/lib/auth/phone";
 import { stripe } from "@/lib/stripe";
 import { sanitizePlainText } from "@/lib/admin/sanitize-html";
-import { CLIENT_FACING_REASONS, reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
-import type { SubscriptionStatus } from "@/lib/supabase/types";
+import { CLIENT_FACING_REASONS, ELIGIBLE_STATUSES, reasonRequiresDetail, isCompletionScheduled } from "@/lib/portal/cancellation";
 import { createClient as createStatelessClient } from "@supabase/supabase-js";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 const GENERIC_ERROR = "No se pudo guardar. Intenta más tarde.";
-
-// A9 — eligible statuses a client may cancel from.
-const CANCELABLE_STATUSES: SubscriptionStatus[] = ["active", "trialing", "past_due"];
 
 const cancelInputSchema = z.object({
   // Derivado, no recopiado: la lista vive UNA vez en `CLIENT_FACING_REASONS`.
@@ -44,7 +40,7 @@ async function getOwnedCancelableSub(
     .from("subscriptions")
     .select("id, stripe_subscription_id, status, completed_at, cancel_at_period_end")
     .eq("profile_id", userId)
-    .in("status", CANCELABLE_STATUSES)
+    .in("status", ELIGIBLE_STATUSES)
     .order("enrollment_date", { ascending: false });
 
   // El filtro se hace aquí y NO en SQL con `completed_at is null`: esa columna
