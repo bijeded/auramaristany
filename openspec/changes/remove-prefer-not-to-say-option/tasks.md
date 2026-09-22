@@ -13,8 +13,8 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Preview smoke (non-destructive): open `/portal/settings` as a seeded client, open "Cancelar mi plan", confirm six options and no "Prefiero no decir", close the modal without confirming
+- [x] 3.1 Preview smoke (non-destructive): open `/portal/settings` as a seeded client, open "Cancelar mi plan", confirm six options and no "Prefiero no decir", close the modal without confirming
 
 ## 4. Handoff
 
-- [ ] 4.1 Open PR `task/remove-prefer-not-to-say-option`; body states the silent-defect flag: **yes** — touches a client-facing enum subset and the cancel action's validation (DB `CHECK` and union unchanged)
+- [x] 4.1 Open PR `task/remove-prefer-not-to-say-option`; body states the silent-defect flag: **yes** — touches a client-facing enum subset and the cancel action's validation (DB `CHECK` and union unchanged)
