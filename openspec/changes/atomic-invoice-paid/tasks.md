@@ -17,8 +17,8 @@
 
 - [x] 3.1 `grep -rn "recordInvoice\|handleInvoicePaid" docs/adr openspec/specs` and update any stale description (rule 20). Verify: grep output quoted in the PR.
 - [x] 3.2 Run `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build`. Verify: all four exit 0.
-- [ ] 3.3 Runtime scope statement: an end-to-end renewal `invoice.paid` cannot be exercised non-destructively — the three Stripe-backed demo subscriptions have only their first (`subscription_create`) invoice, and a synthetic signed event would advance a demo client's month for real. Task 1.3 is the runtime verification of the new write; state this limit explicitly in the PR body rather than implying an end-to-end run.
-- [ ] 3.4 Run `/security-review` (sensitive surface: webhook, money, service-role, migration); address or dismiss each finding with a reason in the PR body.
+- [x] 3.3 Runtime scope statement: an end-to-end renewal `invoice.paid` cannot be exercised non-destructively — the three Stripe-backed demo subscriptions have only their first (`subscription_create`) invoice, and a synthetic signed event would advance a demo client's month for real. Task 1.3 is the runtime verification of the new write; state this limit explicitly in the PR body rather than implying an end-to-end run.
+- [x] 3.4 Run `/security-review` (sensitive surface: webhook, money, service-role, migration); address or dismiss each finding with a reason in the PR body.
 
 ## 4. PR handoff
 
