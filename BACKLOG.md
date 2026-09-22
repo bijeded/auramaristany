@@ -3,7 +3,7 @@
 Living list of **pending** work. **Each item has a stable ID** to launch it directly into the OpenSpec loop.
 
 ```
-/opsx:propose "D28 — real test-mode subscriptions in the demo seed"   # when scope is already clear
+/opsx:propose "D2 — transactional block saves"   # when scope is already clear
 /opsx:explore "L9 — admin UI for prices"   # when it still needs defining
 ```
 
@@ -127,7 +127,6 @@ These three are one root cause (no single-statement transaction) and should be c
 
 | ID | Item | Size | Note |
 |----|------|:----:|------|
-| **D28** | Demo subscriptions carry synthetic Stripe ids, so no Stripe-touching flow can be smoke-tested | S | `seed-demo.ts` writes `sub_seed_NNN` / `cus_seed_NNN`, which do not exist in Stripe — `GET /v1/subscriptions/sub_seed_002` → `No such subscription`. So **cancel and reactivate cannot be exercised on demo data at all**: `cancelSubscription` calls Stripe first, the call 404s, and the client sees the generic error. Correct behaviour (Stripe is the source of truth, so no survey row is written for a cancellation that did not happen) but it means every smoke card for those flows is unrunnable, and the only workaround is registering a fresh client through real test-mode checkout each time. ⚠ **Sprung twice now, so state the rule in place: every step of a manual smoke check must be possible with the data that actually exists, and non-destructive** — one card asked for a Stripe subscription that didn't exist, another told the reader to delete a client for real; **D8** is the same shape from the other side (no `trialing` sub exists to look at). Fix: create real test-mode subscriptions in the seed for a handful of clients, or add a documented "make me a cancellable client" script. |
 | **D22** | `paused`/`incomplete` have no client-list pill | XS | The three statuses the DB accepts beyond the six the UI modelled match no filter pill, so such a client is visible only with no filter applied. Nothing mis-buckets them (verified: positive `!==` guards, and the cohort branch gates on `status === "active"` first). Worth a `Pausada` pill only if Aura starts pausing subscriptions routinely. |
 | **D30** | No test asserts a rendered options list matches its source constant | S | RULE CANDIDATE from the PR #49 review. Rule 8's second half — "an options list rendered by a component comes entirely from one exported constant" — is the rule with **no automated enforcement**: `tsc` and lint both pass on a hand-written `<option>` beside a mapped list, which is exactly how the cancel modal offered "Prefiero no decir" for months (D19). PR #49 added a `<select>` built from `STATUS_FILTERS` plus one legitimate `""` sentinel; nothing but a smoke step stops a future edit from adding an eighth literal option. The blocker is that **this repo has no component render tests at all** — Testing Library + jsdom are installed and only `use-progress-form.test.ts` uses the hook renderer — so the first one is real scope, which is why #49 left it out. Proposed rule once the harness exists: *a component rendering an options list from an exported constant gets one render test asserting the option set equals that constant plus its declared sentinels.* Natural first targets: `ClientsTable`'s status select and the cancellation-reason list. |
 | **D31** | `PaymentsTable` still filters with the old pill row | XS | PR #49 replaced the client list's seven status pills with a `<select>` and deliberately did not touch `components/admin/PaymentsTable.tsx`, so the two admin list screens now filter with **different controls**. Not a defect — `PaymentsTable` has only four payment-status filters and does not wrap — but it is a visible inconsistency between two adjacent screens. ⚠ Its `STATUS_FILTERS` is a **separate local constant** of a different shape (`{key, label}[]`, payment statuses), not the client-list one — do not try to share them. Decide deliberately: converge on the select, or accept the difference because four pills genuinely fit on one line. |
@@ -146,8 +145,7 @@ These three are one root cause (no single-statement transaction) and should be c
 
 ## Suggested Sequence
 
-1. **Now — the real S/M debts:** `D28` (demo data cannot exercise any Stripe-touching flow — it blocks smoke-testing cancel/reactivate, and has now cost two unrunnable smoke cards).
-2. **Transactionality, as one change:** `D2` + `D13` + `D16` — one Postgres RPC pattern closes all three.
-3. **In parallel, waiting on Aura:** `L1` pricing · `L3` onboarding questions · `L5` WhatsApp · `L7` (needs Aura's list).
-4. **Launch close-out, in order:** `L4` smoke → `L6` demo cleanup → `L11` turn the A4 rules on (one at a time) → `L8` pre-launch verification.
-5. **After launch, on demand:** `L9` prices UI decision · `A13` message builder (wait for Aura's third-rule request).
+1. **Now — transactionality, as one change:** `D2` + `D13` + `D16` — one Postgres RPC pattern closes all three.
+2. **In parallel, waiting on Aura:** `L1` pricing · `L3` onboarding questions · `L5` WhatsApp · `L7` (needs Aura's list).
+3. **Launch close-out, in order:** `L4` smoke → `L6` demo cleanup → `L11` turn the A4 rules on (one at a time) → `L8` pre-launch verification.
+4. **After launch, on demand:** `L9` prices UI decision · `A13` message builder (wait for Aura's third-rule request).

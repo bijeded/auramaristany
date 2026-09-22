@@ -33,9 +33,13 @@ context: |
     include them. Picking the wrong side is invisible to every test, because the
     row-set is identical either way.
 
-  What the demo data cannot do: demo subscriptions carry synthetic Stripe ids
-  (sub_seed_*), so no Stripe-touching flow — cancel, reactivate — can be exercised on
-  seeded data at all. A smoke step that asks for one is impossible, not merely awkward.
+  What the demo data can and cannot do: three seeded clients carry REAL Stripe
+  test-mode subscriptions (scripts/stripe-seed.ts -> STRIPE_BACKED) — Gabriela Torres
+  and Patricia Reyes can cancel, Adriana Ortega (grace) can reactivate. Every other
+  seeded subscription carries synthetic ids (sub_seed_*), so a Stripe-touching step on
+  any other client is impossible, not merely awkward. past_due, unpaid, paused,
+  incomplete*, trialing, completing and completed exist only synthetically. Cancelling
+  or reactivating one of the three changes its state until the next reseed.
 
   design-handoff-aura/ is the original prototype and the domain has moved since. Where
   it and the shipped code disagree on LOGIC (Mes·Semana not "Día X de 180"; 4x7 grid not
