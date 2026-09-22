@@ -17,7 +17,9 @@ export function WeightUnitToggle({
     <div
       role="group"
       aria-label="Unidad de peso"
-      className={`inline-flex rounded-full ${className}`.trim()}
+      // shrink-0: junto a una etiqueta larga, el flex lo encogía por debajo de
+      // sus dos botones de 44px y `overflow: hidden` recortaba "lb".
+      className={`inline-flex shrink-0 rounded-full ${className}`.trim()}
       style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}
     >
       {(["kg", "lb"] as const).map((u) => (
