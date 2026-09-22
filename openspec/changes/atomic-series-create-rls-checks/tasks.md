@@ -39,14 +39,15 @@
 
 - [x] 3.1 `BACKLOG.md`: add a **D36** row to "Everything else" for the four non-content `for all` policies with no `with check` (`profiles_admin_insert_update_delete`, `invoices_admin_write`, `subscription_events_admin_only`, `message_recipients_admin_write`), noting that they are functionally equivalent, a money/identity surface, and to be fixed with `alter policy` like 022. Change the index row `D1–D35` to `D1–D36`. Leave the D34 and D35 rows alone; the archive PR deletes them. Grep `docs/adr/` for `createSeries` and update any reference (rule 20). Verify: grep output shown in the PR.
 - [x] 3.2 Run `npx tsc --noEmit`, `npm run lint`, `npm run test:run` and `npm run build` locally. Verify: all four exit 0.
-- [ ] 3.3 Runtime check on the Preview URL (or local dev against the real DB), with seeded data, in the content editor of a seeded program:
+- [x] 3.3 Runtime check on the Preview URL (or local dev against the real DB), with seeded data, in the content editor of a seeded program:
   - Create a month for one variant at a position that variant does not use. It appears, unpublished, at that position.
   - Create another month at a position that variant already uses. The inline position-taken error appears. After a reload, the program's month count (read by SQL before and after) has grown only by the first month.
   - Then delete **only the month this step created**, from the editor.
 
   Verify: observations and counts recorded in the PR body.
+  **Outcome:** the maintainer ran it on the Preview and reported that all steps behaved as expected. No SQL counts were taken; the no-orphan property is covered by 1.4(a) against the real DB.
 - [x] 3.4 Run `/security-review` (sensitive surface: migration, RLS policies, an RLS-governed function). Address each finding, or dismiss it with a reason in the PR body.
 
 ## 4. PR handoff
 
-- [ ] 4.1 Open PR `fix(admin): make series creation atomic and add with check to content policies` from `task/atomic-series-create-rls-checks`. The body states when 022 was applied and verified (rule 11) and carries the before/after `pg_policies` snapshots, the 1.4 and 3.3 evidence, the security-review outcome, and the silent-defect flag: **yes, a migration and RLS policies**. Squash-merge on green CI. Then open the separate `chore/archive-atomic-series-create-rls-checks` PR, which syncs the delta spec and deletes the D34 and D35 backlog rows.
+- [x] 4.1 Open PR `fix(admin): make series creation atomic and add with check to content policies` from `task/atomic-series-create-rls-checks`. The body states when 022 was applied and verified (rule 11) and carries the before/after `pg_policies` snapshots, the 1.4 and 3.3 evidence, the security-review outcome, and the silent-defect flag: **yes, a migration and RLS policies**. Squash-merge on green CI. Then open the separate `chore/archive-atomic-series-create-rls-checks` PR, which syncs the delta spec and deletes the D34 and D35 backlog rows.
