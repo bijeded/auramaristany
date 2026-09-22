@@ -22,4 +22,4 @@
 ## 5. Review and handoff
 
 - [x] 5.1 Run `/security-review` (auth surface); address or dismiss each finding with a reason in the PR body.
-- [ ] 5.2 Open PR `fix(admin): guard admin layout server-side and every admin page` from `task/admin-layout-guard-split`; body states silent-defect surface: **none touched** (no enum/status union, money/people aggregation, cancellation state, migration, RLS or DB CHECK).
+- [x] 5.2 Open PR `fix(admin): guard admin layout server-side and every admin page` from `task/admin-layout-guard-split`; body states silent-defect surface: **none touched** (no enum/status union, money/people aggregation, cancellation state, migration, RLS or DB CHECK).
