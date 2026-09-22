@@ -55,3 +55,6 @@ evaluation.md
 
 # scratch scripts de smoke (no versionados)
 .tmp-*
+
+# rtk local filters
+.rtk/
