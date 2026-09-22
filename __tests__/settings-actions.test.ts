@@ -170,17 +170,14 @@ describe("cancelSubscription", () => {
     expect(stripeUpdate).not.toHaveBeenCalled();
   });
 
-  it("acepta 'prefiero_no_decir' elegido explícitamente", async () => {
+  /** "Prefiero no decir" ya no es un radio: el servidor lo asigna sólo al
+   *  confirmar sin motivo, así que mandarlo explícito no es una entrada válida. */
+  it("rechaza 'prefiero_no_decir' enviado por el cliente", async () => {
     queryResults = { subscriptions: OWNED_SUB };
-    const r = await cancelSubscription({ reason: "prefiero_no_decir" });
-    expect(r).toEqual({ ok: true });
-    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ reason: "prefiero_no_decir", source: "voluntary", detail: null });
-  });
-
-  it("no guarda detalle junto a 'prefiero_no_decir'", async () => {
-    queryResults = { subscriptions: OWNED_SUB };
-    await cancelSubscription({ reason: "prefiero_no_decir", detail: "algo que sí quiso escribir" });
-    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ detail: null });
+    const r = await cancelSubscription({ reason: "prefiero_no_decir" as never });
+    expect(r.ok).toBe(false);
+    expect(calls.find((c) => c.op === "insert")).toBeUndefined();
+    expect(stripeUpdate).not.toHaveBeenCalled();
   });
 
   it("sanitiza y guarda el detalle en razones de texto libre", async () => {

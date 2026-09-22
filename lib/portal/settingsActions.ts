@@ -17,7 +17,7 @@ const cancelInputSchema = z.object({
   // Derivado, no recopiado: la lista vive UNA vez en `CLIENT_FACING_REASONS`.
   // Escrita a mano aquí era la tercera copia del mismo enum —modal, esquema y
   // CHECK— y D19 tuvo que tocar las tres para agregar un motivo. `pago_fallido`
-  // se queda fuera por construcción: no está en la lista de origen.
+  // y `prefiero_no_decir` se quedan fuera por construcción: no están en la lista de origen.
   reason: z.enum(CLIENT_FACING_REASONS).optional(),
   detail: z.string().max(200).optional(),
 });

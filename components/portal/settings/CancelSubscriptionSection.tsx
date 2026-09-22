@@ -98,9 +98,8 @@ export function CancelSubscriptionSection({ state }: { state: CancellationState 
 
 function CancelSurveyModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   /**
-   * `null` = todavía no ha elegido nada. UN solo significado desde D19: antes
-   * cargaba dos —"no ha elegido" y "eligió Prefiero no decir"—, indistinguibles
-   * dentro del componente. Ese segundo significado ya tiene valor propio.
+   * `null` = todavía no ha elegido nada. "Prefiero no decir" no es un radio:
+   * declinar es exactamente esto, confirmar con `null`.
    *
    * Se queda nullable porque el modal abre sin nada seleccionado y la encuesta
    * es opcional: confirmar así manda `reason: undefined`, y el servidor lo
