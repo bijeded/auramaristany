@@ -18,7 +18,7 @@ const TABS = [
 
 const PAY_STATUS: Record<string, { label: string; bg: string; color: string }> = {
   paid: { label: "Pagado", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  open: { label: "Pendiente", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  open: { label: "Pendiente", bg: "var(--ambar-tint)", color: "var(--ambar)" },
   void: { label: "Anulado", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
   uncollectible: { label: "Fallido", bg: "var(--error-tint)", color: "var(--error)" },
 };

@@ -7,7 +7,7 @@ import type { CancellationState } from "@/lib/portal/cancellation";
 const STATUS_BADGE: Record<string, { text: string; bg: string; color: string }> = {
   active: { text: "Activa", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
   trialing: { text: "Prueba", bg: "rgba(76,175,125,.14)", color: "var(--exito)" },
-  past_due: { text: "Pago pendiente", bg: "rgba(240,198,116,.18)", color: "#9a7b1f" },
+  past_due: { text: "Pago pendiente", bg: "var(--ambar-tint)", color: "var(--ambar)" },
   canceled: { text: "Cancelada", bg: "var(--gris-claro)", color: "var(--gris-texto)" },
   unpaid: { text: "Sin pagar", bg: "var(--error-tint)", color: "var(--error)" },
   // L2c — terminar es un logro, no una baja. Sin esta entrada caía al fallback

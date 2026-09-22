@@ -24,8 +24,9 @@ right-hand column is what made the real failure in the left-hand column invisibl
 This is not a one-off. `--rosa` (`#eddbd8`), the brand pink, measures **1.22:1** against the
 same track. It is a *background* color and is very good at that job; it cannot be a bar fill
 at all. Reaching for a brand color and assuming it works as a fill is the same mistake in a
-different hue, and at the time of writing `components/admin/RevenueBarChart.tsx` and
-`components/portal/PerformanceChart.tsx` both still carry it.
+different hue. `components/admin/RevenueBarChart.tsx` and `components/portal/PerformanceChart.tsx`
+carried the lavender `#9982f4` (2.81:1 against the track) until the
+`cleanup-batch-d15-d20-d23-d25-d26-d27` change moved both to `--lavanda-dark`.
 
 ## Decision
 
@@ -67,9 +68,9 @@ different obligations, and a designer picking "the pink" has to know which set t
 brand blush — so a chart is no longer guaranteed to match the brand swatch beside it. That
 divergence is the accepted cost, and it should be explained to Aura rather than discovered.
 
-**Two components are knowingly non-compliant** at the time of writing (`RevenueBarChart`,
-`PerformanceChart`). This ADR states the rule; it does not retroactively fix them, and the
-follow-up is recorded in the `dashboard-revenue-by-variant` change.
+**Two components were knowingly non-compliant** when this was written (`RevenueBarChart`,
+`PerformanceChart`). This ADR stated the rule without fixing them; both were brought onto
+`--lavanda-dark` by the `cleanup-batch-d15-d20-d23-d25-d26-d27` change.
 
 **The check is cheap but not automatic.** Nothing in `tsc`, ESLint, the tests or the build
 computes a contrast ratio, so this rule is enforced by review and by the ratio comments on the

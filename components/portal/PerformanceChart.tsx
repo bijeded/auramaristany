@@ -60,7 +60,7 @@ export function PerformanceChart({
           formatter={(v: unknown) => [`${v}${unit}`, METRIC_LABELS[metric]?.label ?? metric]}
           contentStyle={{ borderRadius: 8, fontSize: 12, fontFamily: "var(--font-body)" }}
         />
-        <Line type="monotone" dataKey="value" stroke="#9982f4" strokeWidth={2.5} dot={{ r: 4, fill: "#fff", stroke: "#9982f4", strokeWidth: 2.5 }} />
+        <Line type="monotone" dataKey="value" stroke="var(--lavanda-dark)" strokeWidth={2.5} dot={{ r: 4, fill: "#fff", stroke: "var(--lavanda-dark)", strokeWidth: 2.5 }} />
       </LineChart>
     </ResponsiveContainer>
   );

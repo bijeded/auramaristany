@@ -88,7 +88,7 @@ export const CLIENT_FACING_REASONS = [
 export const CANCELLATION_REASON_OPTIONS: ReadonlyArray<{ value: CancellationReason; label: string }> =
   CLIENT_FACING_REASONS.map((value) => ({ value, label: REASON_LABELS[value] }));
 
-const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", "past_due"];
+export const ELIGIBLE_STATUSES: readonly SubscriptionStatus[] = ["active", "trialing", "past_due"];
 
 /**
  * ¿Está PROGRAMADO el final de esta suscripción?

@@ -22,7 +22,7 @@ export function RevenueBarChart({ data }: { data: MonthRevenue[] }) {
           formatter={(v: unknown) => [`$${Number(v).toLocaleString("es-MX")}`, "Ingresos"]}
           contentStyle={{ borderRadius: 8, fontSize: 12, fontFamily: "var(--font-body)" }}
         />
-        <Bar dataKey="total" fill="#9982f4" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="total" fill="var(--lavanda-dark)" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

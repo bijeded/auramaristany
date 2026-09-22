@@ -90,7 +90,7 @@ export function ClientsTable({
           insensible a cuántos programas existan. */}
       <div className="flex gap-2 flex-wrap items-center" style={{ marginBottom: 20 }}>
         {programs.map((f) => (
-          <button key={f} className={"pill " + (prog === f ? "active" : "")} onClick={() => resetPage(setProg)(f)}>{f}</button>
+          <button key={f} className={"pill " + (prog === f ? "active" : "")} aria-pressed={prog === f} onClick={() => resetPage(setProg)(f)}>{f}</button>
         ))}
         {/* Las opciones salen ENTERAS de STATUS_FILTERS. La única escrita a mano
             es el centinela de "sin filtro", que no es un valor de filtro sino su
