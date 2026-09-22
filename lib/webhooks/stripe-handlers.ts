@@ -46,6 +46,21 @@ export function computeMonthsUpdate(
   return { newMonthsElapsed, shouldComplete };
 }
 
+/**
+ * La fila de `invoices` de una factura de Stripe, sin la suscripción. Única
+ * traducción: la usan el registro del primer invoice (`recordInvoice`) y el de
+ * renovación (`record_invoice_and_advance`).
+ */
+export function invoiceRecord(invoice: Stripe.Invoice) {
+  return {
+    stripe_invoice_id: invoice.id,
+    amount_paid: invoice.amount_paid / 100,
+    currency: invoice.currency,
+    status: invoice.status ?? "paid",
+    invoice_date: new Date(invoice.created * 1000).toISOString().split("T")[0],
+  };
+}
+
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
 async function getProfileContact(supabase: ServiceClient, profileId: string): Promise<{ email: string; name: string } | null> {
@@ -254,122 +269,99 @@ export async function handleInvoicePaid(invoice: Stripe.Invoice) {
     }
   }
 
-  // GUARDA DE IDEMPOTENCIA. Todo lo que avanza va después de esta línea: si la
-  // factura ya estaba registrada, esta entrega es una redelivery de Stripe y no
-  // hay nada que contar. Antes el incremento del mes no estaba protegido.
-  const isNewInvoice = await recordInvoice(invoice, sub.id);
-  if (!isNewInvoice) return;
-
+  // El avance se CALCULA aquí, con la lógica probada de `ladder.ts`, y se
+  // APLICA abajo en la misma transacción que registra la factura. Se calcula
+  // también en una redelivery (unas lecturas de más) porque es la función la
+  // que sabe si la factura ya estaba.
   const position = await nextContentPosition(supabase, sub, {
     billing_model: program?.billing_model ?? "rolling_monthly",
     duration_months: program?.duration_months ?? null,
   });
 
-  // Una sola escritura: el mes y el puntero se mueven juntos o no se mueven.
-  // `program_variant_id` NO se toca: es lo que compró y su vínculo con el precio
-  // de Stripe; el peldaño en el que entrena es `content_variant_id`.
-  const updatePayload = {
-    months_elapsed: newMonthsElapsed,
-    // Sella que la completion queda PROGRAMADA. El `status` NO se toca aquí:
-    // es lo que retira el contenido, y escribirlo ahora le quitaría a la
-    // cliente el mes que acaba de pagar. Lo escribe el borrado, al terminar el
-    // periodo (Decisión 1, enmendada).
-    // Las DOS señales se escriben juntas. `completed_at` a solas no significa
-    // "no habrá más cobros" —así lo dejaba L2b, sin cancelar nada—, y los
-    // lectores exigen las dos: sin espejar aquí `cancel_at_period_end`, cada
-    // fila que termina pasaría por una ventana en la que la pantalla no sabe
-    // que ya está cancelada, hasta que llegara `customer.subscription.updated`.
-    ...(shouldComplete
-      ? { completed_at: new Date().toISOString(), cancel_at_period_end: true }
-      : {}),
-    ...(position
-      ? {
-          content_variant_id: position.variantId,
-          content_ordinal: position.ordinal,
-          content_loops: position.loops,
-        }
-      : {}),
+  // GUARDA DE IDEMPOTENCIA Y AVANCE, EN UNA SOLA TRANSACCIÓN (023, D16).
+  // Antes eran dos escrituras con su propio commit, y la guarda es "la factura
+  // se registró ahora": un fallo del avance dejaba la factura registrada y cada
+  // reintento de Stripe se paraba en la guarda — el mes cobrado sin avanzar,
+  // para siempre. Ahora, si el avance no se aplica, la factura tampoco queda.
+  //
+  // - `false`: la factura ya estaba registrada. Redelivery; nada que contar.
+  // - error: no se escribió NADA (ni la factura). Se relanza, la ruta responde
+  //   500 y Stripe reintenta desde el estado actual. Incluye la guarda
+  //   optimista: dos `invoice.paid` DISTINTAS de la misma suscripción en
+  //   paralelo leerían el mismo `content_ordinal`; la segunda no encuentra la
+  //   fila como la leyó, y su reintento avanza un paso más desde la nueva.
+  //
+  // `program_variant_id` NO se pasa: es lo que compró y su vínculo con el
+  // precio de Stripe; el peldaño en el que entrena es `content_variant_id`.
+  // `p_complete` sella que la completion queda PROGRAMADA escribiendo
+  // `completed_at` y `cancel_at_period_end` juntos —`completed_at` a solas no
+  // significa "no habrá más cobros" y los lectores exigen las dos—. El `status`
+  // tampoco se pasa: es lo que retira el contenido, y escribirlo ahora le
+  // quitaría a la cliente el mes que acaba de pagar. Lo escribe el borrado, al
+  // terminar el periodo (Decisión 1, enmendada).
+  const record = invoiceRecord(invoice);
+  // keep: rpc tipado en el CLIENTE, no en el método — `Functions` de types.ts
+  // se queda vacío (regla 10) y sacar `supabase.rpc` lo desligaría de `this`.
+  const client = supabase as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, string | number | boolean | null>
+    ) => Promise<{ data: boolean | null; error: { message: string } | null }>;
   };
+  const { error: advanceError } = await client.rpc(
+    "record_invoice_and_advance",
+    {
+      p_subscription_id: sub.id,
+      p_stripe_invoice_id: record.stripe_invoice_id,
+      p_amount_paid: record.amount_paid,
+      p_currency: record.currency,
+      p_status: record.status,
+      p_invoice_date: record.invoice_date,
+      p_expected_months_elapsed: sub.months_elapsed,
+      p_expected_content_ordinal: sub.content_ordinal,
+      p_months_elapsed: newMonthsElapsed,
+      p_complete: shouldComplete,
+      p_content_variant_id: position?.variantId ?? null,
+      p_content_ordinal: position?.ordinal ?? null,
+      p_content_loops: position?.loops ?? null,
+    }
+  );
 
-  // Guarda optimista: la escritura sólo pega si la fila sigue como se leyó.
-  // Dos `invoice.paid` DISTINTAS de la misma suscripción procesadas en paralelo
-  // leerían las dos el mismo `content_ordinal` y escribirían las dos: un mes de
-  // entrenamiento saltado en silencio. Con la condición, la segunda no encuentra
-  // fila, no escribe, y se relanza para que Stripe reintente con el valor ya
-  // fresco.
-  const { data: updated, error: updateError } = await supabase
-    .from("subscriptions")
-    .update(updatePayload)
-    .eq("id", sub.id)
-    .eq("months_elapsed", sub.months_elapsed)
-    .eq("content_ordinal", sub.content_ordinal)
-    .select("id");
-
-  if (updateError) {
-    // Se relanza por la misma razón que en `recordInvoice`: la factura ya quedó
-    // registrada, así que tragarse este fallo deja el mes cobrado sin avanzar y
-    // ninguna redelivery lo arreglará.
-    console.error("[webhook] subscription advance error:", updateError);
-    throw new Error(`subscription advance failed: ${updateError.message}`);
-  }
-
-  if ((updated ?? []).length === 0) {
-    console.error(
-      "[webhook] avance perdido por escritura concurrente:",
-      sub.id,
-      invoice.id
-    );
-    throw new Error("subscription advance lost a concurrent write");
+  if (advanceError) {
+    console.error("[webhook] invoice.paid: registro y avance no aplicados", sub.id, invoice.id, advanceError);
+    throw new Error(`record_invoice_and_advance failed: ${advanceError.message}`);
   }
 }
 
 /**
- * Registra la factura. Devuelve `true` sólo si la insertó de verdad; `false` si
- * ya estaba registrada (conflicto en `stripe_invoice_id`).
- *
- * Ese booleano es la guarda de idempotencia de todo el evento. Stripe reentrega
- * `invoice.paid` en reintentos y replays: el upsert evita duplicar la factura,
- * pero quien avanza el mes y el puntero de contenido tiene que saber si esta
- * entrega es la primera. Sin la guarda, una redelivery le SALTA a la cliente un
- * mes de entrenamiento sin dejar rastro y sin forma de distinguirlo después de
- * un avance normal.
+ * Registra el PRIMER invoice de una suscripción (checkout y la red de
+ * seguridad de `subscription_create`). No avanza nada: el checkout ya siembra
+ * `months_elapsed: 1` y el puntero inicial. Las renovaciones no pasan por aquí,
+ * sino por `record_invoice_and_advance`, que registra y avanza en una sola
+ * transacción.
  */
 async function recordInvoice(
   invoice: Stripe.Invoice,
   subscriptionDbId?: string
-): Promise<boolean> {
-  if (!subscriptionDbId) return false;
+): Promise<void> {
+  if (!subscriptionDbId) return;
   const supabase = createServiceClient();
   // Idempotente: checkout.session.completed e invoice.paid pueden intentar registrar
   // el mismo primer invoice; la constraint UNIQUE stripe_invoice_id + ignoreDuplicates
   // evita duplicados y errores en la carrera de eventos (G4).
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("invoices")
     .upsert(
-      {
-        subscription_id: subscriptionDbId,
-        stripe_invoice_id: invoice.id,
-        amount_paid: invoice.amount_paid / 100,
-        currency: invoice.currency,
-        status: invoice.status ?? "paid",
-        invoice_date: new Date(invoice.created * 1000).toISOString().split("T")[0],
-      },
+      { subscription_id: subscriptionDbId, ...invoiceRecord(invoice) },
       { onConflict: "stripe_invoice_id", ignoreDuplicates: true }
-    )
-    .select("id");
+    );
 
   if (error) {
-    // Se relanza a propósito: la ruta responde 500 y Stripe reintenta. Antes un
-    // fallo aquí era inocuo porque el mes se incrementaba igual; ahora TODO lo
-    // que avanza cuelga de esta llamada, así que tragarse el error y responder
-    // 200 convertiría un fallo transitorio de la base en un mes de
-    // entrenamiento perdido para siempre. El reintento es seguro precisamente
-    // por la guarda de idempotencia que este valor alimenta.
+    // Se relanza a propósito: la ruta responde 500 y Stripe reintenta. El
+    // reintento es seguro porque el upsert es idempotente.
     console.error("[webhook] invoice upsert error:", error);
     throw new Error(`invoice upsert failed: ${error.message}`);
   }
-  // Con `ignoreDuplicates`, un conflicto devuelve cero filas: eso ES la señal.
-  return (data ?? []).length > 0;
 }
 
 /**

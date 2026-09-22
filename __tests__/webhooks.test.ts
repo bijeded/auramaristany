@@ -120,8 +120,16 @@ vi.mock("@/lib/email/send", () => ({
   sendSubscriptionEndedEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+// La renovación registra la factura y avanza la suscripción en UNA llamada a
+// `record_invoice_and_advance` (023). `data: false` = factura ya registrada.
+const rpcResult = vi.fn((): { data: unknown; error: unknown } => ({ data: true, error: null }));
+const rpcMock = vi.fn(async (_fn: string, _args: Record<string, unknown>) => rpcResult());
+function rpcArgs(): Record<string, unknown> {
+  return rpcMock.mock.calls[0][1];
+}
+
 vi.mock("@/lib/supabase/service", () => ({
-  createServiceClient: () => ({ from: fromMock }),
+  createServiceClient: () => ({ from: fromMock, rpc: rpcMock }),
 }));
 
 const retrieveMock = vi.fn();
@@ -141,8 +149,44 @@ import {
   handleSubscriptionUpdated,
   handleInvoicePaid,
   handleSubscriptionDeleted,
+  invoiceRecord,
 } from "@/lib/webhooks/stripe-handlers";
 import type Stripe from "stripe";
+
+describe("invoiceRecord", () => {
+  // Una sola traducción factura de Stripe → fila de `invoices`: la usan el
+  // registro del primer invoice y el de renovación. Dos copias harían que la
+  // misma factura quedara distinta según el evento que la registró.
+  it("convierte centavos a pesos y la fecha a YYYY-MM-DD", () => {
+    const invoice = {
+      id: "in_1",
+      amount_paid: 99050,
+      currency: "mxn",
+      status: "paid",
+      created: 1749340800,
+    } as unknown as Stripe.Invoice;
+
+    expect(invoiceRecord(invoice)).toEqual({
+      stripe_invoice_id: "in_1",
+      amount_paid: 990.5,
+      currency: "mxn",
+      status: "paid",
+      invoice_date: "2025-06-08",
+    });
+  });
+
+  it("sin status de Stripe, registra 'paid'", () => {
+    const invoice = {
+      id: "in_2",
+      amount_paid: 0,
+      currency: "mxn",
+      status: null,
+      created: 1749340800,
+    } as unknown as Stripe.Invoice;
+
+    expect(invoiceRecord(invoice).status).toBe("paid");
+  });
+});
 
 describe("computeMonthsUpdate", () => {
   it("increments months_elapsed by 1", () => {
@@ -342,15 +386,9 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    updateEqMock.mockImplementation((_col: string, _val: string) => ({
-      error: null,
-      eq: () => updateEqChain,
-      select: () => ({ maybeSingle: deletedRowMaybeSingle }),
-    }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectEqSingleMock.mockReturnValue(subRow() as any);
-    upsertInsertedRows.mockReturnValue({ data: [{ id: "inv-new" }], error: null });
-    updatedRows.mockReturnValue({ data: [{ id: "db-sub-1" }], error: null });
+    rpcResult.mockReturnValue({ data: true, error: null });
     curriculumRows.mockReturnValue({
       data: [
         { program_variant_id: "variant-1", series_id: "s1", ordinal: 1 },
@@ -365,28 +403,76 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
     });
   });
 
-  it("una factura nueva avanza el mes Y el puntero, en una sola escritura", async () => {
+  // D16. Registrar la factura y avanzar eran dos escrituras con su propio
+  // commit, y la guarda de idempotencia es "la factura se registró ahora":
+  // cualquier fallo entre las dos dejaba la factura registrada, y cada
+  // reintento de Stripe se paraba en la guarda. El mes se perdía para siempre.
+  it("registra y avanza en UNA sola llamada: ni upsert de la factura ni update aparte", async () => {
     await handleInvoicePaid(renewalInvoice());
 
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    const payload = updateMock.mock.calls[0][0];
-    expect(payload.months_elapsed).toBe(3);
-    expect(payload.content_variant_id).toBe("variant-1");
-    expect(payload.content_ordinal).toBe(3);
-    expect(payload.content_loops).toBe(0);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[0][0]).toBe("record_invoice_and_advance");
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it("una redelivery NO avanza nada", async () => {
-    // Stripe reentrega invoice.paid en reintentos y replays. Con el upsert
-    // idempotente el invoice no se duplica, pero hasta ahora el incremento de
-    // `months_elapsed` no estaba protegido: la cliente sumaba dos meses. Con el
-    // puntero encima, una redelivery le SALTARÍA un mes de entrenamiento sin
-    // dejar rastro.
-    upsertInsertedRows.mockReturnValue({ data: [], error: null });
+  it("pasa la factura con la suscripción de la BD", async () => {
+    await handleInvoicePaid(renewalInvoice());
+
+    const args = rpcArgs();
+    expect(args.p_subscription_id).toBe("db-sub-1");
+    expect(args.p_stripe_invoice_id).toBe("in_renewal_1");
+    expect(args.p_amount_paid).toBe(990);
+    expect(args.p_currency).toBe("mxn");
+    expect(args.p_status).toBe("paid");
+    expect(args.p_invoice_date).toBe("2025-06-08");
+  });
+
+  // La guarda optimista vive ahora en la función: sin los valores que se
+  // leyeron no puede detectar que otra factura se adelantó.
+  it("pasa como esperados los valores que leyó", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue(subRow({ months_elapsed: 4, content_ordinal: 1 }) as any);
 
     await handleInvoicePaid(renewalInvoice());
 
+    expect(rpcArgs().p_expected_months_elapsed).toBe(4);
+    expect(rpcArgs().p_expected_content_ordinal).toBe(1);
+  });
+
+  it("una factura nueva avanza el mes Y el puntero, en la misma llamada", async () => {
+    await handleInvoicePaid(renewalInvoice());
+
+    const args = rpcArgs();
+    expect(args.p_months_elapsed).toBe(3);
+    expect(args.p_complete).toBe(false);
+    expect(args.p_content_variant_id).toBe("variant-1");
+    expect(args.p_content_ordinal).toBe(3);
+    expect(args.p_content_loops).toBe(0);
+  });
+
+  it("una redelivery (la función devuelve false) no escribe nada más", async () => {
+    // Stripe reentrega invoice.paid en reintentos y replays. La función ve la
+    // factura ya registrada y no toca la suscripción: una redelivery que
+    // avanzara le SALTARÍA un mes de entrenamiento sin dejar rastro.
+    rpcResult.mockReturnValue({ data: false, error: null });
+
+    await expect(handleInvoicePaid(renewalInvoice())).resolves.toBeUndefined();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(upsertMock).not.toHaveBeenCalled();
     expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  // Un error de la función (incluida la guarda optimista perdida) ya deshizo
+  // también la factura: relanzar es lo que hace que el reintento de Stripe la
+  // procese de nuevo desde el estado actual.
+  it("relanza si la función falla, para que Stripe reintente", async () => {
+    rpcResult.mockReturnValue({
+      data: null,
+      error: { message: "avance no aplicado", code: "40001" },
+    });
+
+    await expect(handleInvoicePaid(renewalInvoice())).rejects.toThrow();
   });
 
   it("al agotar el peldaño pasa al siguiente en su primera posición", async () => {
@@ -407,9 +493,8 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
 
     await handleInvoicePaid(renewalInvoice());
 
-    const payload = updateMock.mock.calls[0][0];
-    expect(payload.content_variant_id).toBe("variant-2");
-    expect(payload.content_ordinal).toBe(1);
+    expect(rpcArgs().p_content_variant_id).toBe("variant-2");
+    expect(rpcArgs().p_content_ordinal).toBe(1);
   });
 
   it("en el último peldaño da la vuelta y cuenta la vuelta", async () => {
@@ -418,9 +503,8 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
 
     await handleInvoicePaid(renewalInvoice());
 
-    const payload = updateMock.mock.calls[0][0];
-    expect(payload.content_ordinal).toBe(1);
-    expect(payload.content_loops).toBe(1);
+    expect(rpcArgs().p_content_ordinal).toBe(1);
+    expect(rpcArgs().p_content_loops).toBe(1);
   });
 
   it("una suscripción de plazo fijo cumplida congela el puntero", async () => {
@@ -437,10 +521,10 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
 
     await handleInvoicePaid(renewalInvoice());
 
-    const payload = updateMock.mock.calls[0][0];
-    expect(payload.content_ordinal).toBe(3);
-    expect(payload.content_loops).toBe(0);
-    expect(payload.content_variant_id).toBe("variant-1");
+    const args = rpcArgs();
+    expect(args.p_content_ordinal).toBe(3);
+    expect(args.p_content_loops).toBe(0);
+    expect(args.p_content_variant_id).toBe("variant-1");
   });
 
   it("de plazo fijo, el mes ANTERIOR al último todavía avanza", async () => {
@@ -461,33 +545,48 @@ describe("handleInvoicePaid — idempotencia y avance del puntero", () => {
 
     await handleInvoicePaid(renewalInvoice());
 
-    const payload = updateMock.mock.calls[0][0];
-    expect(payload.months_elapsed).toBe(6);
-    expect(payload.content_ordinal).toBe(3);
+    expect(rpcArgs().p_months_elapsed).toBe(6);
+    expect(rpcArgs().p_content_ordinal).toBe(3);
   });
 
-  it("relanza si otra escritura concurrente se adelantó (no pierde el avance)", async () => {
-    // La guarda optimista no encuentra fila: alguien ya movió el puntero. Se
-    // relanza para que Stripe reintente en vez de dar el mes por avanzado.
-    updatedRows.mockReturnValue({ data: [], error: null });
+  it("sin puntero ni variante, el mes avanza y el contenido se queda como estaba", async () => {
+    selectEqSingleMock.mockReturnValue(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      subRow({ content_variant_id: null, program_variant_id: null }) as any
+    );
 
-    await expect(handleInvoicePaid(renewalInvoice())).rejects.toThrow();
-  });
-
-  it("relanza si falla el registro de la factura, para que Stripe reintente", async () => {
-    // Tragarse el error y responder 200 convertiría un fallo transitorio de la
-    // base en un mes de entrenamiento perdido para siempre: Stripe no reintenta.
-    upsertInsertedRows.mockReturnValue({ data: null, error: { message: "boom" } });
-
-    await expect(handleInvoicePaid(renewalInvoice())).rejects.toThrow();
-    expect(updateMock).not.toHaveBeenCalled();
-  });
-
-  it("no escribe `program_variant_id`: lo que compró no se reescribe nunca", async () => {
     await handleInvoicePaid(renewalInvoice());
 
-    expect(updateMock).toHaveBeenCalledTimes(1);
-    expect(updateMock.mock.calls[0][0]).not.toHaveProperty("program_variant_id");
+    const args = rpcArgs();
+    expect(args.p_months_elapsed).toBe(3);
+    expect(args.p_content_variant_id).toBeNull();
+    expect(args.p_content_ordinal).toBeNull();
+    expect(args.p_content_loops).toBeNull();
+  });
+
+  // La función sólo puede escribir lo que recibe: fijar el conjunto de
+  // argumentos es fijar que `program_variant_id` (lo que compró, su vínculo con
+  // el precio de Stripe) y el `status` de la suscripción no se tocan nunca.
+  it("no pasa `program_variant_id` ni un estado de la suscripción", async () => {
+    await handleInvoicePaid(renewalInvoice());
+
+    expect(Object.keys(rpcArgs()).sort()).toEqual(
+      [
+        "p_amount_paid",
+        "p_complete",
+        "p_content_loops",
+        "p_content_ordinal",
+        "p_content_variant_id",
+        "p_currency",
+        "p_expected_content_ordinal",
+        "p_expected_months_elapsed",
+        "p_invoice_date",
+        "p_months_elapsed",
+        "p_status",
+        "p_stripe_invoice_id",
+        "p_subscription_id",
+      ].sort()
+    );
   });
 });
 
@@ -656,8 +755,7 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
       eq: () => updateEqChain,
       select: () => ({ maybeSingle: deletedRowMaybeSingle }),
     }));
-    upsertInsertedRows.mockReturnValue({ data: [{ id: "inv-new" }], error: null });
-    updatedRows.mockReturnValue({ data: [{ id: "db-sub-1" }], error: null });
+    rpcResult.mockReturnValue({ data: true, error: null });
     curriculumRows.mockReturnValue({
       data: [1, 2, 3, 4, 5, 6].map((n) => ({
         program_variant_id: "variant-1",
@@ -686,14 +784,30 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
 
   // Las dos señales se escriben juntas. Sin espejar aquí la bandera, cada fila
   // que termina pasaría por una ventana en la que la pantalla aún no sabe que
-  // está cancelada, y los lectores exigen las dos.
+  // está cancelada, y los lectores exigen las dos. `p_complete` es UNA bandera
+  // que escribe `completed_at` y `cancel_at_period_end` a la vez (023): no hay
+  // forma de pasar una sin la otra.
   it("espeja también cancel_at_period_end, sin dejar ventana", async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     selectEqSingleMock.mockReturnValue(fixedTermSub(5) as any);
 
     await handleInvoicePaid(renewalInvoice());
 
-    expect(updateMock.mock.calls[0][0].cancel_at_period_end).toBe(true);
+    expect(rpcArgs().p_complete).toBe(true);
+  });
+
+  // La cancelación en Stripe va ANTES de la guarda de idempotencia (regla 16):
+  // si fuera después y fallara, el reintento encontraría la factura registrada
+  // y no la programaría nunca.
+  it("programa la cancelación en Stripe antes de registrar la factura", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    selectEqSingleMock.mockReturnValue(fixedTermSub(5) as any);
+
+    await handleInvoicePaid(renewalInvoice());
+
+    expect(stripeUpdateMock.mock.invocationCallOrder[0]).toBeLessThan(
+      rpcMock.mock.invocationCallOrder[0]
+    );
   });
 
   it("y sella completed_at, sin tocar todavía el estado", async () => {
@@ -702,12 +816,14 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
 
     await handleInvoicePaid(renewalInvoice());
 
-    const payload = updateMock.mock.calls[0][0];
-    expect(payload.completed_at).toBeTruthy();
+    const args = rpcArgs();
+    expect(args.p_complete).toBe(true);
     // El estado es lo que retira el contenido: escribirlo aquí le quitaría el
     // mes que acaba de pagar. Lo escribe el borrado, al terminar el periodo.
-    expect(payload.status).toBeUndefined();
-    expect(payload.months_elapsed).toBe(6);
+    // (`p_status` es el de la FACTURA; la función no recibe estado de la
+    // suscripción.)
+    expect(args.p_status).toBe("paid");
+    expect(args.p_months_elapsed).toBe(6);
   });
 
   it("la factura anterior no programa nada: aún le quedan meses", async () => {
@@ -717,7 +833,7 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
     await handleInvoicePaid(renewalInvoice());
 
     expect(stripeUpdateMock).not.toHaveBeenCalled();
-    expect(updateMock.mock.calls[0][0].completed_at).toBeUndefined();
+    expect(rpcArgs().p_complete).toBe(false);
   });
 
   it("no hace falta una factura posterior: el mes 7 no llega a existir", async () => {
@@ -740,7 +856,7 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
     await handleInvoicePaid(renewalInvoice());
 
     expect(stripeUpdateMock).not.toHaveBeenCalled();
-    expect(updateMock.mock.calls[0][0].completed_at).toBeUndefined();
+    expect(rpcArgs().p_complete).toBe(false);
   });
 
   // Si Stripe falla, la ruta responde 500 y Stripe reintenta. Por eso la
@@ -755,6 +871,7 @@ describe("handleInvoicePaid — final de un plazo fijo", () => {
     await expect(handleInvoicePaid(renewalInvoice())).rejects.toThrow();
     // Nada se escribió: la factura no quedó registrada, así que el reintento
     // vuelve a entrar por el camino completo.
+    expect(rpcMock).not.toHaveBeenCalled();
     expect(upsertMock).not.toHaveBeenCalled();
   });
 });
