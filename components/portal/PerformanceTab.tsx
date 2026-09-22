@@ -7,6 +7,7 @@ import { PerformanceChart } from "./PerformanceChart";
 import type { PerfExercise } from "@/lib/content/history-helpers";
 import type { HistoryListItem } from "@/lib/content/history";
 import type { WeightUnit } from "@/hooks/useProgressForm";
+import { WeightUnitToggle } from "./WeightUnitToggle";
 
 const METRIC_LABELS: Record<string, string> = {
   reps_done: "Reps",
@@ -92,32 +93,7 @@ export function PerformanceTab({
 
               {/* Toggle kg/lb — solo para la métrica Peso */}
               {activeMetric === "weight_kg" && (
-                <div
-                  role="group"
-                  aria-label="Unidad de peso"
-                  className="flex gap-0 ml-auto rounded-full"
-                  style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}
-                >
-                  {(["kg", "lb"] as const).map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      onClick={() => setWeightUnit(u)}
-                      aria-pressed={weightUnit === u}
-                      className="font-body px-3 py-1"
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        minWidth: 44,
-                        minHeight: 32,
-                        background: weightUnit === u ? "var(--lavanda)" : "#fff",
-                        color: weightUnit === u ? "#fff" : "var(--gris-texto)",
-                      }}
-                    >
-                      {u}
-                    </button>
-                  ))}
-                </div>
+                <WeightUnitToggle unit={weightUnit} onChange={setWeightUnit} className="ml-auto" />
               )}
             </div>
           )}

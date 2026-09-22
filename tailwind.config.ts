@@ -65,8 +65,8 @@ const config: Config = {
         ring: "hsl(var(--ring))",
       },
       fontFamily: {
-        head: ["Oswald", "system-ui", "sans-serif"],
-        body: ["Hind", "system-ui", "sans-serif"],
+        head: ["var(--font-head)"],
+        body: ["var(--font-body)"],
       },
       borderRadius: {
         lg: "var(--radius)",
