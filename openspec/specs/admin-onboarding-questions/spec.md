@@ -5,6 +5,7 @@
 Integridad del orden en el constructor de preguntas de onboarding: cómo se guarda el orden que la admin arrastra, y qué pasa cuando ese guardado falla. El cuestionario es lo que se le pregunta a cada cliente nueva, así que un orden a medias no es un detalle de UI — lo contestan personas antes de que nadie lo note. La regla que convierte una lista de ids en posiciones vive en un solo sitio, y el orden se aplica de una sola vez o no se aplica.
 
 ## Requirements
+
 ### Requirement: The onboarding question order is saved as a whole
 
 When the admin reorders the onboarding questions, the system SHALL persist the new order as a single write. A failure SHALL leave the previously saved order intact, and SHALL NOT leave the questionnaire partially renumbered.
@@ -45,3 +46,18 @@ Reordering SHALL be permitted only to an administrator, and SHALL be authorized 
 - **WHEN** the order is applied
 - **THEN** it is applied under the caller's own permissions, governed by the existing admin write policy
 
+### Requirement: Admin writes are checked against the row being written
+
+Every insert and update to the onboarding questions SHALL be authorized against the row as written, and not only against the existing row it replaces. The policy that governs admin writes SHALL state an explicit write check, so no write path relies on the implicit fallback to the read condition.
+
+#### Scenario: A non-admin cannot insert a question
+- **WHEN** an authenticated client attempts to insert an onboarding question
+- **THEN** the insert is refused by row-level security
+
+#### Scenario: An admin can still write
+- **WHEN** an administrator creates, edits, or reorders onboarding questions
+- **THEN** each write succeeds as before
+
+#### Scenario: The policy declares its write check
+- **WHEN** the policies on the onboarding questions table are inspected in the database
+- **THEN** the admin write policy carries a write check equal to its read condition
