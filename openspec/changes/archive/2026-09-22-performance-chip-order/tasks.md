@@ -15,8 +15,8 @@
 
 ## 3. Runtime verification
 
-- [ ] 3.1 On the Preview URL, log in as the seeded client Sofía, whose month-1 history comes from PR #84. Open Historial -> Desempeño and confirm that the chips follow the numbered template order of her first logged day, with exercises from later days appended after them. This check is read-only.
+- [x] 3.1 On the Preview URL, log in as the seeded client Sofía, whose month-1 history comes from PR #84. Open Historial -> Desempeño and confirm that the chips follow the numbered template order of her first logged day, with exercises from later days appended after them. This check is read-only.
 
 ## 4. Handoff
 
-- [ ] 4.1 Open a PR titled `fix(portal): order Desempeño exercise chips by template order` on `task/performance-chip-order`. The PR body states that the change touches no sensitive surface (so no `/security-review` is needed) and no silent-defect surface (no enum/status unions, money/people aggregation, cancellation state, migrations, RLS or DB CHECK). Squash-merge on green CI.
+- [x] 4.1 Open a PR titled `fix(portal): order Desempeño exercise chips by template order` on `task/performance-chip-order`. The PR body states that the change touches no sensitive surface (so no `/security-review` is needed) and no silent-defect surface (no enum/status unions, money/people aggregation, cancellation state, migrations, RLS or DB CHECK). Squash-merge on green CI.
