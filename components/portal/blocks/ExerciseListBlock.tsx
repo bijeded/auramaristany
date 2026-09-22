@@ -3,6 +3,7 @@
 import { Play, Check } from "lucide-react";
 import { useState } from "react";
 import type { ExerciseFormState, ExerciseSeriesEntry, WeightUnit } from "@/hooks/useProgressForm";
+import { WeightUnitToggle } from "@/components/portal/WeightUnitToggle";
 import { formatRestLabel } from "@/lib/content/rest-label";
 import { formatSetsReps } from "@/lib/content/sets-reps-label";
 
@@ -33,40 +34,6 @@ interface Props {
     value: string
   ) => void;
   onSetWeightUnit: (exerciseId: string, unit: WeightUnit) => void;
-}
-
-// A1 — selector kg/lb por ejercicio (la unidad es del momento de captura; se guarda kg)
-function UnitToggle({ unit, onChange }: { unit: WeightUnit; onChange: (u: WeightUnit) => void }) {
-  return (
-    <div
-      role="group"
-      aria-label="Unidad de peso"
-      className="inline-flex rounded-full"
-      style={{ border: "1.5px solid var(--gris-linea)", overflow: "hidden" }}
-    >
-      {(["kg", "lb"] as const).map((u) => (
-        <button
-          key={u}
-          type="button"
-          onClick={() => onChange(u)}
-          aria-pressed={unit === u}
-          className="font-body"
-          style={{
-            minWidth: 44,
-            minHeight: 32,
-            padding: "4px 12px",
-            fontSize: 12,
-            fontWeight: 600,
-            background: unit === u ? "var(--lavanda)" : "#fff",
-            color: unit === u ? "#fff" : "var(--gris-texto)",
-            transition: "all 0.15s ease",
-          }}
-        >
-          {u}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function ExerciseVideoDemo({ videoUrl, name }: { videoUrl: string; name: string }) {
@@ -166,7 +133,7 @@ function MetricInputs({
         >
           Mi registro · {exercise.sets} series de {exercise.reps} reps
         </p>
-        {showWeight && <UnitToggle unit={unit} onChange={onSetUnit} />}
+        {showWeight && <WeightUnitToggle unit={unit} onChange={onSetUnit} />}
       </div>
 
       {/* Column headers */}

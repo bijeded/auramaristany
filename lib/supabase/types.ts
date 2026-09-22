@@ -112,7 +112,7 @@ export type Database = {
           reason: CancellationReason;
           detail: string | null;
           source: CancellationSource;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           profile_id: string;
