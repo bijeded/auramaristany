@@ -21,9 +21,9 @@
 
 - [x] 4.1 `BACKLOG.md`: mark D2 and D13 resolved by this change; add follow-ups for `createSeries`' compensating delete and the missing `with check` on the `for all` policies of the three tables. Grep `docs/adr/` for `saveBlocks`/`savePillarBlocks`/`updateSeries` and update any reference (rule 20). Verify: grep output shown in the PR.
 - [x] 4.2 Run `npx tsc --noEmit`, `npm run lint`, `npm run test:run`, `npm run build` locally. Verify: all four exit 0.
-- [ ] 4.3 Runtime check on the Preview URL (or local dev against the real DB) with seeded data: edit a day's blocks and save, edit a pillar's blocks and save, edit a month's title and save — each reloads showing the change; then move a month to a position its variant already uses — inline error appears and, after reload, title and positions are unchanged. Restore any edited text to its original value afterwards. Verify: observations recorded in the PR body.
+- [x] 4.3 Runtime check on the Preview URL (or local dev against the real DB) with seeded data: edit a day's blocks and save, edit a pillar's blocks and save, edit a month's title and save — each reloads showing the change; then move a month to a position its variant already uses — inline error appears and, after reload, title and positions are unchanged. Restore any edited text to its original value afterwards. Verify: observations recorded in the PR body.
 - [x] 4.4 Run `/security-review` (sensitive surface: migration + RLS-governed functions); address or dismiss each finding with a reason in the PR body.
 
 ## 5. PR handoff
 
-- [ ] 5.1 Open PR `fix(admin): make block and series saves atomic` from `task/atomic-content-saves`; body states when 021 was applied and verified (rule 11), the 1.3 and 4.3 evidence, security-review outcome, and the silent-defect flag: **yes — migration, RLS-governed functions, DB `CHECK` on `block_type`**. Squash-merge on green CI; then the separate `chore/archive-atomic-content-saves` PR.
+- [x] 5.1 Open PR `fix(admin): make block and series saves atomic` from `task/atomic-content-saves`; body states when 021 was applied and verified (rule 11), the 1.3 and 4.3 evidence, security-review outcome, and the silent-defect flag: **yes — migration, RLS-governed functions, DB `CHECK` on `block_type`**. Squash-merge on green CI; then the separate `chore/archive-atomic-content-saves` PR.
