@@ -16,10 +16,10 @@
 
 ## 4. Runtime verification (non-destructive, existing data)
 
-- [ ] 4.1 On the Preview URL, log in as the demo admin: open Dashboard, Clientes, Contenido and one existing day editor; confirm the sidebar renders and the highlighted item follows navigation.
-- [ ] 4.2 Log in as a seeded demo client and request `/admin/content` and an existing deep `/admin/content/.../days/<dayId>` URL directly; confirm redirect to the portal and no admin markup in the response.
+- [x] 4.1 On the Preview URL, log in as the demo admin: open Dashboard, Clientes, Contenido and one existing day editor; confirm the sidebar renders and the highlighted item follows navigation.
+- [x] 4.2 Log in as a seeded demo client and request `/admin/content` and an existing deep `/admin/content/.../days/<dayId>` URL directly; confirm redirect to the portal and no admin markup in the response.
 
 ## 5. Review and handoff
 
-- [ ] 5.1 Run `/security-review` (auth surface); address or dismiss each finding with a reason in the PR body.
+- [x] 5.1 Run `/security-review` (auth surface); address or dismiss each finding with a reason in the PR body.
 - [ ] 5.2 Open PR `fix(admin): guard admin layout server-side and every admin page` from `task/admin-layout-guard-split`; body states silent-defect surface: **none touched** (no enum/status union, money/people aggregation, cancellation state, migration, RLS or DB CHECK).
