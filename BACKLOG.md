@@ -3,7 +3,7 @@
 Living list of **pending** work. **Each item has a stable ID** to launch it directly into the OpenSpec loop.
 
 ```
-/opsx:propose "D34 — atomic createSeries"   # when scope is already clear
+/opsx:propose "D16 — atomic invoice.paid"   # when scope is already clear
 /opsx:explore "L9 — admin UI for prices"   # when it still needs defining
 ```
 
@@ -115,14 +115,11 @@ Let Aura **create** automated messages, not just edit the two shipped ones.
 ## D · Deferred / Technical Debt
 
 ### Transactionality
-D2 and D13 were closed by `atomic-content-saves` (migration 021: one `SECURITY INVOKER` function per save). D16 stays separate on purpose — webhook/money surface. The follow-ups below are the same root cause, left out of that change's scope.
+D2 and D13 were closed by `atomic-content-saves` (migration 021: one `SECURITY INVOKER` function per save); D34 and D35 by `atomic-series-create-rls-checks` (migration 022). D16 stays separate on purpose — webhook/money surface.
 
 | ID | Item | Size | Note |
 |----|------|:----:|------|
 | **D16** | `invoice.paid` records the invoice and advances the pointer in two statements | M | From L2b PR2 (security review). The idempotency gate is "was this invoice newly recorded", so the invoice row is written *first*. A crash between the two permanently loses that month's advance. **Not a regression** — the ordering is deliberate: the reverse order risks a *double* advance, which skips a month of workouts and is indistinguishable from normal progress afterwards, whereas a lost advance is inspectable state a human can correct. |
-
-| **D34** | `createSeries` compensates a failed mapping with a best-effort delete | S | Found while planning `atomic-content-saves`. It inserts the series, then the mappings, and deletes the series if the mapping insert fails; if that delete also fails, an unmapped series is left behind — invisible and not deletable from the editor. Same fix as 021: one function inserting series + mappings. |
-| **D35** | `for all using (is_admin())` without `with check` on three content tables | XS | `program_day_blocks`, `program_pillar_blocks` and `variant_series_map` (001, 004) — now the RLS guard of the 021 functions. Functionally equivalent (Postgres falls back to `using`), but against rule 3 / D20. Same fix as migration 020. |
 
 ### Everything else
 
@@ -144,7 +141,7 @@ D2 and D13 were closed by `atomic-content-saves` (migration 021: one `SECURITY I
 
 ## Suggested Sequence
 
-1. **Now — transactionality follow-ups:** `D34` + `D35` (same pattern as 021); `D16` on its own, as a webhook/money change.
+1. **Now — transactionality follow-up:** `D16` on its own, as a webhook/money change.
 2. **In parallel, waiting on Aura:** `L1` pricing · `L3` onboarding questions · `L5` WhatsApp · `L7` (needs Aura's list).
 3. **Launch close-out, in order:** `L4` smoke → `L6` demo cleanup → `L11` turn the A4 rules on (one at a time) → `L8` pre-launch verification.
 4. **After launch, on demand:** `L9` prices UI decision · `A13` message builder (wait for Aura's third-rule request).
