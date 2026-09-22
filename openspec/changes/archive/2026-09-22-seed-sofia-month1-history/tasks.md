@@ -19,4 +19,4 @@
 ## 4. Ship
 
 - [x] 4.1 Run the full CI suite locally (`tsc`, `lint`, `test:run`, `build`) and quote the results. No `/security-review` is needed, because the proposal declares no sensitive surface.
-- [ ] 4.2 Open the PR on `task/seed-sofia-month1-history`. The PR states the silent-defect flag: no enum or status unions, money aggregation, cancellation state, migrations, RLS or `CHECK` are touched, only demo data written by the seed. Squash-merge on green CI.
+- [x] 4.2 Open the PR on `task/seed-sofia-month1-history`. The PR states the silent-defect flag: no enum or status unions, money aggregation, cancellation state, migrations, RLS or `CHECK` are touched, only demo data written by the seed. Squash-merge on green CI.
