@@ -28,7 +28,7 @@ Closed work is not summarized here — the durable record is `openspec/changes/a
 | **L8** | Pre-launch verification | M | At the end |
 | **L9** | Admin UI for plans/prices? | L | Decision pending |
 | **A13** | Automated-message builder (own triggers) | L | Nice-to-have, does NOT block launch |
-| **D1–D32** | Deferred / technical debt | — | See below |
+| **D1–D31** | Deferred / technical debt | — | See below |
 
 ---
 
